@@ -25,6 +25,7 @@ class ProyectoController extends Controller
 
     public function list(Request $request)
     {
+        // Usar purchase_orders (solo aprobadas) para calcular gastos
         $projects = DB::table($this->projectsTable)
             ->select([
                 'projects.id',
@@ -38,12 +39,12 @@ class ProyectoController extends Controller
                 'projects.user_id',
                 'projects.created_at',
                 'projects.updated_at',
-                DB::raw('COALESCE(SUM(project_expenses.amount), 0) as spent'),
-                DB::raw('(projects.available_amount - COALESCE(SUM(project_expenses.amount), 0)) as remaining'),
-                DB::raw('CASE WHEN projects.available_amount > 0 THEN (COALESCE(SUM(project_expenses.amount), 0) / projects.available_amount * 100) ELSE 0 END as usage_percent'),
-                DB::raw('COUNT(project_expenses.id) as expense_count')
+                DB::raw("COALESCE(SUM(CASE WHEN purchase_orders.status = 'approved' THEN purchase_orders.amount ELSE 0 END), 0) as spent"),
+                DB::raw("(projects.available_amount - COALESCE(SUM(CASE WHEN purchase_orders.status = 'approved' THEN purchase_orders.amount ELSE 0 END), 0)) as remaining"),
+                DB::raw("CASE WHEN projects.available_amount > 0 THEN (COALESCE(SUM(CASE WHEN purchase_orders.status = 'approved' THEN purchase_orders.amount ELSE 0 END), 0) / projects.available_amount * 100) ELSE 0 END as usage_percent"),
+                DB::raw("SUM(CASE WHEN purchase_orders.status = 'pending' THEN 1 ELSE 0 END) as pending_orders")
             ])
-            ->leftJoin('project_expenses', 'projects.id', '=', 'project_expenses.project_id')
+            ->leftJoin('purchase_orders', 'projects.id', '=', 'purchase_orders.project_id')
             ->groupBy([
                 'projects.id', 'projects.name', 'projects.base_amount', 
                 'projects.total_amount', 'projects.retained_amount',
@@ -85,28 +86,36 @@ class ProyectoController extends Controller
             return response()->json(['success' => false, 'message' => 'Proyecto no encontrado'], 404);
         }
 
-        // Obtener gastos del proyecto
-        $expenses = DB::table($this->expensesTable)
+        // Obtener órdenes de compra del proyecto
+        $orders = DB::table('purchase_orders')
             ->where('project_id', $id)
             ->orderBy('created_at', 'desc')
-            ->get();
+            ->get()
+            ->map(function ($order) {
+                $order->materials = $order->materials ? json_decode($order->materials, true) : [];
+                return $order;
+            });
 
-        // Calcular totales
-        $spent = $expenses->sum('amount');
+        // Calcular totales solo de órdenes aprobadas
+        $approvedOrders = $orders->where('status', 'approved');
+        $spent = $approvedOrders->sum('amount');
         $remaining = $project->available_amount - $spent;
         $usagePercent = $project->available_amount > 0 
             ? ($spent / $project->available_amount * 100) 
             : 0;
 
+        $pendingCount = $orders->where('status', 'pending')->count();
+
         return response()->json([
             'success' => true,
             'project' => $project,
-            'expenses' => $expenses,
+            'orders' => $orders,
             'summary' => [
                 'spent' => $spent,
                 'remaining' => $remaining,
                 'usage_percent' => $usagePercent,
-                'expense_count' => $expenses->count()
+                'total_orders' => $orders->count(),
+                'pending_orders' => $pendingCount
             ]
         ]);
     }
@@ -247,9 +256,14 @@ class ProyectoController extends Controller
         ]);
     }
 
-    // Gastos
+    // Órdenes de Compra / Gastos
 
-    public function addExpense(Request $request, $id)
+    /**
+     * Crear orden de compra (servicio o material)
+     * - Servicios: se aprueban automáticamente
+     * - Materiales: quedan pendientes para aprobación en Compras
+     */
+    public function createPurchaseOrder(Request $request, $id)
     {
         $project = DB::table($this->projectsTable)->find($id);
 
@@ -259,25 +273,54 @@ class ProyectoController extends Controller
 
         $request->validate([
             'description' => 'required|string|max:255',
-            'amount' => 'required|numeric|min:0.01',
+            'type' => 'required|in:service,material',
         ]);
 
+        $type = $request->type;
+        $description = trim($request->description);
+        
         try {
-            $expenseId = DB::table($this->expensesTable)->insertGetId([
+            $orderData = [
                 'project_id' => $id,
-                'description' => trim($request->description),
-                'amount' => floatval($request->amount),
-                'category' => $request->input('category', 'General'),
-                'notes' => $request->input('notes'),
-                'user_id' => auth()->id(),
+                'type' => $type,
+                'description' => $description,
+                'created_by' => auth()->id(),
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]);
+            ];
+
+            if ($type === 'service') {
+                // Servicio: requiere monto, se aprueba automáticamente
+                $request->validate(['amount' => 'required|numeric|min:0.01']);
+                
+                $orderData['amount'] = floatval($request->amount);
+                $orderData['status'] = 'approved';
+                $orderData['approved_by'] = auth()->id();
+                $orderData['approved_at'] = now();
+            } else {
+                // Material: lista de items, queda pendiente
+                $materials = $request->input('materials', []);
+                if (empty($materials)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Debe agregar al menos un material'
+                    ], 400);
+                }
+                
+                $orderData['materials'] = json_encode($materials);
+                $orderData['status'] = 'pending';
+                $orderData['amount'] = null;
+            }
+
+            $orderId = DB::table('purchase_orders')->insertGetId($orderData);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Gasto registrado exitosamente',
-                'expense_id' => $expenseId
+                'message' => $type === 'service' 
+                    ? 'Gasto por servicio registrado' 
+                    : 'Orden de compra creada (pendiente de aprobación)',
+                'order_id' => $orderId,
+                'status' => $orderData['status']
             ]);
         } catch (\Exception $e) {
             return response()->json([

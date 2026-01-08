@@ -223,20 +223,40 @@
             </div>
           </div>
 
-          <!-- Add Expense Section -->
-          <div class="add-expense-section">
-            <h3>Registrar Nuevo Gasto</h3>
-            <form @submit.prevent="addExpense" class="expense-form">
+          <!-- Add Order Section -->
+          <div class="add-order-section">
+            <h3>Registrar Nuevo Gasto / Orden</h3>
+            
+            <!-- Type Tabs -->
+            <div class="order-type-tabs">
+              <button 
+                @click="orderForm.type = 'service'" 
+                :class="{ active: orderForm.type === 'service' }"
+                class="type-tab"
+              >
+                🔧 Gasto por Servicio
+              </button>
+              <button 
+                @click="orderForm.type = 'material'" 
+                :class="{ active: orderForm.type === 'material' }"
+                class="type-tab"
+              >
+                📦 Orden de Materiales
+              </button>
+            </div>
+
+            <!-- Service Form -->
+            <form v-if="orderForm.type === 'service'" @submit.prevent="createOrder" class="order-form">
               <div class="form-row">
                 <input 
-                  v-model="expenseForm.description" 
+                  v-model="orderForm.description" 
                   type="text" 
-                  placeholder="Descripción del gasto"
+                  placeholder="Descripción (ej: Servicio de Taxi)"
                   required
                   class="input-field"
                 />
                 <input 
-                  v-model.number="expenseForm.amount" 
+                  v-model.number="orderForm.amount" 
                   type="number" 
                   step="0.01"
                   min="0.01"
@@ -244,53 +264,97 @@
                   required
                   class="input-field amount"
                 />
-                <select v-model="expenseForm.category" class="input-field category">
-                  <option value="General">General</option>
-                  <option value="Materiales">Materiales</option>
-                  <option value="Mano de Obra">Mano de Obra</option>
-                  <option value="Transporte">Transporte</option>
-                  <option value="Equipos">Equipos</option>
-                  <option value="Otros">Otros</option>
-                </select>
-                <button type="submit" :disabled="addingExpense" class="btn-add-expense">
-                  <span v-if="addingExpense">Guardando...</span>
-                  <span v-else>+ Agregar Gasto</span>
+                <button type="submit" :disabled="creatingOrder" class="btn-add-order service">
+                  <span v-if="creatingOrder">Guardando...</span>
+                  <span v-else>+ Registrar Gasto</span>
                 </button>
               </div>
             </form>
+
+            <!-- Material Form -->
+            <form v-else @submit.prevent="createOrder" class="order-form material-form">
+              <div class="form-group">
+                <input 
+                  v-model="orderForm.description" 
+                  type="text" 
+                  placeholder="Descripción de la orden (ej: Materiales de construcción)"
+                  required
+                  class="input-field"
+                />
+              </div>
+              
+              <div class="materials-input">
+                <label>Materiales a comprar:</label>
+                <div class="material-add-row">
+                  <input 
+                    v-model="newMaterial" 
+                    type="text" 
+                    placeholder="Agregar material..."
+                    @keyup.enter.prevent="addMaterial"
+                    class="input-field"
+                  />
+                  <button type="button" @click="addMaterial" class="btn-add-material">+</button>
+                </div>
+                
+                <ul v-if="orderForm.materials.length" class="materials-list-input">
+                  <li v-for="(mat, idx) in orderForm.materials" :key="idx">
+                    <span>{{ mat }}</span>
+                    <button type="button" @click="removeMaterial(idx)" class="btn-remove-material">×</button>
+                  </li>
+                </ul>
+                <p v-else class="materials-hint">Agregue los materiales que necesita comprar</p>
+              </div>
+
+              <button type="submit" :disabled="creatingOrder || orderForm.materials.length === 0" class="btn-add-order material">
+                <span v-if="creatingOrder">Enviando...</span>
+                <span v-else>📤 Enviar para Aprobación</span>
+              </button>
+              <p class="order-hint">* La orden se enviará a Compras para asignar precio y aprobar</p>
+            </form>
           </div>
 
-          <!-- Expenses List -->
-          <div class="expenses-section">
-            <h3>Historial de Gastos ({{ detailData.expenses?.length || 0 }})</h3>
+          <!-- Orders List -->
+          <div class="orders-section">
+            <h3>Órdenes y Gastos ({{ detailData.orders?.length || 0 }})</h3>
             
-            <div v-if="detailData.expenses?.length === 0" class="empty-expenses">
-              <p>No hay gastos registrados en este proyecto</p>
+            <div v-if="detailData.orders?.length === 0" class="empty-orders">
+              <p>No hay órdenes registradas en este proyecto</p>
             </div>
 
-            <div v-else class="expenses-table">
+            <div v-else class="orders-table">
               <table>
                 <thead>
                   <tr>
                     <th>Fecha</th>
+                    <th>Tipo</th>
                     <th>Descripción</th>
-                    <th>Categoría</th>
+                    <th>Estado</th>
                     <th>Monto</th>
-                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="expense in detailData.expenses" :key="expense.id">
-                    <td>{{ formatDate(expense.created_at) }}</td>
-                    <td>{{ expense.description }}</td>
-                    <td><span class="category-badge">{{ expense.category }}</span></td>
-                    <td class="amount-cell">S/ {{ formatNumber(expense.amount) }}</td>
+                  <tr v-for="order in detailData.orders" :key="order.id" :class="'row-' + order.status">
+                    <td>{{ formatDate(order.created_at) }}</td>
                     <td>
-                      <button @click="deleteExpense(expense.id)" class="btn-delete-expense">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                      <span class="type-badge" :class="order.type">
+                        {{ order.type === 'service' ? '🔧 Servicio' : '📦 Materiales' }}
+                      </span>
+                    </td>
+                    <td>
+                      {{ order.description }}
+                      <ul v-if="order.materials?.length" class="materials-inline">
+                        <li v-for="(mat, idx) in order.materials" :key="idx">{{ mat }}</li>
+                      </ul>
+                    </td>
+                    <td>
+                      <span class="status-badge" :class="order.status">
+                        {{ order.status === 'approved' ? '✓ Aprobado' : order.status === 'pending' ? '🕐 Pendiente' : '✗ Rechazado' }}
+                      </span>
+                    </td>
+                    <td class="amount-cell">
+                      <span v-if="order.status === 'approved'">S/ {{ formatNumber(order.amount) }}</span>
+                      <span v-else-if="order.status === 'pending'" class="pending-amount">Por asignar</span>
+                      <span v-else class="rejected-amount">-</span>
                     </td>
                   </tr>
                 </tbody>
@@ -412,13 +476,14 @@ const isDarkMode = ref(false);
 const activeTab = ref('list');
 const loading = ref(false);
 const saving = ref(false);
-const addingExpense = ref(false);
+const creatingOrder = ref(false);
 const showCreateModal = ref(false);
 const errorMessage = ref('');
 const projects = ref([]);
 const selectedProject = ref(null);
-const detailData = ref({ expenses: [], summary: {} });
+const detailData = ref({ orders: [], summary: {} });
 const toast = ref({ show: false, message: '', type: 'success' });
+const newMaterial = ref('');
 
 const stats = ref({
   total_projects: 0,
@@ -441,10 +506,11 @@ const preview = ref({
   available: 0
 });
 
-const expenseForm = ref({
+const orderForm = ref({
+  type: 'service',
   description: '',
   amount: 0,
-  category: 'General'
+  materials: []
 });
 
 // Get module name dynamically
@@ -548,7 +614,7 @@ const loadProjectDetail = async (id) => {
     const data = await res.json();
     if (data.success) {
       detailData.value = {
-        expenses: data.expenses || [],
+        orders: data.orders || [],
         summary: data.summary || {}
       };
     }
@@ -605,58 +671,76 @@ const createProject = async () => {
   }
 };
 
-const addExpense = async () => {
-  if (!expenseForm.value.description.trim() || expenseForm.value.amount <= 0) {
-    showToast('Complete todos los campos', 'error');
+// Material helpers
+const addMaterial = () => {
+  const mat = newMaterial.value.trim();
+  if (mat && !orderForm.value.materials.includes(mat)) {
+    orderForm.value.materials.push(mat);
+    newMaterial.value = '';
+  }
+};
+
+const removeMaterial = (idx) => {
+  orderForm.value.materials.splice(idx, 1);
+};
+
+// Create order (service or material)
+const createOrder = async () => {
+  if (!orderForm.value.description.trim()) {
+    showToast('Ingrese una descripción', 'error');
+    return;
+  }
+
+  if (orderForm.value.type === 'service' && orderForm.value.amount <= 0) {
+    showToast('Ingrese un monto válido', 'error');
+    return;
+  }
+
+  if (orderForm.value.type === 'material' && orderForm.value.materials.length === 0) {
+    showToast('Agregue al menos un material', 'error');
     return;
   }
 
   try {
-    addingExpense.value = true;
+    creatingOrder.value = true;
 
-    const res = await fetchWithCsrf(`${apiBase.value}/${selectedProject.value.id}/expense`, {
+    const payload = {
+      type: orderForm.value.type,
+      description: orderForm.value.description
+    };
+
+    if (orderForm.value.type === 'service') {
+      payload.amount = orderForm.value.amount;
+    } else {
+      payload.materials = orderForm.value.materials;
+    }
+
+    const res = await fetchWithCsrf(`${apiBase.value}/${selectedProject.value.id}/order`, {
       method: 'POST',
-      body: JSON.stringify(expenseForm.value)
+      body: JSON.stringify(payload)
     });
 
     const data = await res.json();
 
     if (data.success) {
-      showToast('Gasto registrado', 'success');
-      expenseForm.value = { description: '', amount: 0, category: 'General' };
+      const msg = orderForm.value.type === 'service' 
+        ? 'Gasto por servicio registrado' 
+        : 'Orden enviada para aprobación';
+      showToast(msg, 'success');
+      
+      // Reset form
+      orderForm.value = { type: 'service', description: '', amount: 0, materials: [] };
+      
       await loadProjectDetail(selectedProject.value.id);
       await loadStats();
       await loadProjects();
     } else {
-      showToast(data.message || 'Error al registrar gasto', 'error');
+      showToast(data.message || 'Error al crear orden', 'error');
     }
   } catch (e) {
     showToast('Error de conexión', 'error');
   } finally {
-    addingExpense.value = false;
-  }
-};
-
-const deleteExpense = async (expenseId) => {
-  if (!confirm('¿Eliminar este gasto?')) return;
-
-  try {
-    const res = await fetchWithCsrf(`${apiBase.value}/${selectedProject.value.id}/expense/${expenseId}`, {
-      method: 'DELETE'
-    });
-
-    const data = await res.json();
-
-    if (data.success) {
-      showToast('Gasto eliminado', 'success');
-      await loadProjectDetail(selectedProject.value.id);
-      await loadStats();
-      await loadProjects();
-    } else {
-      showToast(data.message || 'Error', 'error');
-    }
-  } catch (e) {
-    showToast('Error de conexión', 'error');
+    creatingOrder.value = false;
   }
 };
 
@@ -1198,23 +1282,56 @@ onMounted(() => {
 .text-warning { color: #f59e0b; }
 .text-success { color: #10b981; }
 
-/* Add Expense Section */
-.add-expense-section {
+/* Add Order Section */
+.add-order-section {
   background: rgba(255, 255, 255, 0.1);
   padding: 24px;
   border-radius: 16px;
   margin-bottom: 30px;
 }
 
-.add-expense-section h3 {
+.add-order-section h3 {
   font-size: 1rem;
   margin: 0 0 16px 0;
 }
 
-.expense-form .form-row {
+.order-type-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.type-tab {
+  flex: 1;
+  padding: 12px 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid transparent;
+  border-radius: 12px;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-align: center;
+  font-weight: 500;
+}
+
+.type-tab:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.type-tab.active {
+  background: rgba(235, 160, 89, 0.2);
+  border-color: #eba059;
+  color: #eba059;
+}
+
+.order-form .form-row {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.order-form .form-group {
+  margin-bottom: 16px;
 }
 
 .input-field {
@@ -1236,84 +1353,194 @@ onMounted(() => {
   max-width: 150px;
 }
 
-.input-field.category {
-  max-width: 180px;
+.materials-input {
+  margin-bottom: 20px;
 }
 
-.btn-add-expense {
-  padding: 12px 24px;
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+.materials-input label {
+  display: block;
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.material-add-row {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-add-material {
+  padding: 12px 20px;
+  background: rgba(59, 130, 246, 0.3);
   border: none;
   border-radius: 10px;
+  color: #60a5fa;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-add-material:hover {
+  background: rgba(59, 130, 246, 0.4);
+}
+
+.materials-list-input {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.materials-list-input li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(59, 130, 246, 0.2);
+  border-radius: 20px;
+  font-size: 0.9rem;
+}
+
+.btn-remove-material {
+  background: none;
+  border: none;
+  color: #ef4444;
+  font-size: 1.2rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
+
+.materials-hint {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 10px;
+}
+
+.btn-add-order {
+  padding: 14px 28px;
+  border: none;
+  border-radius: 12px;
   color: #fff;
   font-weight: 600;
   cursor: pointer;
-  white-space: nowrap;
+  transition: all 0.3s;
 }
 
-/* Expenses Section */
-.expenses-section h3 {
+.btn-add-order.service {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.btn-add-order.material {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  width: 100%;
+}
+
+.btn-add-order:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.order-hint {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 10px;
+  text-align: center;
+}
+
+/* Orders Section */
+.orders-section h3 {
   font-size: 1rem;
   margin: 0 0 16px 0;
 }
 
-.empty-expenses {
+.empty-orders {
   text-align: center;
   padding: 40px;
   color: rgba(255, 255, 255, 0.6);
 }
 
-.expenses-table {
+.orders-table {
   overflow-x: auto;
 }
 
-.expenses-table table {
+.orders-table table {
   width: 100%;
   border-collapse: collapse;
 }
 
-.expenses-table th,
-.expenses-table td {
+.orders-table th,
+.orders-table td {
   padding: 12px 16px;
   text-align: left;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.expenses-table th {
+.orders-table th {
   font-size: 0.8rem;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.6);
   text-transform: uppercase;
 }
 
-.expenses-table td {
+.orders-table td {
   font-size: 0.95rem;
 }
 
-.category-badge {
+.orders-table tr.row-pending {
+  background: rgba(245, 158, 11, 0.05);
+}
+
+.orders-table tr.row-rejected {
+  opacity: 0.5;
+}
+
+.type-badge {
   padding: 4px 10px;
-  background: rgba(235, 160, 89, 0.2);
   border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.type-badge.service { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
+.type-badge.material { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+
+.status-badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.status-badge.approved { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+.status-badge.pending { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+.status-badge.rejected { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+
+.materials-inline {
+  list-style: none;
+  padding: 4px 0 0 0;
+  margin: 0;
   font-size: 0.8rem;
-  color: #eba059;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.materials-inline li::before {
+  content: "• ";
 }
 
 .amount-cell {
   font-weight: 600;
 }
 
-.btn-delete-expense {
-  background: none;
-  border: none;
-  color: #ef4444;
-  cursor: pointer;
-  padding: 4px;
-  opacity: 0.6;
-  transition: opacity 0.3s;
+.pending-amount {
+  color: #f59e0b;
+  font-style: italic;
 }
 
-.btn-delete-expense:hover {
-  opacity: 1;
+.rejected-amount {
+  color: #ef4444;
 }
 
 .btn-delete-expense svg {
