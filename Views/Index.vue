@@ -352,7 +352,14 @@
                       </span>
                     </td>
                     <td class="amount-cell">
-                      <span v-if="order.status === 'approved'">S/ {{ formatNumber(order.amount) }}</span>
+                      <div v-if="order.status === 'approved'" class="amount-approved-wrap">
+                        <span class="currency-badge" :class="order.currency || 'PEN'">{{ order.currency || 'PEN' }}</span>
+                        <span>{{ order.currency === 'USD' ? '$' : 'S/' }} {{ formatNumber(order.amount) }}</span>
+                        <div v-if="order.currency === 'USD' && order.exchange_rate" class="exchange-info-small">
+                          <span>T.C: {{ parseFloat(order.exchange_rate).toFixed(4) }}</span>
+                          <span>= S/ {{ formatNumber(order.amount_pen) }}</span>
+                        </div>
+                      </div>
                       <span v-else-if="order.status === 'pending'" class="pending-amount">Por asignar</span>
                       <span v-else class="rejected-amount">-</span>
                     </td>
@@ -1532,6 +1539,32 @@ onMounted(() => {
 
 .amount-cell {
   font-weight: 600;
+}
+
+.amount-approved-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.currency-badge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  margin-right: 6px;
+}
+
+.currency-badge.PEN { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+.currency-badge.USD { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+
+.exchange-info-small {
+  display: flex;
+  gap: 6px;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 400;
 }
 
 .pending-amount {
