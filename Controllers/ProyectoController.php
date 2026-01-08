@@ -1,6 +1,6 @@
 <?php
 
-namespace Modulos_ERP\proyectos_krsft\Controllers;
+namespace Modulos_ERP\ProyectosKrsft\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
