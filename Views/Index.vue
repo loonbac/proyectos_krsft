@@ -456,6 +456,22 @@ const getModuleName = () => {
 
 const apiBase = computed(() => `/api/${getModuleName()}`);
 
+// Get CSRF token from meta tag
+const getCsrfToken = () => {
+  return document.querySelector('meta[name="csrf-token"]')?.content || '';
+};
+
+// Helper for fetch with CSRF
+const fetchWithCsrf = (url, options = {}) => {
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'X-CSRF-TOKEN': getCsrfToken(),
+    ...options.headers
+  };
+  return fetch(url, { ...options, headers });
+};
+
 // Methods
 const goBack = () => {
   window.location.href = '/';
@@ -566,9 +582,8 @@ const createProject = async () => {
     saving.value = true;
     errorMessage.value = '';
 
-    const res = await fetch(`${apiBase.value}/create`, {
+    const res = await fetchWithCsrf(`${apiBase.value}/create`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(form.value)
     });
 
@@ -599,9 +614,8 @@ const addExpense = async () => {
   try {
     addingExpense.value = true;
 
-    const res = await fetch(`${apiBase.value}/${selectedProject.value.id}/expense`, {
+    const res = await fetchWithCsrf(`${apiBase.value}/${selectedProject.value.id}/expense`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(expenseForm.value)
     });
 
@@ -627,7 +641,7 @@ const deleteExpense = async (expenseId) => {
   if (!confirm('¿Eliminar este gasto?')) return;
 
   try {
-    const res = await fetch(`${apiBase.value}/${selectedProject.value.id}/expense/${expenseId}`, {
+    const res = await fetchWithCsrf(`${apiBase.value}/${selectedProject.value.id}/expense/${expenseId}`, {
       method: 'DELETE'
     });
 
@@ -650,7 +664,7 @@ const confirmDelete = async (project) => {
   if (!confirm(`¿Eliminar el proyecto "${project.name}"? Esta acción no se puede deshacer.`)) return;
 
   try {
-    const res = await fetch(`${apiBase.value}/${project.id}`, { method: 'DELETE' });
+    const res = await fetchWithCsrf(`${apiBase.value}/${project.id}`, { method: 'DELETE' });
     const data = await res.json();
 
     if (data.success) {
