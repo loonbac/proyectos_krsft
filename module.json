@@ -1,11 +1,16 @@
 {
     "name": "ProyectosKrsft",
     "display_name": "Gestión de Proyectos",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "description": "Sistema completo de gestión de proyectos con tracking de presupuesto, gastos, tiempo y estados. Permite crear, editar y hacer seguimiento de proyectos empresariales con cálculo automático de IGV y retenciones.",
     "icon": "briefcase",
-    "gradient": "linear-gradient(135deg, #eba059, #d97706)",
+    "color": "#f59e0b",
+    "gradient": "linear-gradient(135deg, #f59e0b, #d97706)",
     "author": "loonbac21",
     "enabled": true,
+    "allowed_cargos": [
+        "Sub-Gerente",
+        "Jefe de Proyectos"
+    ],
     "dependencies": []
 }
