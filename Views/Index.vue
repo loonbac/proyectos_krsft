@@ -89,10 +89,10 @@
               <div 
                 class="progress-fill"
                 :class="project.status_label"
-                :style="{ width: Math.min(project.usage_percent || 0, 100) + '%' }"
+                :style="{ width: Math.min(parseFloat(project.usage_percent) || 0, 100) + '%' }"
               ></div>
             </div>
-            <small>{{ (project.usage_percent || 0).toFixed(1) }}% utilizado</small>
+            <small>{{ parseFloat(project.usage_percent || 0).toFixed(1) }}% utilizado</small>
           </div>
         </div>
 
