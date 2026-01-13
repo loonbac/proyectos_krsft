@@ -12,14 +12,58 @@ class ProyectoController extends Controller
     protected $projectsTable = 'projects';
     protected $expensesTable = 'project_expenses';
 
-    // Constantes de cálculo
     const RETENTION_RATE = 0.12;
     const AVAILABLE_RATE = 0.88;
 
     public function index()
     {
         $moduleName = basename(dirname(__DIR__));
-        return Inertia::render("{$moduleName}/Index");
+        $userInfo = $this->getUserRoleInfo();
+        
+        return Inertia::render("{$moduleName}/Index", [
+            'userRole' => $userInfo['role'],
+            'isSupervisor' => $userInfo['isSupervisor'],
+            'trabajadorId' => $userInfo['trabajadorId']
+        ]);
+    }
+
+    /**
+     * Determine user role and supervisor status
+     */
+    protected function getUserRoleInfo(): array
+    {
+        $user = auth()->user();
+        
+        if (!$user) {
+            return ['role' => 'guest', 'isSupervisor' => false, 'trabajadorId' => null];
+        }
+
+        // Admin always has full access
+        if ($user->role === 'admin') {
+            return ['role' => 'admin', 'isSupervisor' => false, 'trabajadorId' => $user->trabajador_id];
+        }
+
+        // Check if user has linked trabajador with cargo
+        if ($user->trabajador_id && DB::getSchemaBuilder()->hasTable('trabajadores')) {
+            $trabajador = DB::table('trabajadores')->find($user->trabajador_id);
+            
+            if ($trabajador) {
+                $cargo = mb_strtolower(trim($trabajador->cargo ?? ''), 'UTF-8');
+                
+                // Check for supervisor cargo
+                if (str_contains($cargo, 'supervisor')) {
+                    return ['role' => 'supervisor', 'isSupervisor' => true, 'trabajadorId' => $user->trabajador_id];
+                }
+                
+                // Check for sub-gerente or jefe de proyectos
+                if (str_contains($cargo, 'sub-gerente') || str_contains($cargo, 'subgerente') || 
+                    str_contains($cargo, 'jefe de proyectos') || str_contains($cargo, 'gerente')) {
+                    return ['role' => 'manager', 'isSupervisor' => false, 'trabajadorId' => $user->trabajador_id];
+                }
+            }
+        }
+
+        return ['role' => 'user', 'isSupervisor' => false, 'trabajadorId' => $user->trabajador_id ?? null];
     }
 
     /**
@@ -28,41 +72,51 @@ class ProyectoController extends Controller
     public function getSupervisors()
     {
         try {
-            // Check if trabajadores table exists
             if (!DB::getSchemaBuilder()->hasTable('trabajadores')) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Tabla de trabajadores no existe',
-                    'supervisors' => []
-                ]);
+                return response()->json(['success' => false, 'supervisors' => []]);
             }
 
             $supervisors = DB::table('trabajadores')
                 ->where('estado', 'LIKE', '%activo%')
                 ->where(function($query) {
                     $query->where('cargo', 'LIKE', '%supervisor%')
-                          ->orWhere('cargo', 'LIKE', '%Supervisor%')
-                          ->orWhere('cargo', 'LIKE', '%SUPERVISOR%');
+                          ->orWhere('cargo', 'LIKE', '%Supervisor%');
                 })
                 ->orderBy('nombre_completo')
                 ->get(['id', 'nombre_completo', 'cargo', 'dni', 'email']);
 
-            return response()->json([
-                'success' => true,
-                'supervisors' => $supervisors
-            ]);
+            return response()->json(['success' => true, 'supervisors' => $supervisors]);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error: ' . $e->getMessage(),
-                'supervisors' => []
-            ]);
+            return response()->json(['success' => false, 'supervisors' => [], 'message' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Get all workers (for supervisor to assign to project)
+     */
+    public function getAllWorkers()
+    {
+        try {
+            if (!DB::getSchemaBuilder()->hasTable('trabajadores')) {
+                return response()->json(['success' => false, 'workers' => []]);
+            }
+
+            $workers = DB::table('trabajadores')
+                ->where('estado', 'LIKE', '%activo%')
+                ->orderBy('nombre_completo')
+                ->get(['id', 'nombre_completo', 'cargo', 'dni']);
+
+            return response()->json(['success' => true, 'workers' => $workers]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'workers' => [], 'message' => $e->getMessage()]);
         }
     }
 
     public function list(Request $request)
     {
-        $projects = DB::table($this->projectsTable)
+        $userInfo = $this->getUserRoleInfo();
+        
+        $query = DB::table($this->projectsTable)
             ->select([
                 'projects.id',
                 'projects.name',
@@ -88,21 +142,25 @@ class ProyectoController extends Controller
             ])
             ->leftJoin('purchase_orders', 'projects.id', '=', 'purchase_orders.project_id')
             ->leftJoin('trabajadores', 'projects.supervisor_id', '=', 'trabajadores.id')
-            ->leftJoin('users', 'projects.user_id', '=', 'users.id')
-            ->groupBy([
+            ->leftJoin('users', 'projects.user_id', '=', 'users.id');
+
+        // If supervisor, only show their assigned projects
+        if ($userInfo['isSupervisor'] && $userInfo['trabajadorId']) {
+            $query->where('projects.supervisor_id', $userInfo['trabajadorId']);
+        }
+
+        $projects = $query->groupBy([
                 'projects.id', 'projects.name', 'projects.currency', 'projects.base_amount', 
                 'projects.total_amount', 'projects.retained_amount',
                 'projects.available_amount', 'projects.spending_threshold',
                 'projects.igv_enabled', 'projects.igv_rate', 'projects.supervisor_id',
                 'projects.status', 'projects.user_id', 
                 'projects.created_at', 'projects.updated_at',
-                'trabajadores.nombre_completo',
-                'users.name'
+                'trabajadores.nombre_completo', 'users.name'
             ])
             ->orderBy('projects.created_at', 'desc')
             ->get();
 
-        // Agregar estado visual
         $projects = $projects->map(function ($project) {
             $usagePercent = floatval($project->usage_percent ?? 0);
             $threshold = $project->spending_threshold ?? 75;
@@ -121,7 +179,9 @@ class ProyectoController extends Controller
         return response()->json([
             'success' => true,
             'projects' => $projects,
-            'total' => $projects->count()
+            'total' => $projects->count(),
+            'userRole' => $userInfo['role'],
+            'isSupervisor' => $userInfo['isSupervisor']
         ]);
     }
 
@@ -137,7 +197,7 @@ class ProyectoController extends Controller
             return response()->json(['success' => false, 'message' => 'Proyecto no encontrado'], 404);
         }
 
-        // Obtener órdenes de compra del proyecto
+        // Get purchase orders
         $orders = DB::table('purchase_orders')
             ->where('project_id', $id)
             ->orderBy('created_at', 'desc')
@@ -147,7 +207,13 @@ class ProyectoController extends Controller
                 return $order;
             });
 
-        // Calcular totales solo de órdenes aprobadas
+        // Get assigned workers
+        $workers = DB::table('project_workers')
+            ->join('trabajadores', 'project_workers.trabajador_id', '=', 'trabajadores.id')
+            ->where('project_workers.project_id', $id)
+            ->select('trabajadores.id', 'trabajadores.nombre_completo', 'trabajadores.cargo', 'trabajadores.dni')
+            ->get();
+
         $approvedOrders = $orders->where('status', 'approved');
         $spent = $approvedOrders->sum('amount');
         $remaining = $project->available_amount - $spent;
@@ -155,20 +221,123 @@ class ProyectoController extends Controller
             ? ($spent / $project->available_amount * 100) 
             : 0;
 
-        $pendingCount = $orders->where('status', 'pending')->count();
-
         return response()->json([
             'success' => true,
             'project' => $project,
             'orders' => $orders,
+            'workers' => $workers,
             'summary' => [
                 'spent' => $spent,
                 'remaining' => $remaining,
                 'usage_percent' => $usagePercent,
                 'total_orders' => $orders->count(),
-                'pending_orders' => $pendingCount
+                'pending_orders' => $orders->where('status', 'pending')->count()
             ]
         ]);
+    }
+
+    /**
+     * Add worker to project
+     */
+    public function addWorker(Request $request, $projectId)
+    {
+        $request->validate(['trabajador_id' => 'required|integer']);
+
+        try {
+            // Check if already assigned
+            $exists = DB::table('project_workers')
+                ->where('project_id', $projectId)
+                ->where('trabajador_id', $request->trabajador_id)
+                ->exists();
+
+            if ($exists) {
+                return response()->json(['success' => false, 'message' => 'Trabajador ya asignado']);
+            }
+
+            DB::table('project_workers')->insert([
+                'project_id' => $projectId,
+                'trabajador_id' => $request->trabajador_id,
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
+
+            return response()->json(['success' => true, 'message' => 'Trabajador agregado']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Remove worker from project
+     */
+    public function removeWorker($projectId, $trabajadorId)
+    {
+        try {
+            DB::table('project_workers')
+                ->where('project_id', $projectId)
+                ->where('trabajador_id', $trabajadorId)
+                ->delete();
+
+            return response()->json(['success' => true, 'message' => 'Trabajador removido']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Create purchase order (for supervisors to send to Compras)
+     */
+    public function createPurchaseOrder(Request $request, $id)
+    {
+        $project = DB::table($this->projectsTable)->find($id);
+
+        if (!$project) {
+            return response()->json(['success' => false, 'message' => 'Proyecto no encontrado'], 404);
+        }
+
+        $request->validate([
+            'description' => 'required|string|max:255',
+            'type' => 'required|in:service,material',
+        ]);
+
+        try {
+            $orderData = [
+                'project_id' => $id,
+                'type' => $request->type,
+                'description' => trim($request->description),
+                'currency' => $project->currency ?? 'PEN',
+                'created_by' => auth()->id(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+
+            if ($request->type === 'service') {
+                $request->validate(['amount' => 'required|numeric|min:0.01']);
+                $orderData['amount'] = floatval($request->amount);
+                $orderData['status'] = 'approved';
+                $orderData['approved_by'] = auth()->id();
+                $orderData['approved_at'] = now();
+            } else {
+                $materials = $request->input('materials', []);
+                if (empty($materials)) {
+                    return response()->json(['success' => false, 'message' => 'Agregue materiales'], 400);
+                }
+                $orderData['materials'] = json_encode($materials);
+                $orderData['status'] = 'pending';
+            }
+
+            $orderId = DB::table('purchase_orders')->insertGetId($orderData);
+
+            return response()->json([
+                'success' => true,
+                'message' => $request->type === 'service' 
+                    ? 'Gasto registrado' 
+                    : 'Orden enviada a Compras para aprobación',
+                'order_id' => $orderId
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
     }
 
     public function store(Request $request)
@@ -188,7 +357,6 @@ class ProyectoController extends Controller
             $spendingThreshold = intval($request->input('threshold', 75));
             $supervisorId = intval($request->supervisor_id);
 
-            // Calcular montos
             $totalAmount = $igvEnabled ? $baseAmount * (1 + ($igvRate / 100)) : $baseAmount;
             $retainedAmount = $totalAmount * self::RETENTION_RATE;
             $availableAmount = $totalAmount * self::AVAILABLE_RATE;
@@ -210,16 +378,9 @@ class ProyectoController extends Controller
                 'updated_at' => now(),
             ]);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Proyecto creado exitosamente',
-                'project_id' => $id
-            ]);
+            return response()->json(['success' => true, 'message' => 'Proyecto creado', 'project_id' => $id]);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
-            ], 500);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
@@ -234,35 +395,14 @@ class ProyectoController extends Controller
         try {
             $data = ['updated_at' => now()];
             
-            if ($request->has('name')) {
-                $data['name'] = trim($request->name);
-            }
-            
-            if ($request->has('currency')) {
-                $data['currency'] = $request->currency;
-            }
-            
-            if ($request->has('spending_threshold')) {
-                $data['spending_threshold'] = intval($request->spending_threshold);
-            }
-            
-            if ($request->has('igv_enabled')) {
-                $data['igv_enabled'] = $request->boolean('igv_enabled');
-            }
-            
-            if ($request->has('igv_rate')) {
-                $data['igv_rate'] = floatval($request->igv_rate);
-            }
-            
-            if ($request->has('supervisor_id')) {
-                $data['supervisor_id'] = intval($request->supervisor_id);
-            }
-            
-            if ($request->has('status')) {
-                $data['status'] = $request->status;
-            }
+            if ($request->has('name')) $data['name'] = trim($request->name);
+            if ($request->has('currency')) $data['currency'] = $request->currency;
+            if ($request->has('spending_threshold')) $data['spending_threshold'] = intval($request->spending_threshold);
+            if ($request->has('igv_enabled')) $data['igv_enabled'] = $request->boolean('igv_enabled');
+            if ($request->has('igv_rate')) $data['igv_rate'] = floatval($request->igv_rate);
+            if ($request->has('supervisor_id')) $data['supervisor_id'] = intval($request->supervisor_id);
+            if ($request->has('status')) $data['status'] = $request->status;
 
-            // Recalcular montos si se cambia amount o igv
             if ($request->has('amount')) {
                 $baseAmount = floatval($request->amount);
                 $igvEnabled = $request->has('igv_enabled') ? $request->boolean('igv_enabled') : $project->igv_enabled;
@@ -277,49 +417,39 @@ class ProyectoController extends Controller
 
             DB::table($this->projectsTable)->where('id', $id)->update($data);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Proyecto actualizado exitosamente'
-            ]);
+            return response()->json(['success' => true, 'message' => 'Proyecto actualizado']);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
-            ], 500);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
     public function destroy($id)
     {
-        $project = DB::table($this->projectsTable)->find($id);
-
-        if (!$project) {
-            return response()->json(['success' => false, 'message' => 'Proyecto no encontrado'], 404);
-        }
-
         try {
+            DB::table('project_workers')->where('project_id', $id)->delete();
             DB::table($this->expensesTable)->where('project_id', $id)->delete();
             DB::table('purchase_orders')->where('project_id', $id)->delete();
             DB::table($this->projectsTable)->where('id', $id)->delete();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Proyecto eliminado exitosamente'
-            ]);
+            return response()->json(['success' => true, 'message' => 'Proyecto eliminado']);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
-            ], 500);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
     public function stats()
     {
-        $totalProjects = DB::table($this->projectsTable)->count();
-        $totalBudget = DB::table($this->projectsTable)->sum('available_amount');
-        $totalSpent = DB::table($this->expensesTable)->sum('amount');
-        $activeProjects = DB::table($this->projectsTable)->where('status', 'active')->count();
+        $userInfo = $this->getUserRoleInfo();
+        
+        $query = DB::table($this->projectsTable);
+        
+        if ($userInfo['isSupervisor'] && $userInfo['trabajadorId']) {
+            $query->where('supervisor_id', $userInfo['trabajadorId']);
+        }
+
+        $totalProjects = $query->count();
+        $totalBudget = $query->sum('available_amount');
+        $activeProjects = $query->where('status', 'active')->count();
 
         return response()->json([
             'success' => true,
@@ -327,10 +457,9 @@ class ProyectoController extends Controller
                 'total_projects' => $totalProjects,
                 'active_projects' => $activeProjects,
                 'total_budget' => $totalBudget,
-                'total_spent' => $totalSpent,
-                'total_remaining' => $totalBudget - $totalSpent
+                'total_spent' => 0,
+                'total_remaining' => $totalBudget
             ]
         ]);
     }
 }
-

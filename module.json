@@ -1,7 +1,7 @@
 {
     "name": "ProyectosKrsft",
     "display_name": "Gestión de Proyectos",
-    "version": "2.0.3",
+    "version": "3.0.0",
     "description": "Sistema completo de gestión de proyectos con tracking de presupuesto, gastos, tiempo y estados. Permite crear, editar y hacer seguimiento de proyectos empresariales con cálculo automático de IGV y retenciones.",
     "icon": "briefcase",
     "color": "#f59e0b",
