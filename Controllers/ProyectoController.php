@@ -80,6 +80,7 @@ class ProyectoController extends Controller
                 'projects.created_at',
                 'projects.updated_at',
                 'trabajadores.nombre_completo as supervisor_name',
+                'users.name as creator_name',
                 DB::raw("COALESCE(SUM(CASE WHEN purchase_orders.status = 'approved' THEN purchase_orders.amount ELSE 0 END), 0) as spent"),
                 DB::raw("(projects.available_amount - COALESCE(SUM(CASE WHEN purchase_orders.status = 'approved' THEN purchase_orders.amount ELSE 0 END), 0)) as remaining"),
                 DB::raw("CASE WHEN projects.available_amount > 0 THEN (COALESCE(SUM(CASE WHEN purchase_orders.status = 'approved' THEN purchase_orders.amount ELSE 0 END), 0) / projects.available_amount * 100) ELSE 0 END as usage_percent"),
@@ -87,6 +88,7 @@ class ProyectoController extends Controller
             ])
             ->leftJoin('purchase_orders', 'projects.id', '=', 'purchase_orders.project_id')
             ->leftJoin('trabajadores', 'projects.supervisor_id', '=', 'trabajadores.id')
+            ->leftJoin('users', 'projects.user_id', '=', 'users.id')
             ->groupBy([
                 'projects.id', 'projects.name', 'projects.currency', 'projects.base_amount', 
                 'projects.total_amount', 'projects.retained_amount',
@@ -94,7 +96,8 @@ class ProyectoController extends Controller
                 'projects.igv_enabled', 'projects.igv_rate', 'projects.supervisor_id',
                 'projects.status', 'projects.user_id', 
                 'projects.created_at', 'projects.updated_at',
-                'trabajadores.nombre_completo'
+                'trabajadores.nombre_completo',
+                'users.name'
             ])
             ->orderBy('projects.created_at', 'desc')
             ->get();

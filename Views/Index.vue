@@ -93,6 +93,10 @@
               ></div>
             </div>
             <small>{{ parseFloat(project.usage_percent || 0).toFixed(1) }}% utilizado</small>
+
+            <div class="project-footer">
+              <span>Creado por: {{ project.creator_name || 'Desconocido' }}</span>
+            </div>
           </div>
         </div>
 
