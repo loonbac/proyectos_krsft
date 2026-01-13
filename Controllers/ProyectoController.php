@@ -135,9 +135,9 @@ class ProyectoController extends Controller
                 'projects.updated_at',
                 'trabajadores.nombre_completo as supervisor_name',
                 'users.name as creator_name',
-                DB::raw("COALESCE(SUM(CASE WHEN purchase_orders.status = 'approved' THEN purchase_orders.amount ELSE 0 END), 0) as spent"),
-                DB::raw("(projects.available_amount - COALESCE(SUM(CASE WHEN purchase_orders.status = 'approved' THEN purchase_orders.amount ELSE 0 END), 0)) as remaining"),
-                DB::raw("CASE WHEN projects.available_amount > 0 THEN (COALESCE(SUM(CASE WHEN purchase_orders.status = 'approved' THEN purchase_orders.amount ELSE 0 END), 0) / projects.available_amount * 100) ELSE 0 END as usage_percent"),
+                DB::raw("COALESCE(SUM(CASE WHEN purchase_orders.status = 'approved' THEN COALESCE(purchase_orders.amount_pen, purchase_orders.amount) ELSE 0 END), 0) as spent"),
+                DB::raw("(projects.available_amount - COALESCE(SUM(CASE WHEN purchase_orders.status = 'approved' THEN COALESCE(purchase_orders.amount_pen, purchase_orders.amount) ELSE 0 END), 0)) as remaining"),
+                DB::raw("CASE WHEN projects.available_amount > 0 THEN (COALESCE(SUM(CASE WHEN purchase_orders.status = 'approved' THEN COALESCE(purchase_orders.amount_pen, purchase_orders.amount) ELSE 0 END), 0) / projects.available_amount * 100) ELSE 0 END as usage_percent"),
                 DB::raw("SUM(CASE WHEN purchase_orders.status = 'pending' THEN 1 ELSE 0 END) as pending_orders")
             ])
             ->leftJoin('purchase_orders', 'projects.id', '=', 'purchase_orders.project_id')
@@ -215,7 +215,10 @@ class ProyectoController extends Controller
             ->get();
 
         $approvedOrders = $orders->where('status', 'approved');
-        $spent = $approvedOrders->sum('amount');
+        // Use amount_pen if available (for USD converted to PEN), otherwise use amount
+        $spent = $approvedOrders->sum(function ($order) {
+            return floatval($order->amount_pen ?? $order->amount ?? 0);
+        });
         $remaining = $project->available_amount - $spent;
         $usagePercent = $project->available_amount > 0 
             ? ($spent / $project->available_amount * 100) 
