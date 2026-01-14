@@ -566,6 +566,11 @@
     cursor: not-allowed;
 }
 
+.qty-input {
+    width: 100px !important;
+    text-align: center;
+}
+
 /* Workers List */
 .workers-list,
 .materials-list {

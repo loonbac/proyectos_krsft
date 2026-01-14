@@ -152,33 +152,29 @@
 
           <!-- SUPERVISOR SECTION: Purchase Orders -->
           <div v-if="isSupervisor" class="section-box">
-            <h3>📦 Enviar Orden de Compra (Proforma)</h3>
+            <h3>📦 Solicitar Materiales</h3>
             
             <form @submit.prevent="createOrder" class="order-form">
               <div class="form-group">
-                <label>Descripción</label>
-                <input v-model="orderForm.description" type="text" required placeholder="Ej: Materiales para etapa 1" class="input-field" />
-              </div>
-              
-              <div class="form-group">
-                <label>Materiales a solicitar</label>
+                <label>Material a solicitar</label>
                 <div class="material-add-row">
-                  <input v-model="newMaterial" type="text" placeholder="Agregar material..." @keyup.enter.prevent="addMaterial" class="input-field" />
-                  <button type="button" @click="addMaterial" class="btn-add">+</button>
+                  <input v-model="newMaterial" type="text" placeholder="Nombre del material..." class="input-field" />
+                  <input v-model.number="newMaterialQty" type="number" min="1" placeholder="Cantidad" class="input-field qty-input" />
+                  <button type="button" @click="addMaterial" :disabled="!newMaterial || !newMaterialQty" class="btn-add">+</button>
                 </div>
-                <ul v-if="orderForm.materials.length" class="materials-list">
-                  <li v-for="(mat, idx) in orderForm.materials" :key="idx">
-                    {{ mat }}
-                    <button type="button" @click="orderForm.materials.splice(idx, 1)" class="btn-remove">×</button>
-                  </li>
-                </ul>
-                <p v-else class="hint">Agregue los materiales que necesita</p>
               </div>
 
+              <ul v-if="orderForm.materials.length" class="materials-list">
+                <li v-for="(mat, idx) in orderForm.materials" :key="idx">
+                  <span>{{ mat.name }} - <strong>{{ mat.qty }}</strong> unidades</span>
+                  <button type="button" @click="orderForm.materials.splice(idx, 1)" class="btn-remove">×</button>
+                </li>
+              </ul>
+              <p v-else class="hint">Agregue los materiales que necesita</p>
+
               <button type="submit" :disabled="savingOrder || orderForm.materials.length === 0" class="btn-submit">
-                {{ savingOrder ? 'Enviando...' : '📤 Enviar a Compras' }}
+                {{ savingOrder ? 'Enviando...' : '📤 Enviar a Aprobación' }}
               </button>
-              <p class="hint">* La orden será revisada y cotizada por el área de Compras</p>
             </form>
           </div>
 
@@ -333,6 +329,7 @@ const projectOrders = ref([]);
 const projectSummary = ref({});
 const toast = ref({ show: false, message: '', type: 'success' });
 const newMaterial = ref('');
+const newMaterialQty = ref(1);
 const selectedWorkerId = ref('');
 
 const isSupervisor = computed(() => props.isSupervisor);
@@ -341,7 +338,7 @@ const stats = ref({ total_projects: 0, active_projects: 0, total_budget: 0, tota
 
 const form = ref({ name: '', currency: 'PEN', amount: 0, threshold: 75, igv_enabled: true, igv_rate: 18, supervisor_id: '' });
 const editForm = ref({ name: '', spending_threshold: 75, supervisor_id: null });
-const orderForm = ref({ description: '', materials: [] });
+const orderForm = ref({ materials: [] });
 
 // API
 const getModuleName = () => {
@@ -454,19 +451,32 @@ const removeWorkerFromProject = async (trabajadorId) => {
 // Orders
 const addMaterial = () => {
   const m = newMaterial.value.trim();
-  if (m && !orderForm.value.materials.includes(m)) {
-    orderForm.value.materials.push(m);
-    newMaterial.value = '';
+  const qty = newMaterialQty.value || 1;
+  if (m && qty > 0) {
+    // Check if material already exists
+    const exists = orderForm.value.materials.find(mat => mat.name === m);
+    if (!exists) {
+      orderForm.value.materials.push({ name: m, qty: qty });
+      newMaterial.value = '';
+      newMaterialQty.value = 1;
+    }
   }
 };
 
 const createOrder = async () => {
-  if (!selectedProject.value || !orderForm.value.description || orderForm.value.materials.length === 0) return;
+  if (!selectedProject.value || orderForm.value.materials.length === 0) return;
   savingOrder.value = true;
   try {
+    // Create description from materials list
+    const description = orderForm.value.materials.map(m => `${m.name} (${m.qty})`).join(', ');
+    
     const res = await fetchWithCsrf(`${apiBase.value}/${selectedProject.value.id}/order`, {
       method: 'POST',
-      body: JSON.stringify({ type: 'material', description: orderForm.value.description, materials: orderForm.value.materials })
+      body: JSON.stringify({ 
+        type: 'material', 
+        description: description, 
+        materials: orderForm.value.materials 
+      })
     });
     const data = await res.json();
     if (data.success) {
