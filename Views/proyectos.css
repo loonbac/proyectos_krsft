@@ -1,7 +1,7 @@
 /* ============================================
    MÓDULO PROYECTOS_KRSFT - ESTILOS DE COMPONENTES
    Layout, paneles, botones y elementos UI
-   Versión 3.1.5 - Gastos + UI Improvements
+   Versión 3.1.7 - Fixed Orders Qty + Status Icons
    ============================================ */
 
 /* ============================================
@@ -881,10 +881,20 @@ body.dark-mode .theme-toggle .sun-icon {
 }
 
 .order-status {
-    padding: 4px 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
     border-radius: var(--proyectos-radius-full);
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
+    white-space: nowrap;
+}
+
+.order-status svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
 }
 
 .order-status.status-pending {

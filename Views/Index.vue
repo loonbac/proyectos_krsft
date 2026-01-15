@@ -216,7 +216,7 @@
                 <tr v-for="order in projectOrders" :key="order.id" :class="getOrderRowClass(order)">
                   <td>{{ formatDate(order.created_at) }}</td>
                   <td>{{ order.description }}</td>
-                  <td class="qty-cell">{{ order.quantity || 1 }}</td>
+                  <td class="qty-cell">{{ getOrderQuantity(order) }}</td>
                   <td>
                     <span class="order-status" :class="getOrderStatusClass(order)">
                       <!-- Pending icon (clock) -->
@@ -463,6 +463,23 @@ const getOrderStatusLabel = (order) => {
 
 const getOrderRowClass = (order) => {
   return 'order-row-' + getOrderStatusClass(order).replace('status-', '');
+};
+
+// Extract quantity from materials array or description
+const getOrderQuantity = (order) => {
+  // Try to get from materials array first
+  if (order.materials && Array.isArray(order.materials) && order.materials.length > 0) {
+    const totalQty = order.materials.reduce((sum, mat) => {
+      if (typeof mat === 'object' && mat.qty) return sum + parseInt(mat.qty);
+      return sum;
+    }, 0);
+    if (totalQty > 0) return totalQty;
+  }
+  // Try to extract from description (format: "Name (qty)")
+  const match = order.description?.match(/\((\d+)\)/);
+  if (match) return parseInt(match[1]);
+  // Fallback
+  return order.quantity || 1;
 };
 
 const availableWorkersFiltered = computed(() => {
