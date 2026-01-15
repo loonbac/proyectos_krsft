@@ -193,16 +193,16 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="order in projectOrders" :key="order.id">
+                <tr v-for="order in projectOrders" :key="order.id" :class="getOrderRowClass(order)">
                   <td>{{ formatDate(order.created_at) }}</td>
                   <td>{{ order.type === 'service' ? '🔧 Servicio' : '📦 Material' }}</td>
                   <td>{{ order.description }}</td>
                   <td>
-                    <span class="order-status" :class="order.status">
-                      {{ order.status === 'approved' ? '✓ Aprobado' : order.status === 'pending' ? '🕐 Pendiente' : '✗ Rechazado' }}
+                    <span class="order-status" :class="getOrderStatusClass(order)">
+                      {{ getOrderStatusText(order) }}
                     </span>
                   </td>
-                  <td>{{ order.amount ? getCurrencySymbol(order.currency) + ' ' + formatNumber(order.amount) : 'Por cotizar' }}</td>
+                  <td>{{ order.amount ? getCurrencySymbol(order.currency) + ' ' + formatNumber(order.total_with_igv || order.amount) : 'Por cotizar' }}</td>
                 </tr>
               </tbody>
             </table>
@@ -363,6 +363,27 @@ const formatDate = (d) => d ? new Date(d).toLocaleDateString('es-PE', { day: '2-
 const getCurrencySymbol = (c) => c === 'USD' ? '$' : 'S/';
 const getStatusLabel = (p) => { const u = parseFloat(p.usage_percent) || 0; if (u >= 90) return 'critical'; if (u >= (p.spending_threshold || 75)) return 'warning'; return 'good'; };
 const getStatusText = (s) => ({ good: 'Normal', warning: 'Precaución', critical: 'Crítico' }[s] || 'Normal');
+
+// Order status helpers (gray=pending, yellow=approved, red=rejected, green=paid)
+const getOrderStatusClass = (order) => {
+  if (order.status === 'rejected') return 'status-rejected';
+  if (order.status === 'pending') return 'status-pending';
+  if (order.status === 'approved' && order.payment_confirmed) return 'status-paid';
+  if (order.status === 'approved') return 'status-approved';
+  return 'status-pending';
+};
+
+const getOrderStatusText = (order) => {
+  if (order.status === 'rejected') return '✗ Rechazado';
+  if (order.status === 'pending') return '🕐 Pendiente';
+  if (order.status === 'approved' && order.payment_confirmed) return '✓ Pagado';
+  if (order.status === 'approved') return '💳 Aprobado';
+  return '🕐 Pendiente';
+};
+
+const getOrderRowClass = (order) => {
+  return 'order-row-' + getOrderStatusClass(order).replace('status-', '');
+};
 
 const availableWorkersFiltered = computed(() => {
   const assignedIds = projectWorkers.value.map(w => w.id);

@@ -646,16 +646,43 @@
     padding: 4px 10px;
     border-radius: 12px;
     font-size: 11px;
+    font-weight: 600;
 }
 
-.order-status.approved {
-    background: #10b981;
+/* Status colors: pending=gray, approved=yellow, rejected=red, paid=green */
+.order-status.status-pending {
+    background: rgba(156, 163, 175, 0.3);
+    color: #9ca3af;
 }
 
-.order-status.pending {
-    background: #f59e0b;
+.order-status.status-approved {
+    background: rgba(245, 158, 11, 0.3);
+    color: #fcd34d;
 }
 
-.order-status.rejected {
-    background: #ef4444;
+.order-status.status-rejected {
+    background: rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+}
+
+.order-status.status-paid {
+    background: rgba(16, 185, 129, 0.3);
+    color: #6ee7b7;
+}
+
+/* Row highlighting */
+.order-row-pending {
+    opacity: 0.7;
+}
+
+.order-row-rejected {
+    opacity: 0.5;
+}
+
+.order-row-approved {
+    background: rgba(245, 158, 11, 0.05);
+}
+
+.order-row-paid {
+    background: rgba(16, 185, 129, 0.05);
 }
