@@ -1,5 +1,9 @@
 <template>
   <div class="proyectos-layout">
+    <!-- Animated Background -->
+    <div class="proyectos-bg"></div>
+
+    <!-- Main Container -->
     <div class="proyectos-container">
       <!-- Header -->
       <header class="module-header">
@@ -11,29 +15,65 @@
             Volver
           </button>
           <h1>
-            <svg class="title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            <svg class="title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
             </svg>
             {{ isSupervisor ? 'MIS PROYECTOS ASIGNADOS' : 'GESTIÓN DE PROYECTOS' }}
           </h1>
         </div>
-        <div v-if="isSupervisor" class="role-badge supervisor">SUPERVISOR</div>
+        <div class="header-right">
+          <div v-if="isSupervisor" class="role-badge supervisor">SUPERVISOR</div>
+          <button @click="toggleDarkMode" class="theme-toggle" title="Cambiar tema">
+            <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5"/>
+              <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+            </svg>
+            <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          </button>
+        </div>
       </header>
 
-      <main>
+      <main class="module-content">
         <!-- Stats -->
         <div class="stats-grid">
-          <div class="stat-card">
-            <h3>{{ isSupervisor ? 'PROYECTOS ASIGNADOS' : 'PROYECTOS ACTIVOS' }}</h3>
-            <p class="stat-number">{{ stats.active_projects }}</p>
+          <div class="stat-card stat-projects">
+            <div class="stat-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="7" width="20" height="14" rx="2"/>
+                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+              </svg>
+            </div>
+            <div class="stat-content">
+              <h3>{{ isSupervisor ? 'PROYECTOS ASIGNADOS' : 'PROYECTOS ACTIVOS' }}</h3>
+              <p class="stat-number">{{ stats.active_projects }}</p>
+            </div>
           </div>
-          <div class="stat-card">
-            <h3>PRESUPUESTO TOTAL</h3>
-            <p class="stat-number">S/ {{ formatNumber(stats.total_budget) }}</p>
+          <div class="stat-card stat-budget">
+            <div class="stat-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="1" x2="12" y2="23"/>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              </svg>
+            </div>
+            <div class="stat-content">
+              <h3>PRESUPUESTO TOTAL</h3>
+              <p class="stat-number">S/ {{ formatNumber(stats.total_budget) }}</p>
+            </div>
           </div>
-          <div class="stat-card">
-            <h3>DISPONIBLE</h3>
-            <p class="stat-number">S/ {{ formatNumber(stats.total_remaining) }}</p>
+          <div class="stat-card stat-available">
+            <div class="stat-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+            </div>
+            <div class="stat-content">
+              <h3>DISPONIBLE</h3>
+              <p class="stat-number">S/ {{ formatNumber(stats.total_remaining) }}</p>
+            </div>
           </div>
         </div>
 
@@ -305,6 +345,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
+import './proyectos_theme.css';
 import './proyectos.css';
 
 // Props from Inertia
@@ -363,6 +404,19 @@ const formatDate = (d) => d ? new Date(d).toLocaleDateString('es-PE', { day: '2-
 const getCurrencySymbol = (c) => c === 'USD' ? '$' : 'S/';
 const getStatusLabel = (p) => { const u = parseFloat(p.usage_percent) || 0; if (u >= 90) return 'critical'; if (u >= (p.spending_threshold || 75)) return 'warning'; return 'good'; };
 const getStatusText = (s) => ({ good: 'Normal', warning: 'Precaución', critical: 'Crítico' }[s] || 'Normal');
+
+// Dark mode toggle
+const toggleDarkMode = () => {
+  document.body.classList.toggle('dark-mode');
+  localStorage.setItem('darkMode', document.body.classList.contains('dark-mode'));
+};
+
+const initDarkMode = () => {
+  const savedMode = localStorage.getItem('darkMode');
+  if (savedMode === 'true' || document.body.classList.contains('dark-mode')) {
+    document.body.classList.add('dark-mode');
+  }
+};
 
 // Order status helpers (gray=pending, yellow=approved, red=rejected, green=paid)
 const getOrderStatusClass = (order) => {
@@ -549,6 +603,7 @@ const confirmDeleteProject = async () => {
 };
 
 onMounted(() => {
+  initDarkMode();
   loadProjects();
   loadStats();
   loadSupervisors();
