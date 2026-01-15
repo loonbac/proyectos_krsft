@@ -549,19 +549,21 @@ const removeWorkerFromProject = async (trabajadorId) => {
   } catch (e) { showToast('Error', 'error'); }
 };
 
-// Orders - Single item expense
+// Orders - Single item expense (sent as material to backend)
 const createOrder = async () => {
   if (!selectedProject.value || !newExpenseDesc.value || !newExpenseQty.value) return;
   savingOrder.value = true;
   try {
+    // Send as single-item materials array (backend expects this format)
+    const materials = [{ name: newExpenseDesc.value.trim(), qty: newExpenseQty.value }];
     const description = `${newExpenseDesc.value} (${newExpenseQty.value})`;
     
     const res = await fetchWithCsrf(`${apiBase.value}/${selectedProject.value.id}/order`, {
       method: 'POST',
       body: JSON.stringify({ 
-        type: 'expense', 
+        type: 'material', 
         description: description,
-        quantity: newExpenseQty.value 
+        materials: materials
       })
     });
     const data = await res.json();
