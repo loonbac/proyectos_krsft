@@ -1,7 +1,7 @@
 /* ============================================
    MÓDULO PROYECTOS_KRSFT - ESTILOS DE COMPONENTES
    Layout, paneles, botones y elementos UI
-   Versión 3.1.2 - Estilo Trabajadores
+   Versión 3.1.5 - Gastos + UI Improvements
    ============================================ */
 
 /* ============================================
@@ -693,6 +693,45 @@ body.dark-mode .theme-toggle .sun-icon {
     cursor: not-allowed;
 }
 
+/* Green circular + button for adding items */
+.btn-add-icon {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    background: var(--proyectos-success);
+    border: none;
+    border-radius: var(--proyectos-radius-md);
+    color: var(--proyectos-text-white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: var(--proyectos-transition-fast);
+}
+
+.btn-add-icon svg {
+    width: 22px;
+    height: 22px;
+}
+
+.btn-add-icon:hover {
+    background: var(--proyectos-success-dark);
+    transform: translateY(-2px);
+}
+
+.btn-add-icon:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Expense add row */
+.expense-add-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
 .btn-submit {
     padding: 12px 24px;
     background: var(--proyectos-success);
@@ -1016,4 +1055,33 @@ body.dark-mode .theme-toggle .sun-icon {
 .btn-submit svg {
     width: 18px;
     height: 18px;
+}
+
+/* Order status SVG icons */
+.order-status svg {
+    width: 14px;
+    height: 14px;
+    vertical-align: middle;
+    margin-right: 4px;
+}
+
+/* Quantity cell in orders table */
+.qty-cell {
+    text-align: center;
+    font-weight: 600;
+}
+
+/* Detail cards - better visibility in day mode */
+.detail-card {
+    background: var(--proyectos-bg-light);
+    padding: 16px;
+    border-radius: var(--proyectos-radius-lg);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid var(--proyectos-border);
+}
+
+/* Progress percentage text - visible in dark mode */
+.project-card small {
+    color: var(--proyectos-text-gray);
+    font-size: 12px;
 }

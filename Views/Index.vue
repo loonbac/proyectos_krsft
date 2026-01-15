@@ -149,7 +149,9 @@
                   {{ w.nombre_completo }} ({{ w.cargo }})
                 </option>
               </select>
-              <button @click="addWorkerToProject" :disabled="!selectedWorkerId" class="btn-add">+ Agregar</button>
+              <button @click="addWorkerToProject" :disabled="!selectedWorkerId" class="btn-add-icon" title="Agregar trabajador">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              </button>
             </div>
 
             <div v-if="projectWorkers.length === 0" class="empty-list">
@@ -163,42 +165,28 @@
             </ul>
           </div>
 
-          <!-- SUPERVISOR SECTION: Purchase Orders -->
+          <!-- SUPERVISOR SECTION: Add Expenses -->
           <div v-if="isSupervisor" class="section-box">
             <h3>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-                <line x1="12" y1="22.08" x2="12" y2="12"/>
+                <line x1="12" y1="1" x2="12" y2="23"/>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
               </svg>
-              Solicitar Materiales
+              AGREGAR GASTOS
             </h3>
             
             <form @submit.prevent="createOrder" class="order-form">
               <div class="form-group">
-                <label>Material a solicitar</label>
-                <div class="material-add-row">
-                  <input v-model="newMaterial" type="text" placeholder="Nombre del material..." class="input-field" />
-                  <input v-model.number="newMaterialQty" type="number" min="1" placeholder="Cantidad" class="input-field qty-input" />
-                  <button type="button" @click="addMaterial" :disabled="!newMaterial || !newMaterialQty" class="btn-add">+</button>
+                <label>Descripción del gasto</label>
+                <div class="expense-add-row">
+                  <input v-model="newExpenseDesc" type="text" placeholder="Ej: Cemento, transporte, materiales..." class="input-field" />
+                  <input v-model.number="newExpenseQty" type="number" min="1" placeholder="Cant." class="input-field qty-input" />
+                  <button type="submit" :disabled="savingOrder || !newExpenseDesc || !newExpenseQty" class="btn-add-icon" title="Agregar gasto">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  </button>
                 </div>
+                <p class="hint">Cada gasto se envía individualmente para aprobación</p>
               </div>
-
-              <ul v-if="orderForm.materials.length" class="materials-list">
-                <li v-for="(mat, idx) in orderForm.materials" :key="idx">
-                  <span>{{ mat.name }} - <strong>{{ mat.qty }}</strong> unidades</span>
-                  <button type="button" @click="orderForm.materials.splice(idx, 1)" class="btn-remove">×</button>
-                </li>
-              </ul>
-              <p v-else class="hint">Agregue los materiales que necesita</p>
-
-              <button type="submit" :disabled="savingOrder || orderForm.materials.length === 0" class="btn-submit">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M22 2L11 13"/>
-                  <path d="M22 2L15 22L11 13L2 9L22 2"/>
-                </svg>
-                {{ savingOrder ? 'Enviando...' : 'Enviar a Aprobación' }}
-              </button>
             </form>
           </div>
 
@@ -213,13 +201,13 @@
               </svg>
               Órdenes y Gastos ({{ projectOrders.length }})
             </h3>
-            <div v-if="projectOrders.length === 0" class="empty-list"><p>No hay órdenes</p></div>
+            <div v-if="projectOrders.length === 0" class="empty-list"><p>No hay gastos registrados</p></div>
             <table v-else class="orders-table">
               <thead>
                 <tr>
                   <th>Fecha</th>
-                  <th>Tipo</th>
                   <th>Descripción</th>
+                  <th>Cantidad</th>
                   <th>Estado</th>
                   <th>Monto</th>
                 </tr>
@@ -227,21 +215,27 @@
               <tbody>
                 <tr v-for="order in projectOrders" :key="order.id" :class="getOrderRowClass(order)">
                   <td>{{ formatDate(order.created_at) }}</td>
-                  <td>
-                    <span class="order-type-badge">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path v-if="order.type === 'service'" d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
-                        <g v-else>
-                          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                        </g>
-                      </svg>
-                      {{ order.type === 'service' ? 'Servicio' : 'Material' }}
-                    </span>
-                  </td>
                   <td>{{ order.description }}</td>
+                  <td class="qty-cell">{{ order.quantity || 1 }}</td>
                   <td>
                     <span class="order-status" :class="getOrderStatusClass(order)">
-                      {{ getOrderStatusText(order) }}
+                      <!-- Pending icon (clock) -->
+                      <svg v-if="order.status === 'pending'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                      </svg>
+                      <!-- Approved icon (check) -->
+                      <svg v-else-if="order.status === 'approved' && !order.payment_confirmed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                      <!-- Paid icon (check circle) -->
+                      <svg v-else-if="order.payment_confirmed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                      </svg>
+                      <!-- Rejected icon (x) -->
+                      <svg v-else-if="order.status === 'rejected'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                      </svg>
+                      {{ getOrderStatusLabel(order) }}
                     </span>
                   </td>
                   <td>{{ order.amount ? getCurrencySymbol(order.currency) + ' ' + formatNumber(order.total_with_igv || order.amount) : 'Por cotizar' }}</td>
@@ -373,6 +367,8 @@ const projectSummary = ref({});
 const toast = ref({ show: false, message: '', type: 'success' });
 const newMaterial = ref('');
 const newMaterialQty = ref(1);
+const newExpenseDesc = ref('');
+const newExpenseQty = ref(1);
 const selectedWorkerId = ref('');
 
 const isSupervisor = computed(() => props.isSupervisor);
@@ -450,11 +446,19 @@ const getOrderStatusClass = (order) => {
 };
 
 const getOrderStatusText = (order) => {
-  if (order.status === 'rejected') return '✗ Rechazado';
-  if (order.status === 'pending') return '🕐 Pendiente';
-  if (order.status === 'approved' && order.payment_confirmed) return '✓ Pagado';
-  if (order.status === 'approved') return '💳 Aprobado';
-  return '🕐 Pendiente';
+  if (order.status === 'rejected') return 'Rechazado';
+  if (order.status === 'pending') return 'Pendiente';
+  if (order.status === 'approved' && order.payment_confirmed) return 'Pagado';
+  if (order.status === 'approved') return 'Aprobado';
+  return 'Pendiente';
+};
+
+const getOrderStatusLabel = (order) => {
+  if (order.status === 'rejected') return 'Rechazado';
+  if (order.status === 'pending') return 'Pendiente';
+  if (order.status === 'approved' && order.payment_confirmed) return 'Pagado';
+  if (order.status === 'approved') return 'Aprobado';
+  return 'Pendiente';
 };
 
 const getOrderRowClass = (order) => {
@@ -545,40 +549,26 @@ const removeWorkerFromProject = async (trabajadorId) => {
   } catch (e) { showToast('Error', 'error'); }
 };
 
-// Orders
-const addMaterial = () => {
-  const m = newMaterial.value.trim();
-  const qty = newMaterialQty.value || 1;
-  if (m && qty > 0) {
-    // Check if material already exists
-    const exists = orderForm.value.materials.find(mat => mat.name === m);
-    if (!exists) {
-      orderForm.value.materials.push({ name: m, qty: qty });
-      newMaterial.value = '';
-      newMaterialQty.value = 1;
-    }
-  }
-};
-
+// Orders - Single item expense
 const createOrder = async () => {
-  if (!selectedProject.value || orderForm.value.materials.length === 0) return;
+  if (!selectedProject.value || !newExpenseDesc.value || !newExpenseQty.value) return;
   savingOrder.value = true;
   try {
-    // Create description from materials list
-    const description = orderForm.value.materials.map(m => `${m.name} (${m.qty})`).join(', ');
+    const description = `${newExpenseDesc.value} (${newExpenseQty.value})`;
     
     const res = await fetchWithCsrf(`${apiBase.value}/${selectedProject.value.id}/order`, {
       method: 'POST',
       body: JSON.stringify({ 
-        type: 'material', 
-        description: description, 
-        materials: orderForm.value.materials 
+        type: 'expense', 
+        description: description,
+        quantity: newExpenseQty.value 
       })
     });
     const data = await res.json();
     if (data.success) {
-      showToast('Orden enviada a Compras', 'success');
-      orderForm.value = { description: '', materials: [] };
+      showToast('Gasto enviado a aprobación', 'success');
+      newExpenseDesc.value = '';
+      newExpenseQty.value = 1;
       await selectProject({ id: selectedProject.value.id });
     } else {
       showToast(data.message || 'Error', 'error');
