@@ -1,0 +1,154 @@
+/* ============================================
+   MÓDULO PROYECTOS_KRSFT - TEMA DE COLORES
+   Variables CSS específicas del módulo
+   Versión 3.1.1 - Fondo Animado + UI Updates
+   ============================================ */
+
+:root {
+    /* Colores Primarios del Módulo (Amber/Orange - Project Style) */
+    --proyectos-primary: #f59e0b;
+    --proyectos-primary-dark: #d97706;
+    --proyectos-primary-light: #fbbf24;
+    --proyectos-secondary: #1e3a5f;
+    --proyectos-gradient: linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #ea580c 100%);
+
+    /* Colores para Animación del Fondo */
+    --proyectos-bg-color-1: #1e3a5f;
+    --proyectos-bg-color-2: #0f172a;
+
+    /* Toggle Border - Modo Claro */
+    --proyectos-toggle-border: #94a3b8;
+
+    /* Colores de Estado */
+    --proyectos-success: #10b981;
+    --proyectos-success-dark: #059669;
+    --proyectos-danger: #ef4444;
+    --proyectos-danger-dark: #dc2626;
+    --proyectos-warning: #f59e0b;
+    --proyectos-info: #3b82f6;
+
+    /* Fondos - Modo Claro */
+    --proyectos-bg-page: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+    --proyectos-bg-container: rgba(255, 255, 255, 0.95);
+    --proyectos-bg-card: #ffffff;
+    --proyectos-bg-card-dark: rgba(255, 255, 255, 0.1);
+    --proyectos-bg-light: #f8fafc;
+    --proyectos-bg-input: #ffffff;
+
+    /* Textos - Modo Claro */
+    --proyectos-text-dark: #1e293b;
+    --proyectos-text-gray: #64748b;
+    --proyectos-text-light: #94a3b8;
+    --proyectos-text-muted: #475569;
+    --proyectos-text-white: #ffffff;
+    --proyectos-text-white-muted: rgba(255, 255, 255, 0.7);
+    --proyectos-text-white-soft: rgba(255, 255, 255, 0.6);
+
+    /* Bordes y Sombras */
+    --proyectos-border: #e2e8f0;
+    --proyectos-border-light: #f1f5f9;
+    --proyectos-border-white: rgba(255, 255, 255, 0.2);
+    --proyectos-border-white-light: rgba(255, 255, 255, 0.1);
+    --proyectos-shadow-sm: 0 4px 15px rgba(0, 0, 0, 0.08);
+    --proyectos-shadow-md: 0 8px 25px rgba(0, 0, 0, 0.12);
+    --proyectos-shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.3);
+    --proyectos-shadow-primary: 0 4px 12px rgba(245, 158, 11, 0.4);
+
+    /* Badges - Estados de Proyecto */
+    --proyectos-badge-success-bg: rgba(16, 185, 129, 0.15);
+    --proyectos-badge-success-text: #10b981;
+
+    --proyectos-badge-danger-bg: rgba(239, 68, 68, 0.15);
+    --proyectos-badge-danger-text: #ef4444;
+
+    --proyectos-badge-warning-bg: rgba(245, 158, 11, 0.15);
+    --proyectos-badge-warning-text: #f59e0b;
+
+    --proyectos-badge-info-bg: rgba(59, 130, 246, 0.15);
+    --proyectos-badge-info-text: #3b82f6;
+
+    --proyectos-badge-default-bg: rgba(156, 163, 175, 0.3);
+    --proyectos-badge-default-text: #9ca3af;
+
+    /* Botones de Acción */
+    --proyectos-btn-edit-bg: rgba(59, 130, 246, 0.1);
+    --proyectos-btn-edit-text: #3b82f6;
+    --proyectos-btn-edit-hover: rgba(59, 130, 246, 0.2);
+
+    --proyectos-btn-delete-bg: rgba(239, 68, 68, 0.1);
+    --proyectos-btn-delete-text: #ef4444;
+    --proyectos-btn-delete-hover: rgba(239, 68, 68, 0.2);
+
+    --proyectos-btn-add-bg: #10b981;
+    --proyectos-btn-add-hover: #059669;
+
+    /* Iconos de Stats (Colores planos) */
+    --proyectos-stat-total-bg: #f59e0b;
+    --proyectos-stat-budget-bg: #3b82f6;
+    --proyectos-stat-available-bg: #10b981;
+    --proyectos-stat-spent-bg: #ef4444;
+
+    /* Progress Bar Colors */
+    --proyectos-progress-good: #10b981;
+    --proyectos-progress-warning: #f59e0b;
+    --proyectos-progress-critical: #ef4444;
+    --proyectos-progress-bg: rgba(0, 0, 0, 0.3);
+
+    /* Currency Badge */
+    --proyectos-currency-bg: #3b82f6;
+
+    /* Modal */
+    --proyectos-modal-bg: #1e293b;
+    --proyectos-modal-overlay: rgba(0, 0, 0, 0.7);
+
+    /* Toast */
+    --proyectos-toast-success: #10b981;
+    --proyectos-toast-error: #ef4444;
+
+    /* Transiciones */
+    --proyectos-transition: all 0.3s ease;
+    --proyectos-transition-fast: all 0.2s ease;
+
+    /* Radios de borde */
+    --proyectos-radius-sm: 6px;
+    --proyectos-radius-md: 8px;
+    --proyectos-radius-lg: 12px;
+    --proyectos-radius-xl: 16px;
+    --proyectos-radius-2xl: 20px;
+    --proyectos-radius-full: 9999px;
+}
+
+/* ============================================
+   MODO OSCURO
+   ============================================ */
+body.dark-mode {
+    /* Fondos - Modo Oscuro */
+    --proyectos-bg-page: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+    --proyectos-bg-container: rgba(30, 41, 59, 0.95);
+    --proyectos-bg-card: #1e293b;
+    --proyectos-bg-card-dark: rgba(255, 255, 255, 0.1);
+    --proyectos-bg-light: #334155;
+    --proyectos-bg-input: #1e293b;
+
+    /* Textos - Modo Oscuro */
+    --proyectos-text-dark: #f1f5f9;
+    --proyectos-text-gray: #cbd5e1;
+    --proyectos-text-light: #94a3b8;
+    --proyectos-text-muted: #e2e8f0;
+
+    /* Bordes - Modo Oscuro */
+    --proyectos-border: #334155;
+    --proyectos-border-light: #1e293b;
+
+    /* Sombras - Modo Oscuro */
+    --proyectos-shadow-sm: 0 4px 15px rgba(0, 0, 0, 0.3);
+    --proyectos-shadow-md: 0 8px 25px rgba(0, 0, 0, 0.4);
+    --proyectos-shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.5);
+
+    /* Colores para Animación del Fondo - Modo Oscuro */
+    --proyectos-bg-color-1: #0f172a;
+    --proyectos-bg-color-2: #1e293b;
+
+    /* Toggle Border - Modo Oscuro */
+    --proyectos-toggle-border: #f59e0b;
+}

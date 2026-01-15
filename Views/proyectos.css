@@ -1,9 +1,13 @@
-/* Proyectos Module - Simple Styles */
+/* ============================================
+   MÓDULO PROYECTOS_KRSFT - ESTILOS PRINCIPALES
+   Versión 3.1.1 - Refactorizado con Variables
+   ============================================ */
 
+/* Layout Principal */
 .proyectos-layout {
     min-height: 100vh;
-    background: #1e3a5f;
-    color: #fff;
+    background: var(--proyectos-bg-page);
+    color: var(--proyectos-text-white);
 }
 
 .proyectos-container {
@@ -18,7 +22,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 20px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid var(--proyectos-border-white-light);
     margin-bottom: 20px;
 }
 
@@ -33,11 +37,12 @@
     align-items: center;
     gap: 8px;
     padding: 10px 20px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    color: #fff;
+    background: var(--proyectos-bg-card-dark);
+    border: 1px solid var(--proyectos-border-white);
+    border-radius: var(--proyectos-radius-md);
+    color: var(--proyectos-text-white);
     cursor: pointer;
+    transition: var(--proyectos-transition-fast);
 }
 
 .btn-back:hover {
@@ -71,14 +76,14 @@
 }
 
 .stat-card {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--proyectos-bg-card-dark);
     padding: 20px;
-    border-radius: 12px;
+    border-radius: var(--proyectos-radius-lg);
 }
 
 .stat-card h3 {
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--proyectos-text-white-muted);
     margin: 0 0 8px 0;
 }
 
@@ -98,16 +103,17 @@
     align-items: center;
     gap: 8px;
     padding: 12px 24px;
-    background: #10b981;
+    background: var(--proyectos-btn-add-bg);
     border: none;
-    border-radius: 8px;
-    color: #fff;
+    border-radius: var(--proyectos-radius-md);
+    color: var(--proyectos-text-white);
     font-weight: 600;
     cursor: pointer;
+    transition: var(--proyectos-transition-fast);
 }
 
 .btn-nuevo:hover {
-    background: #059669;
+    background: var(--proyectos-btn-add-hover);
 }
 
 .btn-nuevo svg {
@@ -123,11 +129,11 @@
 }
 
 .project-card {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
+    background: var(--proyectos-bg-card-dark);
+    border-radius: var(--proyectos-radius-lg);
     padding: 20px;
     cursor: pointer;
-    transition: transform 0.2s;
+    transition: var(--proyectos-transition-fast);
 }
 
 .project-card:hover {
@@ -142,14 +148,14 @@
 
 .project-meta {
     font-size: 13px;
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--proyectos-text-white-soft);
     margin-bottom: 15px;
 }
 
 .project-footer {
     margin-top: 15px;
     padding-top: 12px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: 1px solid var(--proyectos-border-white-light);
     font-size: 12px;
     color: rgba(255, 255, 255, 0.5);
 }
@@ -164,12 +170,12 @@
 .amount-item {
     background: rgba(0, 0, 0, 0.2);
     padding: 10px;
-    border-radius: 8px;
+    border-radius: var(--proyectos-radius-md);
 }
 
 .amount-label {
     font-size: 11px;
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--proyectos-text-white-soft);
 }
 
 .amount-value {
@@ -180,7 +186,7 @@
 .currency-badge {
     display: inline-block;
     padding: 2px 6px;
-    background: #3b82f6;
+    background: var(--proyectos-currency-bg);
     border-radius: 4px;
     font-size: 10px;
     margin-right: 4px;
@@ -189,7 +195,7 @@
 /* Progress */
 .progress-bar {
     height: 8px;
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--proyectos-progress-bg);
     border-radius: 4px;
     overflow: hidden;
 }
@@ -201,15 +207,15 @@
 }
 
 .progress-fill.good {
-    background: #10b981;
+    background: var(--proyectos-progress-good);
 }
 
 .progress-fill.warning {
-    background: #f59e0b;
+    background: var(--proyectos-progress-warning);
 }
 
 .progress-fill.critical {
-    background: #ef4444;
+    background: var(--proyectos-progress-critical);
 }
 
 /* Modal */
@@ -219,7 +225,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: var(--proyectos-modal-overlay);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -227,8 +233,8 @@
 }
 
 .modal-content {
-    background: #1e293b;
-    border-radius: 16px;
+    background: var(--proyectos-modal-bg);
+    border-radius: var(--proyectos-radius-xl);
     width: 90%;
     max-width: 500px;
     max-height: 90vh;
@@ -240,7 +246,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid var(--proyectos-border-white-light);
 }
 
 .modal-header h2 {
@@ -251,7 +257,7 @@
 .btn-close {
     background: none;
     border: none;
-    color: #fff;
+    color: var(--proyectos-text-white);
     font-size: 24px;
     cursor: pointer;
 }
@@ -270,29 +276,30 @@
     margin-bottom: 8px;
     font-size: 13px;
     font-weight: 600;
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--proyectos-text-white-muted);
 }
 
 .input-field,
 .select-field {
     width: 100%;
     padding: 12px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    color: #fff;
+    background: var(--proyectos-bg-card-dark);
+    border: 1px solid var(--proyectos-border-white);
+    border-radius: var(--proyectos-radius-md);
+    color: var(--proyectos-text-white);
     font-size: 14px;
+    transition: var(--proyectos-transition-fast);
 }
 
 .input-field:focus,
 .select-field:focus {
     outline: none;
-    border-color: #3b82f6;
+    border-color: var(--proyectos-info);
 }
 
 .select-field option {
-    background: #1e293b;
-    color: #fff;
+    background: var(--proyectos-modal-bg);
+    color: var(--proyectos-text-white);
 }
 
 .form-row {
@@ -305,7 +312,7 @@
 .currency-switch {
     display: flex;
     background: rgba(0, 0, 0, 0.3);
-    border-radius: 8px;
+    border-radius: var(--proyectos-radius-md);
     overflow: hidden;
 }
 
@@ -314,11 +321,11 @@
     padding: 12px;
     text-align: center;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: var(--proyectos-transition-fast);
 }
 
 .currency-option.active {
-    background: #3b82f6;
+    background: var(--proyectos-currency-bg);
 }
 
 /* Checkbox */
@@ -350,26 +357,36 @@
     gap: 12px;
     justify-content: flex-end;
     padding-top: 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: 1px solid var(--proyectos-border-white-light);
 }
 
 .btn-cancel {
     padding: 12px 24px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    color: #fff;
+    background: var(--proyectos-bg-card-dark);
+    border: 1px solid var(--proyectos-border-white);
+    border-radius: var(--proyectos-radius-md);
+    color: var(--proyectos-text-white);
     cursor: pointer;
+    transition: var(--proyectos-transition-fast);
+}
+
+.btn-cancel:hover {
+    background: rgba(255, 255, 255, 0.2);
 }
 
 .btn-submit {
     padding: 12px 24px;
-    background: #10b981;
+    background: var(--proyectos-btn-add-bg);
     border: none;
-    border-radius: 8px;
-    color: #fff;
+    border-radius: var(--proyectos-radius-md);
+    color: var(--proyectos-text-white);
     font-weight: 600;
     cursor: pointer;
+    transition: var(--proyectos-transition);
+}
+
+.btn-submit:hover {
+    background: var(--proyectos-btn-add-hover);
 }
 
 .btn-submit:disabled {
@@ -380,7 +397,7 @@
 /* Detail View */
 .project-detail {
     background: rgba(255, 255, 255, 0.05);
-    border-radius: 16px;
+    border-radius: var(--proyectos-radius-xl);
     padding: 24px;
 }
 
@@ -393,11 +410,16 @@
 
 .btn-back-small {
     padding: 8px 16px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 6px;
-    color: #fff;
+    background: var(--proyectos-bg-card-dark);
+    border: 1px solid var(--proyectos-border-white);
+    border-radius: var(--proyectos-radius-sm);
+    color: var(--proyectos-text-white);
     cursor: pointer;
+    transition: var(--proyectos-transition-fast);
+}
+
+.btn-back-small:hover {
+    background: rgba(255, 255, 255, 0.2);
 }
 
 .detail-header h2 {
@@ -415,13 +437,13 @@
 .detail-card {
     background: rgba(0, 0, 0, 0.2);
     padding: 16px;
-    border-radius: 10px;
+    border-radius: var(--proyectos-radius-lg);
 }
 
 .detail-card h4 {
     margin: 0 0 8px 0;
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--proyectos-text-white-soft);
 }
 
 .detail-card p {
@@ -433,28 +455,31 @@
 /* Status Badge */
 .status-badge {
     padding: 4px 12px;
-    border-radius: 20px;
+    border-radius: var(--proyectos-radius-full);
     font-size: 12px;
     font-weight: 600;
 }
 
 .status-badge.good {
-    background: #10b981;
+    background: var(--proyectos-badge-success-bg);
+    color: var(--proyectos-badge-success-text);
 }
 
 .status-badge.warning {
-    background: #f59e0b;
+    background: var(--proyectos-badge-warning-bg);
+    color: var(--proyectos-badge-warning-text);
 }
 
 .status-badge.critical {
-    background: #ef4444;
+    background: var(--proyectos-badge-danger-bg);
+    color: var(--proyectos-badge-danger-text);
 }
 
 /* Empty State */
 .empty-state {
     text-align: center;
     padding: 60px 20px;
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--proyectos-text-white-soft);
 }
 
 .empty-state svg {
@@ -476,24 +501,24 @@
     bottom: 20px;
     right: 20px;
     padding: 16px 24px;
-    border-radius: 8px;
-    color: #fff;
+    border-radius: var(--proyectos-radius-md);
+    color: var(--proyectos-text-white);
     z-index: 2000;
 }
 
 .toast.success {
-    background: #10b981;
+    background: var(--proyectos-toast-success);
 }
 
 .toast.error {
-    background: #ef4444;
+    background: var(--proyectos-toast-error);
 }
 
 /* Edit Mode */
 .edit-section {
     margin-top: 30px;
     padding-top: 30px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: 1px solid var(--proyectos-border-white-light);
 }
 
 .edit-section h3 {
@@ -502,39 +527,49 @@
 
 .btn-edit {
     padding: 8px 16px;
-    background: #3b82f6;
-    border: none;
-    border-radius: 6px;
-    color: #fff;
+    background: var(--proyectos-btn-edit-bg);
+    border: 1px solid var(--proyectos-btn-edit-text);
+    border-radius: var(--proyectos-radius-sm);
+    color: var(--proyectos-btn-edit-text);
     cursor: pointer;
+    transition: var(--proyectos-transition-fast);
+}
+
+.btn-edit:hover {
+    background: var(--proyectos-btn-edit-hover);
 }
 
 .btn-delete {
     padding: 8px 16px;
-    background: #ef4444;
-    border: none;
-    border-radius: 6px;
-    color: #fff;
+    background: var(--proyectos-btn-delete-bg);
+    border: 1px solid var(--proyectos-btn-delete-text);
+    border-radius: var(--proyectos-radius-sm);
+    color: var(--proyectos-btn-delete-text);
     cursor: pointer;
+    transition: var(--proyectos-transition-fast);
+}
+
+.btn-delete:hover {
+    background: var(--proyectos-btn-delete-hover);
 }
 
 /* Role Badge */
 .role-badge {
     padding: 8px 16px;
-    border-radius: 20px;
+    border-radius: var(--proyectos-radius-full);
     font-size: 12px;
     font-weight: 600;
 }
 
 .role-badge.supervisor {
-    background: #f59e0b;
-    color: #fff;
+    background: var(--proyectos-warning);
+    color: var(--proyectos-text-white);
 }
 
 /* Section Box */
 .section-box {
     background: rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
+    border-radius: var(--proyectos-radius-lg);
     padding: 20px;
     margin-bottom: 20px;
 }
@@ -554,11 +589,16 @@
 
 .btn-add {
     padding: 10px 20px;
-    background: #10b981;
+    background: var(--proyectos-btn-add-bg);
     border: none;
-    border-radius: 8px;
-    color: #fff;
+    border-radius: var(--proyectos-radius-md);
+    color: var(--proyectos-text-white);
     cursor: pointer;
+    transition: var(--proyectos-transition-fast);
+}
+
+.btn-add:hover {
+    background: var(--proyectos-btn-add-hover);
 }
 
 .btn-add:disabled {
@@ -586,19 +626,24 @@
     align-items: center;
     padding: 10px 15px;
     background: rgba(0, 0, 0, 0.2);
-    border-radius: 8px;
+    border-radius: var(--proyectos-radius-md);
     margin-bottom: 8px;
 }
 
 .btn-remove {
-    background: #ef4444;
+    background: var(--proyectos-danger);
     border: none;
-    color: #fff;
+    color: var(--proyectos-text-white);
     width: 28px;
     height: 28px;
     border-radius: 50%;
     cursor: pointer;
     font-size: 16px;
+    transition: var(--proyectos-transition-fast);
+}
+
+.btn-remove:hover {
+    background: var(--proyectos-danger-dark);
 }
 
 /* Empty List */
@@ -620,7 +665,7 @@
 }
 
 .error {
-    color: #ef4444;
+    color: var(--proyectos-danger);
     margin: 10px 0;
 }
 
@@ -634,40 +679,40 @@
 .orders-table td {
     padding: 12px;
     text-align: left;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid var(--proyectos-border-white-light);
 }
 
 .orders-table th {
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--proyectos-text-white-soft);
 }
 
 .order-status {
     padding: 4px 10px;
-    border-radius: 12px;
+    border-radius: var(--proyectos-radius-lg);
     font-size: 11px;
     font-weight: 600;
 }
 
 /* Status colors: pending=gray, approved=yellow, rejected=red, paid=green */
 .order-status.status-pending {
-    background: rgba(156, 163, 175, 0.3);
-    color: #9ca3af;
+    background: var(--proyectos-badge-default-bg);
+    color: var(--proyectos-badge-default-text);
 }
 
 .order-status.status-approved {
-    background: rgba(245, 158, 11, 0.3);
-    color: #fcd34d;
+    background: var(--proyectos-badge-warning-bg);
+    color: var(--proyectos-badge-warning-text);
 }
 
 .order-status.status-rejected {
-    background: rgba(239, 68, 68, 0.3);
-    color: #fca5a5;
+    background: var(--proyectos-badge-danger-bg);
+    color: var(--proyectos-badge-danger-text);
 }
 
 .order-status.status-paid {
-    background: rgba(16, 185, 129, 0.3);
-    color: #6ee7b7;
+    background: var(--proyectos-badge-success-bg);
+    color: var(--proyectos-badge-success-text);
 }
 
 /* Row highlighting */
@@ -680,9 +725,9 @@
 }
 
 .order-row-approved {
-    background: rgba(245, 158, 11, 0.05);
+    background: var(--proyectos-badge-warning-bg);
 }
 
 .order-row-paid {
-    background: rgba(16, 185, 129, 0.05);
+    background: var(--proyectos-badge-success-bg);
 }
