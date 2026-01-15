@@ -37,46 +37,6 @@
       </header>
 
       <main class="module-content">
-        <!-- Stats -->
-        <div class="stats-grid">
-          <div class="stat-card stat-projects">
-            <div class="stat-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="7" width="20" height="14" rx="2"/>
-                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
-              </svg>
-            </div>
-            <div class="stat-content">
-              <h3>{{ isSupervisor ? 'PROYECTOS ASIGNADOS' : 'PROYECTOS ACTIVOS' }}</h3>
-              <p class="stat-number">{{ stats.active_projects }}</p>
-            </div>
-          </div>
-          <div class="stat-card stat-budget">
-            <div class="stat-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="12" y1="1" x2="12" y2="23"/>
-                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-              </svg>
-            </div>
-            <div class="stat-content">
-              <h3>PRESUPUESTO TOTAL</h3>
-              <p class="stat-number">S/ {{ formatNumber(stats.total_budget) }}</p>
-            </div>
-          </div>
-          <div class="stat-card stat-available">
-            <div class="stat-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                <polyline points="22 4 12 14.01 9 11.01"/>
-              </svg>
-            </div>
-            <div class="stat-content">
-              <h3>DISPONIBLE</h3>
-              <p class="stat-number">S/ {{ formatNumber(stats.total_remaining) }}</p>
-            </div>
-          </div>
-        </div>
-
         <!-- Actions (only for managers, not supervisors) -->
         <div v-if="!isSupervisor && !selectedProject" class="actions-container">
           <button @click="openCreateModal" class="btn-nuevo">
@@ -101,8 +61,8 @@
 
         <!-- Projects Grid -->
         <div v-else-if="!selectedProject" class="projects-grid">
-          <div v-for="project in projects" :key="project.id" class="project-card" @click="selectProject(project)">
-            <h3>{{ project.name }}</h3>
+          <div v-for="project in projects" :key="project.id" class="project-card" :style="{ borderLeftColor: getProjectColor(project.id) }" @click="selectProject(project)">
+            <h3 :style="{ color: getProjectColor(project.id) }">{{ project.name }}</h3>
             <p class="project-meta">
               <span class="currency-badge">{{ project.currency || 'PEN' }}</span>
               Supervisor: {{ project.supervisor_name || 'No asignado' }}
@@ -120,7 +80,7 @@
             </div>
 
             <div class="progress-bar">
-              <div class="progress-fill" :class="project.status_label" :style="{ width: Math.min(parseFloat(project.usage_percent) || 0, 100) + '%' }"></div>
+              <div class="progress-fill" :class="getStatusLabel(project)" :style="{ width: Math.min(parseFloat(project.usage_percent) || 0, 100) + '%' }"></div>
             </div>
             <small>{{ parseFloat(project.usage_percent || 0).toFixed(1) }}% utilizado</small>
 
@@ -133,8 +93,13 @@
         <!-- Project Detail View -->
         <div v-if="selectedProject" class="project-detail">
           <div class="detail-header">
-            <button @click="selectedProject = null; projectWorkers = []; projectOrders = []" class="btn-back-small">← Volver</button>
-            <h2>{{ selectedProject.name }}</h2>
+            <button @click="selectedProject = null; projectWorkers = []; projectOrders = []" class="btn-back-detail" :style="{ background: getProjectColor(selectedProject.id) }">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 12H5M5 12L12 19M5 12L12 5"/>
+              </svg>
+              Volver
+            </button>
+            <h2 :style="{ color: getProjectColor(selectedProject.id) }">{{ selectedProject.name }}</h2>
             <span class="status-badge" :class="getStatusLabel(selectedProject)">{{ getStatusText(getStatusLabel(selectedProject)) }}</span>
           </div>
 
@@ -167,7 +132,15 @@
 
           <!-- SUPERVISOR SECTION: Add Workers -->
           <div v-if="isSupervisor" class="section-box">
-            <h3>👷 Trabajadores del Proyecto</h3>
+            <h3>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+              Trabajadores del Proyecto
+            </h3>
             
             <div class="add-worker-row">
               <select v-model="selectedWorkerId" class="select-field">
@@ -192,7 +165,14 @@
 
           <!-- SUPERVISOR SECTION: Purchase Orders -->
           <div v-if="isSupervisor" class="section-box">
-            <h3>📦 Solicitar Materiales</h3>
+            <h3>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                <line x1="12" y1="22.08" x2="12" y2="12"/>
+              </svg>
+              Solicitar Materiales
+            </h3>
             
             <form @submit.prevent="createOrder" class="order-form">
               <div class="form-group">
@@ -213,14 +193,26 @@
               <p v-else class="hint">Agregue los materiales que necesita</p>
 
               <button type="submit" :disabled="savingOrder || orderForm.materials.length === 0" class="btn-submit">
-                {{ savingOrder ? 'Enviando...' : '📤 Enviar a Aprobación' }}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 2L11 13"/>
+                  <path d="M22 2L15 22L11 13L2 9L22 2"/>
+                </svg>
+                {{ savingOrder ? 'Enviando...' : 'Enviar a Aprobación' }}
               </button>
             </form>
           </div>
 
           <!-- Orders List -->
           <div class="section-box">
-            <h3>📋 Órdenes y Gastos ({{ projectOrders.length }})</h3>
+            <h3>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+              Órdenes y Gastos ({{ projectOrders.length }})
+            </h3>
             <div v-if="projectOrders.length === 0" class="empty-list"><p>No hay órdenes</p></div>
             <table v-else class="orders-table">
               <thead>
@@ -235,7 +227,17 @@
               <tbody>
                 <tr v-for="order in projectOrders" :key="order.id" :class="getOrderRowClass(order)">
                   <td>{{ formatDate(order.created_at) }}</td>
-                  <td>{{ order.type === 'service' ? '🔧 Servicio' : '📦 Material' }}</td>
+                  <td>
+                    <span class="order-type-badge">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path v-if="order.type === 'service'" d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                        <g v-else>
+                          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                        </g>
+                      </svg>
+                      {{ order.type === 'service' ? 'Servicio' : 'Material' }}
+                    </span>
+                  </td>
                   <td>{{ order.description }}</td>
                   <td>
                     <span class="order-status" :class="getOrderStatusClass(order)">
@@ -374,6 +376,26 @@ const newMaterialQty = ref(1);
 const selectedWorkerId = ref('');
 
 const isSupervisor = computed(() => props.isSupervisor);
+
+// Project color palette for random assignment
+const projectColors = [
+  '#0AA4A4', // Teal
+  '#3b82f6', // Blue
+  '#8b5cf6', // Purple
+  '#ec4899', // Pink
+  '#f59e0b', // Amber
+  '#10b981', // Green
+  '#ef4444', // Red
+  '#06b6d4', // Cyan
+  '#6366f1', // Indigo
+  '#84cc16', // Lime
+];
+
+// Get consistent color for project based on ID
+const getProjectColor = (projectId) => {
+  const index = projectId % projectColors.length;
+  return projectColors[index];
+};
 
 const stats = ref({ total_projects: 0, active_projects: 0, total_budget: 0, total_spent: 0, total_remaining: 0 });
 

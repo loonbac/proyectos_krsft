@@ -5,16 +5,16 @@
    ============================================ */
 
 :root {
-    /* Colores Primarios del Módulo (Amber/Orange - Project Style) */
-    --proyectos-primary: #f59e0b;
-    --proyectos-primary-dark: #d97706;
-    --proyectos-primary-light: #fbbf24;
-    --proyectos-secondary: #1e3a5f;
-    --proyectos-gradient: linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #ea580c 100%);
+    /* Colores Primarios del Módulo (Teal/Cyan - Match Trabajadores) */
+    --proyectos-primary: #0AA4A4;
+    --proyectos-primary-dark: #087A7A;
+    --proyectos-primary-light: #08C6B6;
+    --proyectos-secondary: #2F6FBF;
+    --proyectos-gradient: linear-gradient(135deg, #0AA4A4 0%, #08C6B6 50%, #2F6FBF 100%);
 
     /* Colores para Animación del Fondo */
-    --proyectos-bg-color-1: #1e3a5f;
-    --proyectos-bg-color-2: #0f172a;
+    --proyectos-bg-color-1: #0AA4A4;
+    --proyectos-bg-color-2: #2F6FBF;
 
     /* Toggle Border - Modo Claro */
     --proyectos-toggle-border: #94a3b8;
@@ -52,7 +52,7 @@
     --proyectos-shadow-sm: 0 4px 15px rgba(0, 0, 0, 0.08);
     --proyectos-shadow-md: 0 8px 25px rgba(0, 0, 0, 0.12);
     --proyectos-shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.3);
-    --proyectos-shadow-primary: 0 4px 12px rgba(245, 158, 11, 0.4);
+    --proyectos-shadow-primary: 0 4px 12px rgba(10, 164, 164, 0.4);
 
     /* Badges - Estados de Proyecto */
     --proyectos-badge-success-bg: rgba(16, 185, 129, 0.15);
