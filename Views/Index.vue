@@ -37,8 +37,8 @@
       </header>
 
       <main class="module-content">
-        <!-- Actions (only for managers, not supervisors) -->
-        <div v-if="!isSupervisor && !selectedProject" class="actions-container">
+        <!-- Actions (only for managers, not supervisors) - Hide if empty state (button moves there) -->
+        <div v-if="!isSupervisor && !selectedProject && projects.length > 0" class="actions-container">
           <button @click="openCreateModal" class="btn-nuevo">
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -94,6 +94,13 @@
           </svg>
           <h3>{{ isSupervisor ? 'No tienes proyectos asignados' : 'No hay proyectos' }}</h3>
           <p>{{ isSupervisor ? 'Espera a que te asignen un proyecto' : 'Crea tu primer proyecto' }}</p>
+          
+          <button v-if="!isSupervisor" @click="openCreateModal" class="btn-nuevo" style="margin-top: 24px;">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Nuevo Proyecto
+          </button>
         </div>
 
         <!-- Projects Grid -->
