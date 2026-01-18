@@ -292,6 +292,135 @@ body.dark-mode .theme-toggle .sun-icon {
 }
 
 /* ============================================
+   FILTER BAR
+   ============================================ */
+.filter-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding: 16px;
+    background: var(--proyectos-bg-light);
+    border-radius: var(--proyectos-radius-lg);
+    border: 1px solid var(--proyectos-border);
+}
+
+.filter-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.filter-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    background: var(--proyectos-bg-card);
+    border: 1px solid var(--proyectos-border);
+    border-radius: var(--proyectos-radius-md);
+    color: var(--proyectos-text-gray);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--proyectos-transition-fast);
+}
+
+.filter-btn:hover {
+    background: var(--proyectos-bg-card);
+    color: var(--proyectos-text-dark);
+    border-color: var(--proyectos-primary);
+}
+
+.filter-btn.active {
+    background: var(--proyectos-primary);
+    color: var(--proyectos-text-white);
+    border-color: var(--proyectos-primary);
+}
+
+.filter-btn.active svg {
+    color: var(--proyectos-text-white);
+}
+
+.filter-btn svg {
+    width: 16px;
+    height: 16px;
+    color: var(--proyectos-text-light);
+}
+
+.filter-count {
+    padding: 2px 8px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: var(--proyectos-radius-full);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.filter-btn:not(.active) .filter-count {
+    background: var(--proyectos-bg-light);
+    color: var(--proyectos-text-gray);
+}
+
+.filter-dates {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.date-input-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.date-input-group label {
+    font-size: 12px;
+    color: var(--proyectos-text-gray);
+    font-weight: 500;
+}
+
+.date-input {
+    padding: 8px 12px;
+    background: var(--proyectos-bg-card);
+    border: 1px solid var(--proyectos-border);
+    border-radius: var(--proyectos-radius-sm);
+    color: var(--proyectos-text-dark);
+    font-size: 13px;
+}
+
+.date-input:focus {
+    outline: none;
+    border-color: var(--proyectos-primary);
+}
+
+.btn-clear-dates {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--proyectos-bg-card);
+    border: 1px solid var(--proyectos-border);
+    border-radius: var(--proyectos-radius-full);
+    color: var(--proyectos-text-gray);
+    cursor: pointer;
+    transition: var(--proyectos-transition-fast);
+}
+
+.btn-clear-dates:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border-color: #ef4444;
+}
+
+.btn-clear-dates svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* ============================================
    PROJECTS GRID
    ============================================ */
 .projects-list {
@@ -414,15 +543,21 @@ body.dark-mode .theme-toggle .sun-icon {
    EMPTY & LOADING STATES
    ============================================ */
 .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     text-align: center;
-    padding: 60px 20px;
+    padding: 80px 20px;
+    min-height: 300px;
 }
 
 .empty-state svg {
-    width: 64px;
-    height: 64px;
+    width: 80px;
+    height: 80px;
     color: var(--proyectos-text-light);
-    margin-bottom: 20px;
+    margin-bottom: 24px;
+    display: block;
 }
 
 .empty-state h3 {

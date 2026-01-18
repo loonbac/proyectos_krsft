@@ -47,6 +47,43 @@
           </button>
         </div>
 
+        <!-- Filter Bar -->
+        <div v-if="projects.length > 0 && !selectedProject" class="filter-bar">
+          <div class="filter-group">
+            <button 
+              v-for="filter in statusFilters" 
+              :key="filter.value"
+              :class="['filter-btn', { active: statusFilter === filter.value }]"
+              @click="statusFilter = filter.value"
+            >
+              <svg v-if="filter.icon" :viewBox="filter.viewBox || '0 0 24 24'" fill="none" stroke="currentColor" stroke-width="2">
+                <path v-if="filter.icon === 'all'" stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+                <path v-if="filter.icon === 'good'" stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                <path v-if="filter.icon === 'warning'" stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                <path v-if="filter.icon === 'critical'" stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              {{ filter.label }}
+              <span v-if="filter.count !== undefined" class="filter-count">{{ filter.count }}</span>
+            </button>
+          </div>
+          
+          <div class="filter-dates">
+            <div class="date-input-group">
+              <label>Desde:</label>
+              <input type="date" v-model="dateFrom" class="date-input" />
+            </div>
+            <div class="date-input-group">
+              <label>Hasta:</label>
+              <input type="date" v-model="dateTo" class="date-input" />
+            </div>
+            <button v-if="dateFrom || dateTo" @click="clearDateFilters" class="btn-clear-dates">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
         <!-- Loading -->
         <div v-if="loading" class="loading"><p>Cargando proyectos...</p></div>
 
@@ -61,7 +98,7 @@
 
         <!-- Projects Grid -->
         <div v-else-if="!selectedProject" class="projects-grid">
-          <div v-for="project in projects" :key="project.id" class="project-card" :style="{ borderLeftColor: getProjectColor(project.id) }" @click="selectProject(project)">
+          <div v-for="project in filteredProjects" :key="project.id" class="project-card" :style="{ borderLeftColor: getProjectColor(project.id) }" @click="selectProject(project)">
             <h3 :style="{ color: getProjectColor(project.id) }">{{ project.name }}</h3>
             <p class="project-meta">
               <span class="currency-badge">{{ project.currency || 'PEN' }}</span>
@@ -371,6 +408,11 @@ const newExpenseDesc = ref('');
 const newExpenseQty = ref(1);
 const selectedWorkerId = ref('');
 
+// Filter state
+const statusFilter = ref('all');
+const dateFrom = ref('');
+const dateTo = ref('');
+
 const isSupervisor = computed(() => props.isSupervisor);
 
 // Project color palette for random assignment
@@ -422,6 +464,45 @@ const formatDate = (d) => d ? new Date(d).toLocaleDateString('es-PE', { day: '2-
 const getCurrencySymbol = (c) => c === 'USD' ? '$' : 'S/';
 const getStatusLabel = (p) => { const u = parseFloat(p.usage_percent) || 0; if (u >= 90) return 'critical'; if (u >= (p.spending_threshold || 75)) return 'warning'; return 'good'; };
 const getStatusText = (s) => ({ good: 'Normal', warning: 'Precaución', critical: 'Crítico' }[s] || 'Normal');
+
+// Filter computed properties
+const statusFilters = computed(() => {
+  const counts = { all: projects.value.length, good: 0, warning: 0, critical: 0 };
+  projects.value.forEach(p => {
+    const label = getStatusLabel(p);
+    if (counts[label] !== undefined) counts[label]++;
+  });
+  return [
+    { value: 'all', label: 'Todos', icon: 'all', count: counts.all },
+    { value: 'good', label: 'Activos', icon: 'good', count: counts.good },
+    { value: 'warning', label: 'Alerta', icon: 'warning', count: counts.warning },
+    { value: 'critical', label: 'Críticos', icon: 'critical', count: counts.critical }
+  ];
+});
+
+const filteredProjects = computed(() => {
+  return projects.value.filter(project => {
+    // Status filter
+    if (statusFilter.value !== 'all') {
+      const projectStatus = getStatusLabel(project);
+      if (projectStatus !== statusFilter.value) return false;
+    }
+    
+    // Date range filter
+    if (dateFrom.value || dateTo.value) {
+      const createdAt = new Date(project.created_at);
+      if (dateFrom.value && createdAt < new Date(dateFrom.value)) return false;
+      if (dateTo.value && createdAt > new Date(dateTo.value + 'T23:59:59')) return false;
+    }
+    
+    return true;
+  });
+});
+
+const clearDateFilters = () => {
+  dateFrom.value = '';
+  dateTo.value = '';
+};
 
 // Dark mode toggle
 const toggleDarkMode = () => {
