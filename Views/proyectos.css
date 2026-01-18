@@ -552,7 +552,7 @@ body.dark-mode .theme-toggle .sun-icon {
     min-height: 300px;
 }
 
-.empty-state svg {
+.empty-state>svg {
     width: 80px;
     height: 80px;
     color: var(--proyectos-text-light);
