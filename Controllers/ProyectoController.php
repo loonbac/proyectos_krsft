@@ -473,17 +473,28 @@ class ProyectoController extends Controller
     }
 
     /**
-     * Download Excel template for material import (XLS format, headers only)
+     * Download Excel template for material import
+     * Serves file from Assets/Templates/plantilla_materiales.xls
      */
     public function downloadMaterialTemplate()
     {
+        $modulePath = dirname(__DIR__);
+        $templatePath = $modulePath . '/Assets/Templates/plantilla_materiales.xls';
+        
+        // If custom template exists, serve it
+        if (file_exists($templatePath)) {
+            return response()->download($templatePath, 'plantilla_materiales.xls', [
+                'Content-Type' => 'application/vnd.ms-excel',
+            ]);
+        }
+        
+        // Fallback: generate default template
         $headers = [
             'Content-Type' => 'application/vnd.ms-excel',
             'Content-Disposition' => 'attachment; filename="plantilla_materiales.xls"',
             'Cache-Control' => 'max-age=0',
         ];
 
-        // Create XML Spreadsheet (Excel 2003 XML format - compatible with .xls)
         $xml = '<?xml version="1.0" encoding="UTF-8"?>
 <?mso-application progid="Excel.Sheet"?>
 <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
