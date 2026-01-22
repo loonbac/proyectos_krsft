@@ -561,9 +561,12 @@ class ProyectoController extends Controller
             
             $rows = [];
             
-            // Check if it's an XML Spreadsheet (our XLS template)
-            if ($extension === 'xls' || strpos($content, 'schemas-microsoft-com:office:spreadsheet') !== false) {
-                // Parse XML Spreadsheet format
+            // Check file type and parse accordingly
+            if ($extension === 'xlsx') {
+                // Parse modern XLSX (ZIP-based) format
+                $rows = $this->parseXlsx($file->getRealPath());
+            } elseif ($extension === 'xls' || strpos($content, 'schemas-microsoft-com:office:spreadsheet') !== false) {
+                // Parse XML Spreadsheet format (old XLS)
                 $rows = $this->parseXmlSpreadsheet($content);
             } else {
                 // Parse as CSV
@@ -679,6 +682,87 @@ class ProyectoController extends Controller
             }
             
             $rows[] = $columns;
+        }
+        
+        return $rows;
+    }
+
+    /**
+     * Parse XLSX format (ZIP-based Excel 2007+)
+     */
+    private function parseXlsx($filePath)
+    {
+        $rows = [];
+        
+        $zip = new \ZipArchive();
+        if ($zip->open($filePath) !== true) {
+            throw new \Exception('No se pudo abrir el archivo XLSX');
+        }
+        
+        // Read sharedStrings.xml for string values
+        $sharedStrings = [];
+        $sharedStringsXml = $zip->getFromName('xl/sharedStrings.xml');
+        if ($sharedStringsXml) {
+            // Fix encoding
+            $sharedStringsXml = mb_convert_encoding($sharedStringsXml, 'UTF-8', 'UTF-8');
+            preg_match_all('/<t[^>]*>([^<]*)<\/t>/u', $sharedStringsXml, $stringMatches);
+            if (!empty($stringMatches[1])) {
+                $sharedStrings = array_map(function($s) {
+                    return html_entity_decode($s, ENT_QUOTES | ENT_XML1, 'UTF-8');
+                }, $stringMatches[1]);
+            }
+        }
+        
+        // Read sheet1.xml for data
+        $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+        if (!$sheetXml) {
+            $zip->close();
+            throw new \Exception('No se encontró la hoja de datos');
+        }
+        
+        $zip->close();
+        
+        // Fix encoding
+        $sheetXml = mb_convert_encoding($sheetXml, 'UTF-8', 'UTF-8');
+        
+        // Extract rows
+        preg_match_all('/<row[^>]*>(.*?)<\/row>/su', $sheetXml, $rowMatches);
+        
+        if (!empty($rowMatches[1])) {
+            // Skip header row (first row)
+            $dataRows = array_slice($rowMatches[1], 1);
+            
+            foreach ($dataRows as $rowXml) {
+                $rowData = [];
+                
+                // Extract cells - handle sparse columns
+                preg_match_all('/<c[^>]*r="([A-Z]+)\d+"[^>]*(?:t="([^"]*)")?[^>]*>(?:<v>([^<]*)<\/v>)?/su', $rowXml, $cellMatches, PREG_SET_ORDER);
+                
+                // Build row with proper column positions (A-H = 0-7)
+                $currentRow = array_fill(0, 8, '');
+                
+                foreach ($cellMatches as $cellMatch) {
+                    $colLetter = $cellMatch[1];
+                    $cellType = $cellMatch[2] ?? '';
+                    $cellValue = $cellMatch[3] ?? '';
+                    
+                    // Convert column letter to index (A=0, B=1, etc.)
+                    $colIndex = ord($colLetter) - ord('A');
+                    
+                    if ($cellType === 's' && isset($sharedStrings[(int)$cellValue])) {
+                        // Shared string reference
+                        $currentRow[$colIndex] = $sharedStrings[(int)$cellValue];
+                    } else {
+                        // Direct value
+                        $currentRow[$colIndex] = $cellValue;
+                    }
+                }
+                
+                // Only add non-empty rows
+                if (array_filter($currentRow)) {
+                    $rows[] = $currentRow;
+                }
+            }
         }
         
         return $rows;
