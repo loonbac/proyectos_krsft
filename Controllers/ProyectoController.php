@@ -474,16 +474,24 @@ class ProyectoController extends Controller
 
     /**
      * Download Excel template for material import
-     * Serves file from Assets/Templates/plantilla_materiales.xls
+     * Serves file from Assets/Templates/
      */
     public function downloadMaterialTemplate()
     {
         $modulePath = dirname(__DIR__);
-        $templatePath = $modulePath . '/Assets/Templates/plantilla_materiales.xls';
         
-        // If custom template exists, serve it
-        if (file_exists($templatePath)) {
-            return response()->download($templatePath, 'plantilla_materiales.xls', [
+        // Check for xlsx first (more common), then xls
+        $xlsxPath = $modulePath . '/Assets/Templates/Plantilla_Materiales.xlsx';
+        $xlsPath = $modulePath . '/Assets/Templates/plantilla_materiales.xls';
+        
+        if (file_exists($xlsxPath)) {
+            return response()->download($xlsxPath, 'Plantilla_Materiales.xlsx', [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ]);
+        }
+        
+        if (file_exists($xlsPath)) {
+            return response()->download($xlsPath, 'plantilla_materiales.xls', [
                 'Content-Type' => 'application/vnd.ms-excel',
             ]);
         }
@@ -572,13 +580,15 @@ class ProyectoController extends Controller
                     continue;
                 }
 
-                $qty = intval($columns[0] ?? 1);
-                $unit = trim($columns[1] ?? 'UND');
-                $description = trim($columns[2] ?? '');
-                $diameter = trim($columns[3] ?? '');
-                $series = trim($columns[4] ?? '');
-                $materialType = trim($columns[5] ?? '');
-                $manufacturingStandard = trim($columns[6] ?? '');
+                // Excel columns: ITEM(0), CANT(1), UND(2), DESCRIPCION(3), DIAMETRO(4), SERIE(5), MATERIAL(6), NORMA(7)
+                // Skip ITEM column (index 0) as it's auto-generated
+                $qty = intval($columns[1] ?? 1);
+                $unit = trim($columns[2] ?? 'UND');
+                $description = trim($columns[3] ?? '');
+                $diameter = trim($columns[4] ?? '');
+                $series = trim($columns[5] ?? '');
+                $materialType = trim($columns[6] ?? '');
+                $manufacturingStandard = trim($columns[7] ?? '');
 
                 if (empty($description)) {
                     $errors[] = "Fila " . ($index + 2) . ": descripción vacía";
