@@ -473,51 +473,55 @@ class ProyectoController extends Controller
     }
 
     /**
-     * Download Excel template for material import
+     * Download Excel template for material import (XLS format, headers only)
      */
     public function downloadMaterialTemplate()
     {
         $headers = [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="plantilla_materiales.xlsx"',
+            'Content-Type' => 'application/vnd.ms-excel',
+            'Content-Disposition' => 'attachment; filename="plantilla_materiales.xls"',
+            'Cache-Control' => 'max-age=0',
         ];
 
-        // Create a simple CSV that Excel can open (compatible approach)
-        $headers = [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="plantilla_materiales.csv"',
-        ];
+        // Create XML Spreadsheet (Excel 2003 XML format - compatible with .xls)
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+ <Styles>
+  <Style ss:ID="Header">
+   <Font ss:Bold="1" ss:Size="11"/>
+   <Interior ss:Color="#0AA4A4" ss:Pattern="Solid"/>
+   <Font ss:Color="#FFFFFF"/>
+  </Style>
+ </Styles>
+ <Worksheet ss:Name="Materiales">
+  <Table>
+   <Column ss:Width="60"/>
+   <Column ss:Width="50"/>
+   <Column ss:Width="300"/>
+   <Column ss:Width="100"/>
+   <Column ss:Width="100"/>
+   <Column ss:Width="150"/>
+   <Column ss:Width="120"/>
+   <Row>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">CANT</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">UND</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">DESCRIPCION</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">DIAMETRO</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">SERIE</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">MATERIAL</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">NORMA_DE_FAB</Data></Cell>
+   </Row>
+  </Table>
+ </Worksheet>
+</Workbook>';
 
-        $callback = function() {
-            $file = fopen('php://output', 'w');
-            
-            // BOM for UTF-8 Excel compatibility
-            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
-            
-            // Header row with column names
-            fputcsv($file, [
-                'CANT',
-                'UND',
-                'DESCRIPCION',
-                'DIAMETRO',
-                'SERIE',
-                'MATERIAL',
-                'NORMA_DE_FAB'
-            ], ';');
-            
-            // Example rows
-            fputcsv($file, ['10', 'UND', 'BRIDA ANILLO - SLIP ON RAISED FACE', '1/2 INCH', 'CLASE 150', 'ACERO INOXIDABLE', 'ANSI B16.5'], ';');
-            fputcsv($file, ['5', 'M', 'TUBO SIN COSTURA', '2 INCH', 'SCH40', 'ACERO AL CARBONO', 'ASTM A-106'], ';');
-            fputcsv($file, ['20', 'UND', 'CODO 90 - LONG RADIUS', '1 INCH', 'CLASE 3000', 'ACERO INOXIDABLE', 'ANSI B16.11'], ';');
-            
-            fclose($file);
-        };
-
-        return response()->stream($callback, 200, $headers);
+        return response($xml, 200, $headers);
     }
 
     /**
-     * Import materials from CSV/Excel file
+     * Import materials from XLS/CSV file
      */
     public function importMaterials(Request $request, $id)
     {
@@ -528,32 +532,32 @@ class ProyectoController extends Controller
         }
 
         $request->validate([
-            'file' => 'required|file|mimes:csv,txt,xlsx,xls|max:5120'
+            'file' => 'required|file|mimes:csv,txt,xlsx,xls,xml|max:5120'
         ]);
 
         try {
             $file = $request->file('file');
             $content = file_get_contents($file->getRealPath());
+            $extension = strtolower($file->getClientOriginalExtension());
             
-            // Remove BOM if present
-            $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
+            $rows = [];
             
-            $lines = preg_split('/\r\n|\r|\n/', $content);
+            // Check if it's an XML Spreadsheet (our XLS template)
+            if ($extension === 'xls' || strpos($content, 'schemas-microsoft-com:office:spreadsheet') !== false) {
+                // Parse XML Spreadsheet format
+                $rows = $this->parseXmlSpreadsheet($content);
+            } else {
+                // Parse as CSV
+                $rows = $this->parseCsv($content);
+            }
+
             $imported = 0;
             $errors = [];
 
-            foreach ($lines as $index => $line) {
-                // Skip header row
-                if ($index === 0) continue;
-                
-                // Skip empty lines
-                if (empty(trim($line))) continue;
-
-                // Parse CSV line (semicolon separated)
-                $columns = str_getcsv($line, ';');
-                
+            foreach ($rows as $index => $columns) {
+                // Skip if not enough columns
                 if (count($columns) < 3) {
-                    $errors[] = "Línea " . ($index + 1) . ": formato inválido";
+                    $errors[] = "Fila " . ($index + 2) . ": formato inválido";
                     continue;
                 }
 
@@ -566,7 +570,7 @@ class ProyectoController extends Controller
                 $manufacturingStandard = trim($columns[6] ?? '');
 
                 if (empty($description)) {
-                    $errors[] = "Línea " . ($index + 1) . ": descripción vacía";
+                    $errors[] = "Fila " . ($index + 2) . ": descripción vacía";
                     continue;
                 }
 
@@ -601,5 +605,61 @@ class ProyectoController extends Controller
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => 'Error: ' . $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Parse XML Spreadsheet format (Excel 2003 XML)
+     */
+    private function parseXmlSpreadsheet($content)
+    {
+        $rows = [];
+        
+        // Extract all Row elements after the header
+        preg_match_all('/<Row>(.*?)<\/Row>/s', $content, $rowMatches);
+        
+        if (!empty($rowMatches[1])) {
+            // Skip first row (header)
+            $dataRows = array_slice($rowMatches[1], 1);
+            
+            foreach ($dataRows as $rowXml) {
+                // Extract cell data
+                preg_match_all('/<Data[^>]*>([^<]*)<\/Data>/s', $rowXml, $cellMatches);
+                
+                if (!empty($cellMatches[1])) {
+                    $rows[] = $cellMatches[1];
+                }
+            }
+        }
+        
+        return $rows;
+    }
+
+    /**
+     * Parse CSV content
+     */
+    private function parseCsv($content)
+    {
+        $rows = [];
+        
+        // Remove BOM if present
+        $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
+        
+        $lines = preg_split('/\r\n|\r|\n/', $content);
+        
+        // Skip header row (index 0)
+        for ($i = 1; $i < count($lines); $i++) {
+            $line = trim($lines[$i]);
+            if (empty($line)) continue;
+            
+            // Try semicolon first, then comma
+            $columns = str_getcsv($line, ';');
+            if (count($columns) === 1) {
+                $columns = str_getcsv($line, ',');
+            }
+            
+            $rows[] = $columns;
+        }
+        
+        return $rows;
     }
 }
