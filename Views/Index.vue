@@ -136,41 +136,69 @@
 
         <!-- Project Detail View -->
         <div v-if="selectedProject" class="project-detail">
-          <div class="detail-header">
-            <button @click="selectedProject = null; projectWorkers = []; projectOrders = []" class="btn-back-detail" :style="{ background: getProjectColor(selectedProject.id) }">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M19 12H5M5 12L12 19M5 12L12 5"/>
-              </svg>
-              Volver
-            </button>
-            <h2 :style="{ color: getProjectColor(selectedProject.id) }">{{ selectedProject.name }}</h2>
+          <!-- New Header: Pill-shape name, status badge, back button -->
+          <div class="detail-header-new">
+            <div class="header-left-section">
+              <button @click="selectedProject = null; projectWorkers = []; projectOrders = []" class="btn-back-projects">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M19 12H5M5 12L12 19M5 12L12 5"/>
+                </svg>
+              </button>
+              <span class="project-name-pill" :style="{ background: getProjectColor(selectedProject.id) }">
+                {{ selectedProject.name }}
+              </span>
+              <span class="currency-pill">{{ selectedProject.currency || 'PEN' }}</span>
+            </div>
             <span class="status-badge" :class="getStatusLabel(selectedProject)">{{ getStatusText(getStatusLabel(selectedProject)) }}</span>
           </div>
 
-          <div class="detail-grid">
-            <div class="detail-card">
-              <h4>Moneda</h4>
-              <p>{{ selectedProject.currency || 'PEN' }}</p>
+          <!-- Consolidated Stats with Chart -->
+          <div class="project-stats-panel">
+            <!-- Left: Stats List -->
+            <div class="stats-list">
+              <div class="stat-row">
+                <span class="stat-label">Monto Adjudicado</span>
+                <span class="stat-value primary">{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber(selectedProject.total_amount) }}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Disponible</span>
+                <span class="stat-value success">{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber(projectSummary.remaining || selectedProject.available_amount) }}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Gastado</span>
+                <span class="stat-value warning">{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber(projectSummary.spent || 0) }}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Órdenes Pendientes</span>
+                <span class="stat-value">{{ projectSummary.pending_orders || 0 }}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Supervisor</span>
+                <span class="stat-value muted">{{ selectedProject.supervisor_name || 'No asignado' }}</span>
+              </div>
             </div>
-            <div class="detail-card">
-              <h4>Monto Adjudicado</h4>
-              <p>{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber(selectedProject.total_amount) }}</p>
-            </div>
-            <div class="detail-card">
-              <h4>Disponible</h4>
-              <p>{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber(projectSummary.remaining || selectedProject.available_amount) }}</p>
-            </div>
-            <div class="detail-card">
-              <h4>Gastado</h4>
-              <p>{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber(projectSummary.spent || 0) }}</p>
-            </div>
-            <div class="detail-card">
-              <h4>Supervisor</h4>
-              <p>{{ selectedProject.supervisor_name || 'No asignado' }}</p>
-            </div>
-            <div class="detail-card">
-              <h4>Órdenes Pendientes</h4>
-              <p>{{ projectSummary.pending_orders || 0 }}</p>
+            
+            <!-- Right: Donut Chart -->
+            <div class="expense-chart">
+              <svg viewBox="0 0 120 120" class="donut-chart">
+                <!-- Background circle -->
+                <circle cx="60" cy="60" r="50" fill="none" stroke="var(--proyectos-border)" stroke-width="12"/>
+                <!-- Spent arc -->
+                <circle 
+                  cx="60" cy="60" r="50" 
+                  fill="none" 
+                  stroke="var(--proyectos-warning)" 
+                  stroke-width="12"
+                  stroke-linecap="round"
+                  :stroke-dasharray="getChartArc"
+                  stroke-dashoffset="0"
+                  transform="rotate(-90 60 60)"
+                />
+              </svg>
+              <div class="chart-center">
+                <span class="chart-percent">{{ getUsagePercent }}%</span>
+                <span class="chart-label">Usado</span>
+              </div>
             </div>
           </div>
 
@@ -560,6 +588,20 @@ const formatDate = (d) => d ? new Date(d).toLocaleDateString('es-PE', { day: '2-
 const getCurrencySymbol = (c) => c === 'USD' ? '$' : 'S/';
 const getStatusLabel = (p) => { const u = parseFloat(p.usage_percent) || 0; if (u >= 90) return 'critical'; if (u >= (p.spending_threshold || 75)) return 'warning'; return 'good'; };
 const getStatusText = (s) => ({ good: 'Normal', warning: 'Precaución', critical: 'Crítico' }[s] || 'Normal');
+
+// Chart computed properties
+const getUsagePercent = computed(() => {
+  if (!selectedProject.value) return 0;
+  const usage = parseFloat(selectedProject.value.usage_percent) || 0;
+  return Math.min(100, Math.round(usage));
+});
+
+const getChartArc = computed(() => {
+  const percent = getUsagePercent.value;
+  const circumference = 2 * Math.PI * 50; // r=50
+  const arcLength = (percent / 100) * circumference;
+  return `${arcLength} ${circumference}`;
+});
 
 // Filter computed properties
 const statusFilters = computed(() => {
