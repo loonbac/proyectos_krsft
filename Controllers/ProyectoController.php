@@ -703,7 +703,6 @@ class ProyectoController extends Controller
         $sharedStrings = [];
         $sharedStringsXml = $zip->getFromName('xl/sharedStrings.xml');
         if ($sharedStringsXml) {
-            // Fix encoding
             $sharedStringsXml = mb_convert_encoding($sharedStringsXml, 'UTF-8', 'UTF-8');
             preg_match_all('/<t[^>]*>([^<]*)<\/t>/u', $sharedStringsXml, $stringMatches);
             if (!empty($stringMatches[1])) {
@@ -722,7 +721,6 @@ class ProyectoController extends Controller
         
         $zip->close();
         
-        // Fix encoding
         $sheetXml = mb_convert_encoding($sheetXml, 'UTF-8', 'UTF-8');
         
         // Extract rows
@@ -733,27 +731,39 @@ class ProyectoController extends Controller
             $dataRows = array_slice($rowMatches[1], 1);
             
             foreach ($dataRows as $rowXml) {
-                $rowData = [];
-                
-                // Extract cells - handle sparse columns
-                preg_match_all('/<c[^>]*r="([A-Z]+)\d+"[^>]*(?:t="([^"]*)")?[^>]*>(?:<v>([^<]*)<\/v>)?/su', $rowXml, $cellMatches, PREG_SET_ORDER);
-                
                 // Build row with proper column positions (A-H = 0-7)
                 $currentRow = array_fill(0, 8, '');
                 
+                // Extract each cell element separately
+                preg_match_all('/<c\s+([^>]*)>(.*?)<\/c>|<c\s+([^\/]*)\/>/su', $rowXml, $cellMatches, PREG_SET_ORDER);
+                
                 foreach ($cellMatches as $cellMatch) {
-                    $colLetter = $cellMatch[1];
-                    $cellType = $cellMatch[2] ?? '';
-                    $cellValue = $cellMatch[3] ?? '';
+                    // Get attributes string (from either format)
+                    $attrs = !empty($cellMatch[1]) ? $cellMatch[1] : ($cellMatch[3] ?? '');
+                    $cellContent = $cellMatch[2] ?? '';
                     
-                    // Convert column letter to index (A=0, B=1, etc.)
-                    $colIndex = ord($colLetter) - ord('A');
+                    // Extract cell reference (r="A2")
+                    if (!preg_match('/r="([A-Z]+)\d+"/i', $attrs, $refMatch)) {
+                        continue;
+                    }
+                    $colLetter = $refMatch[1];
+                    $colIndex = ord(strtoupper($colLetter)) - ord('A');
                     
-                    if ($cellType === 's' && isset($sharedStrings[(int)$cellValue])) {
-                        // Shared string reference
+                    if ($colIndex < 0 || $colIndex > 7) continue;
+                    
+                    // Check if it's a shared string (t="s")
+                    $isSharedString = preg_match('/t="s"/i', $attrs);
+                    
+                    // Get the value from <v>...</v>
+                    $cellValue = '';
+                    if (preg_match('/<v>([^<]*)<\/v>/', $cellContent, $valueMatch)) {
+                        $cellValue = $valueMatch[1];
+                    }
+                    
+                    // Apply shared string lookup if needed
+                    if ($isSharedString && $cellValue !== '' && isset($sharedStrings[(int)$cellValue])) {
                         $currentRow[$colIndex] = $sharedStrings[(int)$cellValue];
                     } else {
-                        // Direct value
                         $currentRow[$colIndex] = $cellValue;
                     }
                 }
