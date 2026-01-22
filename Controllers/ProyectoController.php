@@ -312,6 +312,12 @@ class ProyectoController extends Controller
                 'created_by' => auth()->id(),
                 'created_at' => now(),
                 'updated_at' => now(),
+                // Material specification fields
+                'unit' => $request->input('unit'),
+                'diameter' => $request->input('diameter'),
+                'series' => $request->input('series'),
+                'material_type' => $request->input('material_type'),
+                'manufacturing_standard' => $request->input('manufacturing_standard'),
             ];
 
             if ($request->type === 'service') {

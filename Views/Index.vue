@@ -216,26 +216,68 @@
                 <line x1="12" y1="1" x2="12" y2="23"/>
                 <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
               </svg>
-              AGREGAR GASTOS
+              AGREGAR MATERIAL
             </h3>
             
-            <form @submit.prevent="createOrder" class="order-form">
-              <div class="form-group">
-                <label>Descripción del gasto</label>
-                <div class="expense-add-row">
-                  <input v-model="newExpenseDesc" type="text" placeholder="Ej: Cemento, transporte, materiales..." class="input-field" />
-                  <input v-model.number="newExpenseQty" type="number" min="1" placeholder="Cant." class="input-field qty-input" />
-                  <button type="submit" :disabled="savingOrder || !newExpenseDesc || !newExpenseQty" class="btn-add-icon" title="Agregar gasto">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                  </button>
+            <form @submit.prevent="createOrder" class="material-form">
+              <!-- Row 1: Cantidad, Unidad, Descripción -->
+              <div class="material-form-row">
+                <div class="form-group form-group-sm">
+                  <label>CANT</label>
+                  <input v-model.number="materialForm.qty" type="number" min="1" class="input-field" placeholder="1" />
                 </div>
-                <p class="hint">Cada gasto se envía individualmente para aprobación</p>
+                <div class="form-group form-group-sm">
+                  <label>UND</label>
+                  <select v-model="materialForm.unit" class="select-field">
+                    <option value="UND">UND</option>
+                    <option value="M">M</option>
+                    <option value="KG">KG</option>
+                    <option value="PZA">PZA</option>
+                    <option value="JGO">JGO</option>
+                    <option value="GLB">GLB</option>
+                    <option value="LT">LT</option>
+                    <option value="M2">M2</option>
+                    <option value="M3">M3</option>
+                  </select>
+                </div>
+                <div class="form-group form-group-lg">
+                  <label>DESCRIPCIÓN *</label>
+                  <input v-model="materialForm.description" type="text" class="input-field" placeholder="Ej: BRIDA ANILLO - SLIP ON RAISED FACE" />
+                </div>
+              </div>
+              
+              <!-- Row 2: Diámetro, Serie, Material, Norma -->
+              <div class="material-form-row">
+                <div class="form-group form-group-md">
+                  <label>DIÁMETRO</label>
+                  <input v-model="materialForm.diameter" type="text" class="input-field" placeholder="Ej: Φ1/2 INCH" />
+                </div>
+                <div class="form-group form-group-md">
+                  <label>SERIE</label>
+                  <input v-model="materialForm.series" type="text" class="input-field" placeholder="Ej: CLASE 150" />
+                </div>
+                <div class="form-group form-group-md">
+                  <label>MATERIAL</label>
+                  <input v-model="materialForm.material_type" type="text" class="input-field" placeholder="Ej: ACERO INOXIDABLE" />
+                </div>
+                <div class="form-group form-group-md">
+                  <label>NORMA DE FAB.</label>
+                  <input v-model="materialForm.manufacturing_standard" type="text" class="input-field" placeholder="Ej: ANSI B16.5" />
+                </div>
+              </div>
+              
+              <div class="material-form-actions">
+                <button type="submit" :disabled="savingOrder || !materialForm.description || !materialForm.qty" class="btn-add-material">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  {{ savingOrder ? 'Agregando...' : 'Agregar Material' }}
+                </button>
+                <p class="hint">Cada material se envía individualmente para aprobación en Compras</p>
               </div>
             </form>
           </div>
 
           <!-- Orders List -->
-          <div class="section-box">
+          <div class="section-box orders-section">
             <h3>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -243,49 +285,61 @@
                 <line x1="16" y1="13" x2="8" y2="13"/>
                 <line x1="16" y1="17" x2="8" y2="17"/>
               </svg>
-              Órdenes y Gastos ({{ projectOrders.length }})
+              Lista de Materiales ({{ projectOrders.length }})
             </h3>
-            <div v-if="projectOrders.length === 0" class="empty-list"><p>No hay gastos registrados</p></div>
-            <table v-else class="orders-table">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Descripción</th>
-                  <th>Cantidad</th>
-                  <th>Estado</th>
-                  <th>Monto</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="order in projectOrders" :key="order.id" :class="getOrderRowClass(order)">
-                  <td>{{ formatDate(order.created_at) }}</td>
-                  <td>{{ order.description }}</td>
-                  <td class="qty-cell">{{ getOrderQuantity(order) }}</td>
-                  <td>
-                    <span class="order-status" :class="getOrderStatusClass(order)">
-                      <!-- Pending icon (clock) -->
-                      <svg v-if="order.status === 'pending'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                      </svg>
-                      <!-- Approved icon (check) -->
-                      <svg v-else-if="order.status === 'approved' && !order.payment_confirmed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="20 6 9 17 4 12"/>
-                      </svg>
-                      <!-- Paid icon (check circle) -->
-                      <svg v-else-if="order.payment_confirmed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-                      </svg>
-                      <!-- Rejected icon (x) -->
-                      <svg v-else-if="order.status === 'rejected'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
-                      </svg>
-                      {{ getOrderStatusLabel(order) }}
-                    </span>
-                  </td>
-                  <td>{{ order.amount ? getCurrencySymbol(order.currency) + ' ' + formatNumber(order.total_with_igv || order.amount) : 'Por cotizar' }}</td>
-                </tr>
-              </tbody>
-            </table>
+            <div v-if="projectOrders.length === 0" class="empty-list"><p>No hay materiales registrados</p></div>
+            <div v-else class="table-scroll-container">
+              <table class="materials-table">
+                <thead>
+                  <tr>
+                    <th class="col-item">ITEM</th>
+                    <th class="col-cant">CANT</th>
+                    <th class="col-und">UND</th>
+                    <th class="col-desc">DESCRIPCIÓN</th>
+                    <th class="col-diam">DIÁMETRO</th>
+                    <th class="col-serie">SERIE</th>
+                    <th class="col-mat">MATERIAL</th>
+                    <th class="col-norma">NORMA DE FAB.</th>
+                    <th class="col-estado">ESTADO</th>
+                    <th class="col-monto">MONTO</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(order, index) in projectOrders" :key="order.id" :class="getOrderRowClass(order)">
+                    <td class="col-item">{{ index + 1 }}</td>
+                    <td class="col-cant">{{ getOrderQuantity(order) }}</td>
+                    <td class="col-und">{{ order.unit || 'UND' }}</td>
+                    <td class="col-desc">{{ order.description }}</td>
+                    <td class="col-diam">{{ order.diameter || '-' }}</td>
+                    <td class="col-serie">{{ order.series || '-' }}</td>
+                    <td class="col-mat">{{ order.material_type || '-' }}</td>
+                    <td class="col-norma">{{ order.manufacturing_standard || '-' }}</td>
+                    <td class="col-estado">
+                      <span class="order-status" :class="getOrderStatusClass(order)">
+                        <!-- Pending icon (clock) -->
+                        <svg v-if="order.status === 'pending'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                        <!-- Approved icon (check) -->
+                        <svg v-else-if="order.status === 'approved' && !order.payment_confirmed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        <!-- Paid icon (check circle) -->
+                        <svg v-else-if="order.payment_confirmed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                        </svg>
+                        <!-- Rejected icon (x) -->
+                        <svg v-else-if="order.status === 'rejected'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                        </svg>
+                        {{ getOrderStatusLabel(order) }}
+                      </span>
+                    </td>
+                    <td class="col-monto">{{ order.amount ? getCurrencySymbol(order.currency) + ' ' + formatNumber(order.total_with_igv || order.amount) : 'Por cotizar' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <!-- Edit Section (only for managers) -->
@@ -414,6 +468,17 @@ const newMaterialQty = ref(1);
 const newExpenseDesc = ref('');
 const newExpenseQty = ref(1);
 const selectedWorkerId = ref('');
+
+// Material specification form
+const materialForm = ref({
+  qty: 1,
+  unit: 'UND',
+  description: '',
+  diameter: '',
+  series: '',
+  material_type: '',
+  manufacturing_standard: ''
+});
 
 // Filter state
 const statusFilter = ref('all');
@@ -654,28 +719,44 @@ const removeWorkerFromProject = async (trabajadorId) => {
   } catch (e) { showToast('Error', 'error'); }
 };
 
-// Orders - Single item expense (sent as material to backend)
+// Orders - Material specification (sent to backend with all fields)
 const createOrder = async () => {
-  if (!selectedProject.value || !newExpenseDesc.value || !newExpenseQty.value) return;
+  if (!selectedProject.value || !materialForm.value.description || !materialForm.value.qty) return;
   savingOrder.value = true;
   try {
-    // Send as single-item materials array (backend expects this format)
-    const materials = [{ name: newExpenseDesc.value.trim(), qty: newExpenseQty.value }];
-    const description = `${newExpenseDesc.value} (${newExpenseQty.value})`;
+    // Send material with all specification fields
+    const materials = [{ 
+      name: materialForm.value.description.trim(), 
+      qty: materialForm.value.qty 
+    }];
+    const description = materialForm.value.description.trim();
     
     const res = await fetchWithCsrf(`${apiBase.value}/${selectedProject.value.id}/order`, {
       method: 'POST',
       body: JSON.stringify({ 
         type: 'material', 
         description: description,
-        materials: materials
+        materials: materials,
+        unit: materialForm.value.unit,
+        diameter: materialForm.value.diameter || null,
+        series: materialForm.value.series || null,
+        material_type: materialForm.value.material_type || null,
+        manufacturing_standard: materialForm.value.manufacturing_standard || null
       })
     });
     const data = await res.json();
     if (data.success) {
-      showToast('Gasto enviado a aprobación', 'success');
-      newExpenseDesc.value = '';
-      newExpenseQty.value = 1;
+      showToast('Material enviado a aprobación', 'success');
+      // Reset form
+      materialForm.value = {
+        qty: 1,
+        unit: 'UND',
+        description: '',
+        diameter: '',
+        series: '',
+        material_type: '',
+        manufacturing_standard: ''
+      };
       await selectProject({ id: selectedProject.value.id });
     } else {
       showToast(data.message || 'Error', 'error');
