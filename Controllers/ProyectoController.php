@@ -471,4 +471,135 @@ class ProyectoController extends Controller
             ]
         ]);
     }
+
+    /**
+     * Download Excel template for material import
+     */
+    public function downloadMaterialTemplate()
+    {
+        $headers = [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="plantilla_materiales.xlsx"',
+        ];
+
+        // Create a simple CSV that Excel can open (compatible approach)
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="plantilla_materiales.csv"',
+        ];
+
+        $callback = function() {
+            $file = fopen('php://output', 'w');
+            
+            // BOM for UTF-8 Excel compatibility
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+            
+            // Header row with column names
+            fputcsv($file, [
+                'CANT',
+                'UND',
+                'DESCRIPCION',
+                'DIAMETRO',
+                'SERIE',
+                'MATERIAL',
+                'NORMA_DE_FAB'
+            ], ';');
+            
+            // Example rows
+            fputcsv($file, ['10', 'UND', 'BRIDA ANILLO - SLIP ON RAISED FACE', '1/2 INCH', 'CLASE 150', 'ACERO INOXIDABLE', 'ANSI B16.5'], ';');
+            fputcsv($file, ['5', 'M', 'TUBO SIN COSTURA', '2 INCH', 'SCH40', 'ACERO AL CARBONO', 'ASTM A-106'], ';');
+            fputcsv($file, ['20', 'UND', 'CODO 90 - LONG RADIUS', '1 INCH', 'CLASE 3000', 'ACERO INOXIDABLE', 'ANSI B16.11'], ';');
+            
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Import materials from CSV/Excel file
+     */
+    public function importMaterials(Request $request, $id)
+    {
+        $project = DB::table($this->projectsTable)->find($id);
+
+        if (!$project) {
+            return response()->json(['success' => false, 'message' => 'Proyecto no encontrado'], 404);
+        }
+
+        $request->validate([
+            'file' => 'required|file|mimes:csv,txt,xlsx,xls|max:5120'
+        ]);
+
+        try {
+            $file = $request->file('file');
+            $content = file_get_contents($file->getRealPath());
+            
+            // Remove BOM if present
+            $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
+            
+            $lines = preg_split('/\r\n|\r|\n/', $content);
+            $imported = 0;
+            $errors = [];
+
+            foreach ($lines as $index => $line) {
+                // Skip header row
+                if ($index === 0) continue;
+                
+                // Skip empty lines
+                if (empty(trim($line))) continue;
+
+                // Parse CSV line (semicolon separated)
+                $columns = str_getcsv($line, ';');
+                
+                if (count($columns) < 3) {
+                    $errors[] = "Línea " . ($index + 1) . ": formato inválido";
+                    continue;
+                }
+
+                $qty = intval($columns[0] ?? 1);
+                $unit = trim($columns[1] ?? 'UND');
+                $description = trim($columns[2] ?? '');
+                $diameter = trim($columns[3] ?? '');
+                $series = trim($columns[4] ?? '');
+                $materialType = trim($columns[5] ?? '');
+                $manufacturingStandard = trim($columns[6] ?? '');
+
+                if (empty($description)) {
+                    $errors[] = "Línea " . ($index + 1) . ": descripción vacía";
+                    continue;
+                }
+
+                // Create order
+                $orderData = [
+                    'project_id' => $id,
+                    'type' => 'material',
+                    'description' => $description,
+                    'materials' => json_encode([['name' => $description, 'qty' => $qty]]),
+                    'unit' => $unit,
+                    'diameter' => $diameter ?: null,
+                    'series' => $series ?: null,
+                    'material_type' => $materialType ?: null,
+                    'manufacturing_standard' => $manufacturingStandard ?: null,
+                    'currency' => $project->currency ?? 'PEN',
+                    'status' => 'pending',
+                    'created_by' => auth()->id(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+
+                DB::table('purchase_orders')->insert($orderData);
+                $imported++;
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $imported . ' materiales importados',
+                'imported' => $imported,
+                'errors' => $errors
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Error: ' . $e->getMessage()], 500);
+        }
+    }
 }

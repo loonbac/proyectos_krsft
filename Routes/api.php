@@ -21,3 +21,7 @@ Route::delete('/{id}/workers/{trabajadorId}', "{$ctrl}@removeWorker")->where(['i
 
 // Purchase orders
 Route::post('/{id}/order', "{$ctrl}@createPurchaseOrder")->where('id', '[0-9]+');
+
+// Material import/export
+Route::get('/material-template', "{$ctrl}@downloadMaterialTemplate");
+Route::post('/{id}/import-materials', "{$ctrl}@importMaterials")->where('id', '[0-9]+');

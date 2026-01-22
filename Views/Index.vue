@@ -267,11 +267,32 @@
               </div>
               
               <div class="material-form-actions">
-                <button type="submit" :disabled="savingOrder || !materialForm.description || !materialForm.qty" class="btn-add-material">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                  {{ savingOrder ? 'Agregando...' : 'Agregar Material' }}
-                </button>
-                <p class="hint">Cada material se envía individualmente para aprobación en Compras</p>
+                <div class="actions-left">
+                  <button type="submit" :disabled="savingOrder || !materialForm.description || !materialForm.qty" class="btn-add-material">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    {{ savingOrder ? 'Agregando...' : 'Agregar Material' }}
+                  </button>
+                  <p class="hint">Cada material se envía individualmente para aprobación en Compras</p>
+                </div>
+                <div class="actions-right">
+                  <button type="button" @click="downloadTemplate" class="btn-download-template">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="7 10 12 15 17 10"/>
+                      <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Descargar Plantilla
+                  </button>
+                  <label class="btn-import-excel">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="17 8 12 3 7 8"/>
+                      <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    {{ importingFile ? 'Importando...' : 'Importar Excel' }}
+                    <input type="file" @change="importExcel" accept=".csv,.xlsx,.xls" hidden :disabled="importingFile" />
+                  </label>
+                </div>
               </div>
             </form>
           </div>
@@ -479,6 +500,9 @@ const materialForm = ref({
   material_type: '',
   manufacturing_standard: ''
 });
+
+// Import state
+const importingFile = ref(false);
 
 // Filter state
 const statusFilter = ref('all');
@@ -763,6 +787,45 @@ const createOrder = async () => {
     }
   } catch (e) { showToast('Error', 'error'); }
   savingOrder.value = false;
+};
+
+// Download Excel template
+const downloadTemplate = () => {
+  window.location.href = `${apiBase.value}/material-template`;
+};
+
+// Import materials from Excel
+const importExcel = async (event) => {
+  const file = event.target.files[0];
+  if (!file || !selectedProject.value) return;
+
+  importingFile.value = true;
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch(`${apiBase.value}/${selectedProject.value.id}/import-materials`, {
+      method: 'POST',
+      headers: { 'X-CSRF-TOKEN': getCsrfToken() },
+      body: formData
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      showToast(data.message, 'success');
+      await selectProject({ id: selectedProject.value.id });
+      if (data.errors?.length > 0) {
+        console.warn('Import errors:', data.errors);
+      }
+    } else {
+      showToast(data.message || 'Error al importar', 'error');
+    }
+  } catch (e) {
+    showToast('Error al importar archivo', 'error');
+  }
+  importingFile.value = false;
+  // Reset file input
+  event.target.value = '';
 };
 
 // Create/Update/Delete (managers only)

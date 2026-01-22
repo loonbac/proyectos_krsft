@@ -1325,6 +1325,85 @@ body.dark-mode .theme-toggle .sun-icon {
     height: 18px;
 }
 
+/* Actions layout - left and right sections */
+.material-form-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.actions-left {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.actions-right {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* Download Template Button (Gray) */
+.btn-download-template {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    background: #6b7280;
+    border: none;
+    border-radius: var(--proyectos-radius-md);
+    color: white;
+    font-weight: 500;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.btn-download-template:hover {
+    background: #4b5563;
+    transform: translateY(-1px);
+}
+
+.btn-download-template svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Import Excel Button (Green) */
+.btn-import-excel {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    background: #10b981;
+    border: none;
+    border-radius: var(--proyectos-radius-md);
+    color: white;
+    font-weight: 500;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.btn-import-excel:hover {
+    background: #059669;
+    transform: translateY(-1px);
+}
+
+.btn-import-excel svg {
+    width: 16px;
+    height: 16px;
+}
+
+.btn-import-excel input[type="file"] {
+    display: none;
+}
+
+
 /* ============================================
    MATERIALS TABLE (EXCEL-STYLE)
    ============================================ */
