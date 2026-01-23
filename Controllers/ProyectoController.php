@@ -623,25 +623,44 @@ class ProyectoController extends Controller
             $errors = [];
             $skippedDuplicates = 0;
 
-            // Detect format: check if first column contains numbers (ITEM format) or text (old format)
-            // Old format: CANT(0), UND(1), DESCRIPCION(2), DIAMETRO(3), SERIE(4), MATERIAL(5), NORMA(6)
+            // Detect format: check if data follows ITEM format or old CANT format
             // New format: ITEM(0), CANT(1), UND(2), DESCRIPCION(3), DIAMETRO(4), SERIE(5), MATERIAL(6)
-            $hasItemColumn = false;
+            // Old format: CANT(0), UND(1), DESCRIPCION(2), DIAMETRO(3), SERIE(4), MATERIAL(5), NORMA(6)
+            $hasItemColumn = true; // Default to new format (ITEM column)
+            
+            // Try to detect by checking multiple rows
             if (!empty($rows)) {
-                $firstRow = $rows[0];
-                // If first column is numeric or empty, and second column looks like quantity, it's new format
-                // If first column looks like quantity (small number), it's old format
-                $firstCol = trim($firstRow[0] ?? '');
-                $secondCol = trim($firstRow[1] ?? '');
+                $possibleUnits = ['UND', 'M', 'KG', 'PZA', 'JGO', 'GLB', 'LT', 'M2', 'M3', 'ML', 'UNID', 'UN', 'PZ', 'JUEGO', 'GLOBAL'];
                 
-                // New format detection: first col is empty or numeric item number, 
-                // and third column (index 2) contains unit like UND, M, KG, etc.
-                $thirdCol = strtoupper(trim($firstRow[2] ?? ''));
-                $possibleUnits = ['UND', 'M', 'KG', 'PZA', 'JGO', 'GLB', 'LT', 'M2', 'M3'];
+                // Check first few data rows to determine format
+                $checkRows = array_slice($rows, 0, min(3, count($rows)));
+                $newFormatVotes = 0;
+                $oldFormatVotes = 0;
                 
-                if (in_array($thirdCol, $possibleUnits)) {
-                    $hasItemColumn = true;
+                foreach ($checkRows as $row) {
+                    $col0 = strtoupper(trim($row[0] ?? ''));
+                    $col1 = strtoupper(trim($row[1] ?? ''));
+                    $col2 = strtoupper(trim($row[2] ?? ''));
+                    
+                    // New format: col0=number(item), col1=number(qty), col2=unit
+                    // Old format: col0=number(qty), col1=unit, col2=description(text)
+                    
+                    if (in_array($col2, $possibleUnits)) {
+                        // col2 is a unit -> new format
+                        $newFormatVotes++;
+                    } elseif (in_array($col1, $possibleUnits)) {
+                        // col1 is a unit -> old format
+                        $oldFormatVotes++;
+                    } elseif (is_numeric($col0) && is_numeric($col1) && !is_numeric($col2)) {
+                        // col0 and col1 are numbers, col2 is not -> likely new format (item, qty, unit/desc)
+                        $newFormatVotes++;
+                    } elseif (is_numeric($col0) && !is_numeric($col1)) {
+                        // col0 is number, col1 is not -> could be old format (qty, unit)
+                        $oldFormatVotes++;
+                    }
                 }
+                
+                $hasItemColumn = ($newFormatVotes >= $oldFormatVotes);
             }
 
             foreach ($rows as $index => $columns) {
@@ -822,32 +841,38 @@ class ProyectoController extends Controller
         $sheetXml = mb_convert_encoding($sheetXml, 'UTF-8', 'UTF-8');
         
         // Extract rows
-        preg_match_all('/<row[^>]*>(.*?)<\/row>/su', $sheetXml, $rowMatches);
+        preg_match_all('/<row[^>]*r="(\d+)"[^>]*>(.*?)<\/row>/su', $sheetXml, $rowMatches, PREG_SET_ORDER);
         
-        if (!empty($rowMatches[1])) {
-            // Skip header row (first row)
-            $dataRows = array_slice($rowMatches[1], 1);
-            
-            foreach ($dataRows as $rowXml) {
-                // Build row with proper column positions (A-G = 0-6)
-                $currentRow = array_fill(0, 7, '');
+        if (!empty($rowMatches)) {
+            foreach ($rowMatches as $rowMatch) {
+                $rowNum = intval($rowMatch[1]);
+                $rowXml = $rowMatch[2];
                 
-                // Extract each cell element separately
-                preg_match_all('/<c\s+([^>]*)>(.*?)<\/c>|<c\s+([^\/]*)\/>/su', $rowXml, $cellMatches, PREG_SET_ORDER);
+                // Skip header row (row 1)
+                if ($rowNum === 1) {
+                    continue;
+                }
+                
+                // Build row with proper column positions (A-J = 0-9, support up to 10 columns)
+                $currentRow = array_fill(0, 10, '');
+                
+                // Extract each cell - match cells with or without values
+                preg_match_all('/<c\s+r="([A-Z]+)\d+"([^>]*)(?:>(.*?)<\/c>|\/>)/su', $rowXml, $cellMatches, PREG_SET_ORDER);
                 
                 foreach ($cellMatches as $cellMatch) {
-                    // Get attributes string (from either format)
-                    $attrs = !empty($cellMatch[1]) ? $cellMatch[1] : ($cellMatch[3] ?? '');
-                    $cellContent = $cellMatch[2] ?? '';
+                    $colLetter = $cellMatch[1];
+                    $attrs = $cellMatch[2] ?? '';
+                    $cellContent = $cellMatch[3] ?? '';
                     
-                    // Extract cell reference (r="A2")
-                    if (!preg_match('/r="([A-Z]+)\d+"/i', $attrs, $refMatch)) {
-                        continue;
+                    // Convert column letter to index (A=0, B=1, etc.)
+                    $colIndex = 0;
+                    $len = strlen($colLetter);
+                    for ($i = 0; $i < $len; $i++) {
+                        $colIndex = $colIndex * 26 + (ord($colLetter[$i]) - ord('A') + 1);
                     }
-                    $colLetter = $refMatch[1];
-                    $colIndex = ord(strtoupper($colLetter)) - ord('A');
+                    $colIndex--; // Make 0-based
                     
-                    if ($colIndex < 0 || $colIndex > 6) continue;
+                    if ($colIndex < 0 || $colIndex > 9) continue;
                     
                     // Check if it's a shared string (t="s")
                     $isSharedString = preg_match('/t="s"/i', $attrs);
@@ -866,8 +891,16 @@ class ProyectoController extends Controller
                     }
                 }
                 
-                // Only add non-empty rows
-                if (array_filter($currentRow)) {
+                // Only add rows that have at least some data in relevant columns (A-G)
+                $hasData = false;
+                for ($i = 0; $i <= 6; $i++) {
+                    if (!empty(trim($currentRow[$i]))) {
+                        $hasData = true;
+                        break;
+                    }
+                }
+                
+                if ($hasData) {
                     $rows[] = $currentRow;
                 }
             }
