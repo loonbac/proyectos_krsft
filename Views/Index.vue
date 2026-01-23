@@ -7,6 +7,7 @@
     <div class="proyectos-container">
       <!-- Header -->
       <header class="module-header">
+        <!-- Normal header when no project selected -->
         <div v-if="!selectedProject" class="header-left">
           <button @click="goBack" class="btn-back">
             <svg viewBox="0 0 24 24" fill="none">
@@ -22,6 +23,21 @@
             {{ isSupervisor ? 'MIS PROYECTOS ASIGNADOS' : 'GESTIÓN DE PROYECTOS' }}
           </h1>
         </div>
+        
+        <!-- Project detail header when project selected -->
+        <div v-else class="header-left project-detail-header">
+          <button @click="selectedProject = null; projectWorkers = []; projectOrders = []" class="btn-back-projects">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M5 12L12 19M5 12L12 5"/>
+            </svg>
+          </button>
+          <span class="project-name-pill" :style="{ background: getProjectColor(selectedProject.id) }">
+            {{ selectedProject.name }}
+          </span>
+          <span class="currency-pill">{{ selectedProject.currency || 'PEN' }}</span>
+          <span class="status-badge" :class="getStatusLabel(selectedProject)">{{ getStatusText(getStatusLabel(selectedProject)) }}</span>
+        </div>
+        
         <div class="header-right">
           <div v-if="isSupervisor && !selectedProject" class="role-badge supervisor">SUPERVISOR</div>
           <button @click="toggleDarkMode" class="theme-toggle" title="Cambiar tema">
@@ -136,21 +152,6 @@
 
         <!-- Project Detail View -->
         <div v-if="selectedProject" class="project-detail">
-          <!-- New Header: Pill-shape name, status badge, back button -->
-          <div class="detail-header-new">
-            <div class="header-left-section">
-              <button @click="selectedProject = null; projectWorkers = []; projectOrders = []" class="btn-back-projects">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M19 12H5M5 12L12 19M5 12L12 5"/>
-                </svg>
-              </button>
-              <span class="project-name-pill" :style="{ background: getProjectColor(selectedProject.id) }">
-                {{ selectedProject.name }}
-              </span>
-              <span class="currency-pill">{{ selectedProject.currency || 'PEN' }}</span>
-            </div>
-            <span class="status-badge" :class="getStatusLabel(selectedProject)">{{ getStatusText(getStatusLabel(selectedProject)) }}</span>
-          </div>
 
           <!-- Consolidated Stats with Chart -->
           <div class="project-stats-panel">
