@@ -7,7 +7,7 @@
     <div class="proyectos-container">
       <!-- Header -->
       <header class="module-header">
-        <div class="header-left">
+        <div v-if="!selectedProject" class="header-left">
           <button @click="goBack" class="btn-back">
             <svg viewBox="0 0 24 24" fill="none">
               <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -23,7 +23,7 @@
           </h1>
         </div>
         <div class="header-right">
-          <div v-if="isSupervisor" class="role-badge supervisor">SUPERVISOR</div>
+          <div v-if="isSupervisor && !selectedProject" class="role-badge supervisor">SUPERVISOR</div>
           <button @click="toggleDarkMode" class="theme-toggle" title="Cambiar tema">
             <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="5"/>
@@ -288,10 +288,6 @@
                   <label>MATERIAL</label>
                   <input v-model="materialForm.material_type" type="text" class="input-field" placeholder="Ej: ACERO INOXIDABLE" />
                 </div>
-                <div class="form-group form-group-md">
-                  <label>NORMA DE FAB.</label>
-                  <input v-model="materialForm.manufacturing_standard" type="text" class="input-field" placeholder="Ej: ANSI B16.5" />
-                </div>
               </div>
               
               <div class="material-form-actions">
@@ -348,7 +344,6 @@
                     <th class="col-diam">DIÁMETRO</th>
                     <th class="col-serie">SERIE</th>
                     <th class="col-mat">MATERIAL</th>
-                    <th class="col-norma">NORMA DE FAB.</th>
                     <th class="col-estado">ESTADO</th>
                     <th class="col-monto">MONTO</th>
                   </tr>
@@ -362,7 +357,6 @@
                     <td class="col-diam">{{ order.diameter || '-' }}</td>
                     <td class="col-serie">{{ order.series || '-' }}</td>
                     <td class="col-mat">{{ order.material_type || '-' }}</td>
-                    <td class="col-norma">{{ order.manufacturing_standard || '-' }}</td>
                     <td class="col-estado">
                       <span class="order-status" :class="getOrderStatusClass(order)">
                         <!-- Pending icon (clock) -->
@@ -525,8 +519,7 @@ const materialForm = ref({
   description: '',
   diameter: '',
   series: '',
-  material_type: '',
-  manufacturing_standard: ''
+  material_type: ''
 });
 
 // Import state
@@ -806,8 +799,7 @@ const createOrder = async () => {
         unit: materialForm.value.unit,
         diameter: materialForm.value.diameter || null,
         series: materialForm.value.series || null,
-        material_type: materialForm.value.material_type || null,
-        manufacturing_standard: materialForm.value.manufacturing_standard || null
+        material_type: materialForm.value.material_type || null
       })
     });
     const data = await res.json();
@@ -820,8 +812,7 @@ const createOrder = async () => {
         description: '',
         diameter: '',
         series: '',
-        material_type: '',
-        manufacturing_standard: ''
+        material_type: ''
       };
       await selectProject({ id: selectedProject.value.id });
     } else {

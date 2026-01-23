@@ -828,12 +828,14 @@ body.dark-mode .theme-toggle .sun-icon {
 
 /* Donut Chart */
 .expense-chart {
-    width: 180px;
-    min-width: 180px;
+    width: 220px;
+    min-width: 220px;
+    height: 220px;
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
+    margin-right: auto;
 }
 
 .donut-chart {

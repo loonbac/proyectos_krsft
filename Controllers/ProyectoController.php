@@ -481,7 +481,7 @@ class ProyectoController extends Controller
         $modulePath = dirname(__DIR__);
         
         // Check for xlsx first (more common), then xls
-        $xlsxPath = $modulePath . '/Assets/Templates/Plantilla_Materiales.xlsx';
+        $xlsxPath = $modulePath . '/Assets/Templates/Plantilla_Materiales_v2.xlsx';
         $xlsPath = $modulePath . '/Assets/Templates/plantilla_materiales.xls';
         
         if (file_exists($xlsxPath)) {
@@ -583,7 +583,7 @@ class ProyectoController extends Controller
                     continue;
                 }
 
-                // Excel columns: ITEM(0), CANT(1), UND(2), DESCRIPCION(3), DIAMETRO(4), SERIE(5), MATERIAL(6), NORMA(7)
+                // Excel columns: ITEM(0), CANT(1), UND(2), DESCRIPCION(3), DIAMETRO(4), SERIE(5), MATERIAL(6)
                 // Skip ITEM column (index 0) as it's auto-generated
                 $qty = intval($columns[1] ?? 1);
                 $unit = trim($columns[2] ?? 'UND');
@@ -591,7 +591,6 @@ class ProyectoController extends Controller
                 $diameter = trim($columns[4] ?? '');
                 $series = trim($columns[5] ?? '');
                 $materialType = trim($columns[6] ?? '');
-                $manufacturingStandard = trim($columns[7] ?? '');
 
                 if (empty($description)) {
                     $errors[] = "Fila " . ($index + 2) . ": descripción vacía";
@@ -608,7 +607,6 @@ class ProyectoController extends Controller
                     'diameter' => $diameter ?: null,
                     'series' => $series ?: null,
                     'material_type' => $materialType ?: null,
-                    'manufacturing_standard' => $manufacturingStandard ?: null,
                     'currency' => $project->currency ?? 'PEN',
                     'status' => 'pending',
                     'created_by' => auth()->id(),
@@ -731,8 +729,8 @@ class ProyectoController extends Controller
             $dataRows = array_slice($rowMatches[1], 1);
             
             foreach ($dataRows as $rowXml) {
-                // Build row with proper column positions (A-H = 0-7)
-                $currentRow = array_fill(0, 8, '');
+                // Build row with proper column positions (A-G = 0-6)
+                $currentRow = array_fill(0, 7, '');
                 
                 // Extract each cell element separately
                 preg_match_all('/<c\s+([^>]*)>(.*?)<\/c>|<c\s+([^\/]*)\/>/su', $rowXml, $cellMatches, PREG_SET_ORDER);
@@ -749,7 +747,7 @@ class ProyectoController extends Controller
                     $colLetter = $refMatch[1];
                     $colIndex = ord(strtoupper($colLetter)) - ord('A');
                     
-                    if ($colIndex < 0 || $colIndex > 7) continue;
+                    if ($colIndex < 0 || $colIndex > 6) continue;
                     
                     // Check if it's a shared string (t="s")
                     $isSharedString = preg_match('/t="s"/i', $attrs);
