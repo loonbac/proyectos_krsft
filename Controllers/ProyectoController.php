@@ -288,6 +288,34 @@ class ProyectoController extends Controller
     }
 
     /**
+     * Get the next available item number for a project
+     */
+    protected function getNextItemNumber($projectId): int
+    {
+        $maxItem = DB::table('purchase_orders')
+            ->where('project_id', $projectId)
+            ->max('item_number');
+        
+        return ($maxItem ?? 0) + 1;
+    }
+
+    /**
+     * Check if an item number already exists in a project
+     */
+    protected function itemNumberExists($projectId, $itemNumber, $excludeOrderId = null): bool
+    {
+        $query = DB::table('purchase_orders')
+            ->where('project_id', $projectId)
+            ->where('item_number', $itemNumber);
+        
+        if ($excludeOrderId) {
+            $query->where('id', '!=', $excludeOrderId);
+        }
+        
+        return $query->exists();
+    }
+
+    /**
      * Create purchase order (for supervisors to send to Compras)
      */
     public function createPurchaseOrder(Request $request, $id)
@@ -301,11 +329,29 @@ class ProyectoController extends Controller
         $request->validate([
             'description' => 'required|string|max:255',
             'type' => 'required|in:service,material',
+            'item_number' => 'nullable|integer|min:1',
         ]);
 
         try {
+            // Determine item number: use provided value or auto-generate
+            $itemNumber = $request->input('item_number');
+            
+            if ($itemNumber) {
+                // User provided item number - validate it's not duplicate
+                if ($this->itemNumberExists($id, $itemNumber)) {
+                    return response()->json([
+                        'success' => false, 
+                        'message' => "El número de item {$itemNumber} ya existe en este proyecto. Por favor use otro número."
+                    ], 400);
+                }
+            } else {
+                // Auto-generate next item number
+                $itemNumber = $this->getNextItemNumber($id);
+            }
+
             $orderData = [
                 'project_id' => $id,
+                'item_number' => $itemNumber,
                 'type' => $request->type,
                 'description' => trim($request->description),
                 'currency' => $project->currency ?? 'PEN',
@@ -516,21 +562,21 @@ class ProyectoController extends Controller
  </Styles>
  <Worksheet ss:Name="Materiales">
   <Table>
+   <Column ss:Width="50"/>
    <Column ss:Width="60"/>
    <Column ss:Width="50"/>
    <Column ss:Width="300"/>
    <Column ss:Width="100"/>
    <Column ss:Width="100"/>
    <Column ss:Width="150"/>
-   <Column ss:Width="120"/>
    <Row>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">ITEM</Data></Cell>
     <Cell ss:StyleID="Header"><Data ss:Type="String">CANT</Data></Cell>
     <Cell ss:StyleID="Header"><Data ss:Type="String">UND</Data></Cell>
     <Cell ss:StyleID="Header"><Data ss:Type="String">DESCRIPCION</Data></Cell>
     <Cell ss:StyleID="Header"><Data ss:Type="String">DIAMETRO</Data></Cell>
     <Cell ss:StyleID="Header"><Data ss:Type="String">SERIE</Data></Cell>
     <Cell ss:StyleID="Header"><Data ss:Type="String">MATERIAL</Data></Cell>
-    <Cell ss:StyleID="Header"><Data ss:Type="String">NORMA_DE_FAB</Data></Cell>
    </Row>
   </Table>
  </Worksheet>
@@ -575,6 +621,28 @@ class ProyectoController extends Controller
 
             $imported = 0;
             $errors = [];
+            $skippedDuplicates = 0;
+
+            // Detect format: check if first column contains numbers (ITEM format) or text (old format)
+            // Old format: CANT(0), UND(1), DESCRIPCION(2), DIAMETRO(3), SERIE(4), MATERIAL(5), NORMA(6)
+            // New format: ITEM(0), CANT(1), UND(2), DESCRIPCION(3), DIAMETRO(4), SERIE(5), MATERIAL(6)
+            $hasItemColumn = false;
+            if (!empty($rows)) {
+                $firstRow = $rows[0];
+                // If first column is numeric or empty, and second column looks like quantity, it's new format
+                // If first column looks like quantity (small number), it's old format
+                $firstCol = trim($firstRow[0] ?? '');
+                $secondCol = trim($firstRow[1] ?? '');
+                
+                // New format detection: first col is empty or numeric item number, 
+                // and third column (index 2) contains unit like UND, M, KG, etc.
+                $thirdCol = strtoupper(trim($firstRow[2] ?? ''));
+                $possibleUnits = ['UND', 'M', 'KG', 'PZA', 'JGO', 'GLB', 'LT', 'M2', 'M3'];
+                
+                if (in_array($thirdCol, $possibleUnits)) {
+                    $hasItemColumn = true;
+                }
+            }
 
             foreach ($rows as $index => $columns) {
                 // Skip if not enough columns
@@ -583,23 +651,49 @@ class ProyectoController extends Controller
                     continue;
                 }
 
-                // Excel columns: ITEM(0), CANT(1), UND(2), DESCRIPCION(3), DIAMETRO(4), SERIE(5), MATERIAL(6)
-                // Skip ITEM column (index 0) as it's auto-generated
-                $qty = intval($columns[1] ?? 1);
-                $unit = trim($columns[2] ?? 'UND');
-                $description = trim($columns[3] ?? '');
-                $diameter = trim($columns[4] ?? '');
-                $series = trim($columns[5] ?? '');
-                $materialType = trim($columns[6] ?? '');
+                if ($hasItemColumn) {
+                    // New format: ITEM(0), CANT(1), UND(2), DESCRIPCION(3), DIAMETRO(4), SERIE(5), MATERIAL(6)
+                    $providedItemNumber = !empty($columns[0]) ? intval($columns[0]) : null;
+                    $qty = intval($columns[1] ?? 1);
+                    $unit = trim($columns[2] ?? 'UND');
+                    $description = trim($columns[3] ?? '');
+                    $diameter = trim($columns[4] ?? '');
+                    $series = trim($columns[5] ?? '');
+                    $materialType = trim($columns[6] ?? '');
+                } else {
+                    // Old format: CANT(0), UND(1), DESCRIPCION(2), DIAMETRO(3), SERIE(4), MATERIAL(5), NORMA(6)
+                    $providedItemNumber = null; // Auto-generate
+                    $qty = intval($columns[0] ?? 1);
+                    $unit = trim($columns[1] ?? 'UND');
+                    $description = trim($columns[2] ?? '');
+                    $diameter = trim($columns[3] ?? '');
+                    $series = trim($columns[4] ?? '');
+                    $materialType = trim($columns[5] ?? '');
+                }
 
                 if (empty($description)) {
                     $errors[] = "Fila " . ($index + 2) . ": descripción vacía";
                     continue;
                 }
 
+                // Determine item number
+                $itemNumber = $providedItemNumber;
+                if ($itemNumber) {
+                    // Validate provided item number is not duplicate
+                    if ($this->itemNumberExists($id, $itemNumber)) {
+                        $errors[] = "Fila " . ($index + 2) . ": item número {$itemNumber} ya existe en el proyecto";
+                        $skippedDuplicates++;
+                        continue;
+                    }
+                } else {
+                    // Auto-generate next item number
+                    $itemNumber = $this->getNextItemNumber($id);
+                }
+
                 // Create order
                 $orderData = [
                     'project_id' => $id,
+                    'item_number' => $itemNumber,
                     'type' => 'material',
                     'description' => $description,
                     'materials' => json_encode([['name' => $description, 'qty' => $qty]]),
@@ -618,10 +712,16 @@ class ProyectoController extends Controller
                 $imported++;
             }
 
+            $message = $imported . ' materiales importados';
+            if ($skippedDuplicates > 0) {
+                $message .= '. ' . $skippedDuplicates . ' items omitidos por número duplicado.';
+            }
+
             return response()->json([
                 'success' => true,
-                'message' => $imported . ' materiales importados',
+                'message' => $message,
                 'imported' => $imported,
+                'skipped_duplicates' => $skippedDuplicates,
                 'errors' => $errors
             ]);
         } catch (\Exception $e) {

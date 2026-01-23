@@ -249,8 +249,12 @@
             </h3>
             
             <form @submit.prevent="createOrder" class="material-form">
-              <!-- Row 1: Cantidad, Unidad, Descripción -->
+              <!-- Row 1: Item, Cantidad, Unidad, Descripción -->
               <div class="material-form-row">
+                <div class="form-group form-group-xs">
+                  <label>ITEM</label>
+                  <input v-model.number="materialForm.item_number" type="number" min="1" class="input-field" :placeholder="nextItemNumber" title="Número de item (dejar vacío para auto-asignar)" />
+                </div>
                 <div class="form-group form-group-sm">
                   <label>CANT</label>
                   <input v-model.number="materialForm.qty" type="number" min="1" class="input-field" placeholder="1" />
@@ -350,8 +354,8 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(order, index) in projectOrders" :key="order.id" :class="getOrderRowClass(order)">
-                    <td class="col-item">{{ index + 1 }}</td>
+                  <tr v-for="order in projectOrders" :key="order.id" :class="getOrderRowClass(order)">
+                    <td class="col-item">{{ order.item_number || '-' }}</td>
                     <td class="col-cant">{{ getOrderQuantity(order) }}</td>
                     <td class="col-und">{{ order.unit || 'UND' }}</td>
                     <td class="col-desc">{{ order.description }}</td>
@@ -515,6 +519,7 @@ const selectedWorkerId = ref('');
 
 // Material specification form
 const materialForm = ref({
+  item_number: null,
   qty: 1,
   unit: 'UND',
   description: '',
@@ -595,6 +600,13 @@ const getChartArc = computed(() => {
   const circumference = 2 * Math.PI * 50; // r=50
   const arcLength = (percent / 100) * circumference;
   return `${arcLength} ${circumference}`;
+});
+
+// Compute next item number for the selected project
+const nextItemNumber = computed(() => {
+  if (!projectOrders.value || projectOrders.value.length === 0) return 1;
+  const maxItem = Math.max(...projectOrders.value.map(o => o.item_number || 0));
+  return maxItem + 1;
 });
 
 // Filter computed properties
@@ -800,7 +812,8 @@ const createOrder = async () => {
         unit: materialForm.value.unit,
         diameter: materialForm.value.diameter || null,
         series: materialForm.value.series || null,
-        material_type: materialForm.value.material_type || null
+        material_type: materialForm.value.material_type || null,
+        item_number: materialForm.value.item_number || null
       })
     });
     const data = await res.json();
@@ -808,6 +821,7 @@ const createOrder = async () => {
       showToast('Material enviado a aprobación', 'success');
       // Reset form
       materialForm.value = {
+        item_number: null,
         qty: 1,
         unit: 'UND',
         description: '',
