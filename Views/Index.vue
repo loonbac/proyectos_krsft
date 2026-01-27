@@ -261,17 +261,7 @@
                 </div>
                 <div class="form-group form-group-sm">
                   <label>UND</label>
-                  <select v-model="materialForm.unit" class="select-field">
-                    <option value="UND">UND</option>
-                    <option value="M">M</option>
-                    <option value="KG">KG</option>
-                    <option value="PZA">PZA</option>
-                    <option value="JGO">JGO</option>
-                    <option value="GLB">GLB</option>
-                    <option value="LT">LT</option>
-                    <option value="M2">M2</option>
-                    <option value="M3">M3</option>
-                  </select>
+                  <input v-model="materialForm.unit" type="text" class="input-field" placeholder="UND" />
                 </div>
                 <div class="form-group form-group-lg">
                   <label>DESCRIPCIÓN *</label>
