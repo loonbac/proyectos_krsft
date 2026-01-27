@@ -369,7 +369,7 @@
             </form>
           </div>
 
-          <!-- Orders List -->
+          <!-- Orders List Grouped by File -->
           <div class="section-box orders-section">
             <h3>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -381,55 +381,95 @@
               Lista de Materiales ({{ projectOrders.length }})
             </h3>
             <div v-if="projectOrders.length === 0" class="empty-list"><p>No hay materiales registrados</p></div>
-            <div v-else class="table-scroll-container">
-              <table class="materials-table">
-                <thead>
-                  <tr>
-                    <th class="col-item">ITEM</th>
-                    <th class="col-cant">CANT</th>
-                    <th class="col-und">UND</th>
-                    <th class="col-desc">DESCRIPCIÓN</th>
-                    <th class="col-diam">DIÁMETRO</th>
-                    <th class="col-serie">SERIE</th>
-                    <th class="col-mat">MATERIAL</th>
-                    <th class="col-estado">ESTADO</th>
-                    <th class="col-monto">MONTO</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="order in projectOrders" :key="order.id" :class="getOrderRowClass(order)">
-                    <td class="col-item">{{ order.item_number || '-' }}</td>
-                    <td class="col-cant">{{ getOrderQuantity(order) }}</td>
-                    <td class="col-und">{{ order.unit || 'UND' }}</td>
-                    <td class="col-desc">{{ order.description }}</td>
-                    <td class="col-diam">{{ order.diameter || '-' }}</td>
-                    <td class="col-serie">{{ order.series || '-' }}</td>
-                    <td class="col-mat">{{ order.material_type || '-' }}</td>
-                    <td class="col-estado">
-                      <span class="order-status" :class="getOrderStatusClass(order)">
-                        <!-- Pending icon (clock) -->
-                        <svg v-if="order.status === 'pending'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                        </svg>
-                        <!-- Approved icon (check) -->
-                        <svg v-else-if="order.status === 'approved' && !order.payment_confirmed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <polyline points="20 6 9 17 4 12"/>
-                        </svg>
-                        <!-- Paid icon (check circle) -->
-                        <svg v-else-if="order.payment_confirmed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-                        </svg>
-                        <!-- Rejected icon (x) -->
-                        <svg v-else-if="order.status === 'rejected'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
-                        </svg>
-                        {{ getOrderStatusLabel(order) }}
-                      </span>
-                    </td>
-                    <td class="col-monto">{{ order.amount ? getCurrencySymbol(order.currency) + ' ' + formatNumber(order.total_with_igv || order.amount) : 'Por cotizar' }}</td>
-                  </tr>
-                </tbody>
-              </table>
+            
+            <!-- Grouped by file sections -->
+            <div v-else class="file-groups-container">
+              <div v-for="group in ordersGroupedByFile" :key="group.filename || '__manual__'" class="file-group">
+                <!-- File group header (collapsible) -->
+                <div 
+                  class="file-group-header" 
+                  :class="{ expanded: expandedFiles[group.filename || '__manual__'], 'all-paid': group.allPaid }"
+                  @click="toggleFileSection(group.filename)"
+                >
+                  <div class="file-header-left">
+                    <svg class="collapse-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                    <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                    <span class="file-name">{{ group.filename || 'Órdenes Manuales' }}</span>
+                  </div>
+                  <div class="file-header-right">
+                    <span class="file-count">{{ group.orders.length }} items</span>
+                    <span class="file-status-badge" :class="{ 'complete': group.allPaid }">
+                      {{ group.paidCount }}/{{ group.totalCount }} pagados
+                    </span>
+                    <button 
+                      v-if="group.allPaid && isSupervisor" 
+                      class="btn-confirm-all"
+                      @click.stop="confirmFileDelivery(group)"
+                    >
+                      ✓ Confirmar Entrega
+                    </button>
+                  </div>
+                </div>
+                
+                <!-- File group content (orders table) -->
+                <div v-show="expandedFiles[group.filename || '__manual__']" class="file-group-content">
+                  <div class="table-scroll-container">
+                    <table class="materials-table">
+                      <thead>
+                        <tr>
+                          <th class="col-item">ITEM</th>
+                          <th class="col-cant">CANT</th>
+                          <th class="col-und">UND</th>
+                          <th class="col-desc">DESCRIPCIÓN</th>
+                          <th class="col-diam">DIÁMETRO</th>
+                          <th class="col-serie">SERIE</th>
+                          <th class="col-mat">MATERIAL</th>
+                          <th class="col-estado">ESTADO</th>
+                          <th class="col-monto">MONTO</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="order in group.orders" :key="order.id" :class="getOrderRowClass(order)">
+                          <td class="col-item">{{ order.item_number || '-' }}</td>
+                          <td class="col-cant">{{ getOrderQuantity(order) }}</td>
+                          <td class="col-und">{{ order.unit || 'UND' }}</td>
+                          <td class="col-desc">{{ order.description }}</td>
+                          <td class="col-diam">{{ order.diameter || '-' }}</td>
+                          <td class="col-serie">{{ order.series || '-' }}</td>
+                          <td class="col-mat">{{ order.material_type || '-' }}</td>
+                          <td class="col-estado">
+                            <span class="order-status" :class="getOrderStatusClass(order)">
+                              <!-- Pending icon (clock) - En Espera -->
+                              <svg v-if="order.status === 'pending'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                              </svg>
+                              <!-- Approved icon (progress) - En Progreso -->
+                              <svg v-else-if="order.status === 'approved' && !order.payment_confirmed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                              </svg>
+                              <!-- Paid icon (check circle) - Aprobado -->
+                              <svg v-else-if="order.payment_confirmed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                              </svg>
+                              <!-- Rejected icon (x) -->
+                              <svg v-else-if="order.status === 'rejected'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                              </svg>
+                              {{ getOrderStatusLabel(order) }}
+                            </span>
+                          </td>
+                          <td class="col-monto">{{ order.amount ? getCurrencySymbol(order.currency) + ' ' + formatNumber(order.total_with_igv || order.amount) : 'Por cotizar' }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -582,6 +622,7 @@ const allWorkers = ref([]);
 const projectWorkers = ref([]);
 const projectOrders = ref([]);
 const projectSummary = ref({});
+const expandedFiles = ref({}); // Track expanded file sections
 const toast = ref({ show: false, message: '', type: 'success' });
 const newMaterial = ref('');
 const newMaterialQty = ref(1);
@@ -689,6 +730,60 @@ const nextItemNumber = computed(() => {
   return maxItem + 1;
 });
 
+// Group orders by source_filename for collapsible sections
+const ordersGroupedByFile = computed(() => {
+  const groups = {};
+  const manualOrders = [];
+  
+  projectOrders.value.forEach(order => {
+    if (order.source_filename) {
+      if (!groups[order.source_filename]) {
+        groups[order.source_filename] = {
+          filename: order.source_filename,
+          orders: [],
+          imported_at: order.imported_at,
+          allPaid: true,
+          paidCount: 0,
+          totalCount: 0
+        };
+      }
+      groups[order.source_filename].orders.push(order);
+      groups[order.source_filename].totalCount++;
+      if (order.payment_confirmed) {
+        groups[order.source_filename].paidCount++;
+      } else {
+        groups[order.source_filename].allPaid = false;
+      }
+    } else {
+      manualOrders.push(order);
+    }
+  });
+  
+  // Convert to array sorted by import date
+  const result = Object.values(groups).sort((a, b) => 
+    new Date(b.imported_at) - new Date(a.imported_at)
+  );
+  
+  // Add manual orders group at the end if exists
+  if (manualOrders.length > 0) {
+    result.push({
+      filename: null,
+      orders: manualOrders,
+      imported_at: null,
+      allPaid: manualOrders.every(o => o.payment_confirmed),
+      paidCount: manualOrders.filter(o => o.payment_confirmed).length,
+      totalCount: manualOrders.length
+    });
+  }
+  
+  return result;
+});
+
+// Toggle file section
+const toggleFileSection = (filename) => {
+  expandedFiles.value[filename || '__manual__'] = !expandedFiles.value[filename || '__manual__'];
+};
+
 // Filter computed properties
 const statusFilters = computed(() => {
   const counts = { all: projects.value.length, good: 0, warning: 0, critical: 0 };
@@ -760,10 +855,10 @@ const getOrderStatusText = (order) => {
 
 const getOrderStatusLabel = (order) => {
   if (order.status === 'rejected') return 'Rechazado';
-  if (order.status === 'pending') return 'Pendiente';
-  if (order.status === 'approved' && order.payment_confirmed) return 'Pagado';
-  if (order.status === 'approved') return 'Aprobado';
-  return 'Pendiente';
+  if (order.status === 'pending') return 'En Espera';
+  if (order.status === 'approved' && order.payment_confirmed) return 'Aprobado';
+  if (order.status === 'approved') return 'En Progreso';
+  return 'En Espera';
 };
 
 const getOrderRowClass = (order) => {

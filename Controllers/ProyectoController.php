@@ -636,7 +636,6 @@ class ProyectoController extends Controller
  </Styles>
  <Worksheet ss:Name="Materiales">
   <Table>
-   <Column ss:Width="50"/>
    <Column ss:Width="60"/>
    <Column ss:Width="50"/>
    <Column ss:Width="300"/>
@@ -644,7 +643,6 @@ class ProyectoController extends Controller
    <Column ss:Width="100"/>
    <Column ss:Width="150"/>
    <Row>
-    <Cell ss:StyleID="Header"><Data ss:Type="String">ITEM</Data></Cell>
     <Cell ss:StyleID="Header"><Data ss:Type="String">CANT</Data></Cell>
     <Cell ss:StyleID="Header"><Data ss:Type="String">UND</Data></Cell>
     <Cell ss:StyleID="Header"><Data ss:Type="String">DESCRIPCION</Data></Cell>
@@ -678,6 +676,7 @@ class ProyectoController extends Controller
             $file = $request->file('file');
             $content = file_get_contents($file->getRealPath());
             $extension = strtolower($file->getClientOriginalExtension());
+            $sourceFilename = $file->getClientOriginalName(); // Save original filename
             
             $rows = [];
             
@@ -695,48 +694,9 @@ class ProyectoController extends Controller
 
             $imported = 0;
             $errors = [];
-            $skippedDuplicates = 0;
 
-            // Detect format: check if data follows ITEM format or old CANT format
-            // New format: ITEM(0), CANT(1), UND(2), DESCRIPCION(3), DIAMETRO(4), SERIE(5), MATERIAL(6)
-            // Old format: CANT(0), UND(1), DESCRIPCION(2), DIAMETRO(3), SERIE(4), MATERIAL(5), NORMA(6)
-            $hasItemColumn = true; // Default to new format (ITEM column)
-            
-            // Try to detect by checking multiple rows
-            if (!empty($rows)) {
-                $possibleUnits = ['UND', 'M', 'KG', 'PZA', 'JGO', 'GLB', 'LT', 'M2', 'M3', 'ML', 'UNID', 'UN', 'PZ', 'JUEGO', 'GLOBAL'];
-                
-                // Check first few data rows to determine format
-                $checkRows = array_slice($rows, 0, min(3, count($rows)));
-                $newFormatVotes = 0;
-                $oldFormatVotes = 0;
-                
-                foreach ($checkRows as $row) {
-                    $col0 = strtoupper(trim($row[0] ?? ''));
-                    $col1 = strtoupper(trim($row[1] ?? ''));
-                    $col2 = strtoupper(trim($row[2] ?? ''));
-                    
-                    // New format: col0=number(item), col1=number(qty), col2=unit
-                    // Old format: col0=number(qty), col1=unit, col2=description(text)
-                    
-                    if (in_array($col2, $possibleUnits)) {
-                        // col2 is a unit -> new format
-                        $newFormatVotes++;
-                    } elseif (in_array($col1, $possibleUnits)) {
-                        // col1 is a unit -> old format
-                        $oldFormatVotes++;
-                    } elseif (is_numeric($col0) && is_numeric($col1) && !is_numeric($col2)) {
-                        // col0 and col1 are numbers, col2 is not -> likely new format (item, qty, unit/desc)
-                        $newFormatVotes++;
-                    } elseif (is_numeric($col0) && !is_numeric($col1)) {
-                        // col0 is number, col1 is not -> could be old format (qty, unit)
-                        $oldFormatVotes++;
-                    }
-                }
-                
-                $hasItemColumn = ($newFormatVotes >= $oldFormatVotes);
-            }
-
+            // New simplified format (no ID column): CANT(0), UND(1), DESCRIPCION(2), DIAMETRO(3), SERIE(4), MATERIAL(5)
+            // IDs are always auto-generated
             foreach ($rows as $index => $columns) {
                 // Skip if not enough columns
                 if (count($columns) < 3) {
@@ -744,46 +704,22 @@ class ProyectoController extends Controller
                     continue;
                 }
 
-                if ($hasItemColumn) {
-                    // New format: ITEM(0), CANT(1), UND(2), DESCRIPCION(3), DIAMETRO(4), SERIE(5), MATERIAL(6)
-                    $providedItemNumber = !empty($columns[0]) ? intval($columns[0]) : null;
-                    $qty = intval($columns[1] ?? 1);
-                    $unit = trim($columns[2] ?? 'UND');
-                    $description = trim($columns[3] ?? '');
-                    $diameter = trim($columns[4] ?? '');
-                    $series = trim($columns[5] ?? '');
-                    $materialType = trim($columns[6] ?? '');
-                } else {
-                    // Old format: CANT(0), UND(1), DESCRIPCION(2), DIAMETRO(3), SERIE(4), MATERIAL(5), NORMA(6)
-                    $providedItemNumber = null; // Auto-generate
-                    $qty = intval($columns[0] ?? 1);
-                    $unit = trim($columns[1] ?? 'UND');
-                    $description = trim($columns[2] ?? '');
-                    $diameter = trim($columns[3] ?? '');
-                    $series = trim($columns[4] ?? '');
-                    $materialType = trim($columns[5] ?? '');
-                }
+                $qty = intval($columns[0] ?? 1);
+                $unit = trim($columns[1] ?? 'UND');
+                $description = trim($columns[2] ?? '');
+                $diameter = trim($columns[3] ?? '');
+                $series = trim($columns[4] ?? '');
+                $materialType = trim($columns[5] ?? '');
 
                 if (empty($description)) {
                     $errors[] = "Fila " . ($index + 2) . ": descripción vacía";
                     continue;
                 }
 
-                // Determine item number
-                $itemNumber = $providedItemNumber;
-                if ($itemNumber) {
-                    // Validate provided item number is not duplicate
-                    if ($this->itemNumberExists($id, $itemNumber)) {
-                        $errors[] = "Fila " . ($index + 2) . ": item número {$itemNumber} ya existe en el proyecto";
-                        $skippedDuplicates++;
-                        continue;
-                    }
-                } else {
-                    // Auto-generate next item number
-                    $itemNumber = $this->getNextItemNumber($id);
-                }
+                // Always auto-generate item number
+                $itemNumber = $this->getNextItemNumber($id);
 
-                // Create order
+                // Create order with source filename
                 $orderData = [
                     'project_id' => $id,
                     'item_number' => $itemNumber,
@@ -794,6 +730,8 @@ class ProyectoController extends Controller
                     'diameter' => $diameter ?: null,
                     'series' => $series ?: null,
                     'material_type' => $materialType ?: null,
+                    'source_filename' => $sourceFilename,
+                    'imported_at' => now(),
                     'currency' => $project->currency ?? 'PEN',
                     'status' => 'pending',
                     'created_by' => auth()->id(),
@@ -805,10 +743,7 @@ class ProyectoController extends Controller
                 $imported++;
             }
 
-            $message = $imported . ' materiales importados';
-            if ($skippedDuplicates > 0) {
-                $message .= '. ' . $skippedDuplicates . ' items omitidos por número duplicado.';
-            }
+            $message = $imported . ' materiales importados desde ' . $sourceFilename;
 
             return response()->json([
                 'success' => true,
