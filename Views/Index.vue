@@ -360,11 +360,14 @@
                   </div>
                   <div class="file-header-right">
                     <span class="file-count">{{ group.orders.length }} items</span>
-                    <span class="file-status-badge" :class="{ 'complete': group.allPaid }">
+                    <span v-if="group.allDelivered" class="file-status-badge delivered">
+                      ✓ Entregado
+                    </span>
+                    <span v-else class="file-status-badge" :class="{ 'complete': group.allPaid }">
                       {{ group.paidCount }}/{{ group.totalCount }} pagados
                     </span>
                     <button 
-                      v-if="group.allPaid && isSupervisor" 
+                      v-if="group.allPaid && !group.allDelivered && isSupervisor" 
                       class="btn-confirm-all"
                       @click.stop="confirmFileDelivery(group)"
                     >
@@ -700,7 +703,9 @@ const ordersGroupedByFile = computed(() => {
           orders: [],
           imported_at: order.imported_at,
           allPaid: true,
+          allDelivered: true,
           paidCount: 0,
+          deliveredCount: 0,
           totalCount: 0
         };
       }
@@ -710,6 +715,11 @@ const ordersGroupedByFile = computed(() => {
         groups[order.source_filename].paidCount++;
       } else {
         groups[order.source_filename].allPaid = false;
+      }
+      if (order.delivery_confirmed) {
+        groups[order.source_filename].deliveredCount++;
+      } else {
+        groups[order.source_filename].allDelivered = false;
       }
     } else {
       manualOrders.push(order);
@@ -728,7 +738,9 @@ const ordersGroupedByFile = computed(() => {
       orders: manualOrders,
       imported_at: null,
       allPaid: manualOrders.every(o => o.payment_confirmed),
+      allDelivered: manualOrders.every(o => o.delivery_confirmed),
       paidCount: manualOrders.filter(o => o.payment_confirmed).length,
+      deliveredCount: manualOrders.filter(o => o.delivery_confirmed).length,
       totalCount: manualOrders.length
     });
   }

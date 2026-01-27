@@ -1865,6 +1865,11 @@ body.dark-mode .materials-table tbody tr:hover {
     color: #10b981;
 }
 
+.file-status-badge.delivered {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+}
+
 .btn-confirm-all {
     padding: 6px 14px;
     border: none;
