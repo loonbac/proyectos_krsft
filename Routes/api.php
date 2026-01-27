@@ -23,6 +23,7 @@ Route::delete('/{id}/workers/{trabajadorId}', "{$ctrl}@removeWorker")->where(['i
 Route::post('/{id}/order', "{$ctrl}@createPurchaseOrder")->where('id', '[0-9]+');
 Route::get('/{id}/paid-orders', "{$ctrl}@getPaidOrders")->where('id', '[0-9]+');
 Route::post('/orders/{orderId}/confirm-delivery', "{$ctrl}@confirmDelivery")->where('orderId', '[0-9]+');
+Route::post('/confirm-file-delivery', "{$ctrl}@confirmFileDelivery");
 
 // Material import/export
 Route::get('/material-template', "{$ctrl}@downloadMaterialTemplate");

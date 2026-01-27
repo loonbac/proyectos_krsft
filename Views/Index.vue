@@ -238,49 +238,6 @@
             </ul>
           </div>
 
-          <!-- SECTION: Items Pagados por Entregar -->
-          <div v-if="isSupervisor" class="section-box">
-             <h3>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-                <line x1="12" y1="22.08" x2="12" y2="12"></line>
-              </svg>
-              ITEMS PAGADOS (POR ENTREGAR)
-            </h3>
-
-            <div v-if="loadingPaidOrders" class="loading-state">
-              Cargando items...
-            </div>
-            <div v-else-if="paidOrders.length === 0" class="empty-list">
-              <p>No hay items pagados pendientes de entrega</p>
-            </div>
-            <div v-else class="paid-items-list">
-              <div v-for="order in paidOrders" :key="order.id" class="paid-item-card">
-                <div class="paid-item-info">
-                  <div class="item-header">
-                    <span class="item-id">#{{ order.item_number || 'N/A' }}</span>
-                    <span class="item-desc">{{ order.description }}</span>
-                  </div>
-                  <div class="item-details" v-if="order.materials && order.materials.length">
-                    <ul>
-                      <li v-for="(mat, idx) in order.materials" :key="idx">
-                        {{ mat.cantidad }} {{ mat.unidad }} - {{ mat.descripcion }}
-                        <span v-if="mat.diametro">({{ mat.diametro }})</span>
-                      </li>
-                    </ul>
-                  </div>
-                  <div class="item-meta">
-                    <span class="meta-date">Pagado: {{ formatDate(order.payment_confirmed_at) }}</span>
-                  </div>
-                </div>
-                <button @click="openDeliveryModal(order)" class="btn-confirm-delivery">
-                  Marcar Entregado
-                </button>
-              </div>
-            </div>
-          </div>
-
           <!-- SUPERVISOR SECTION: Add Expenses -->
           <div v-if="isSupervisor" class="section-box">
             <h3>
@@ -782,6 +739,31 @@ const ordersGroupedByFile = computed(() => {
 // Toggle file section
 const toggleFileSection = (filename) => {
   expandedFiles.value[filename || '__manual__'] = !expandedFiles.value[filename || '__manual__'];
+};
+
+// Confirm delivery for all orders in a file group
+const confirmFileDelivery = async (group) => {
+  if (!confirm(`¿Marcar todos los ${group.orders.length} items de "${group.filename || 'Órdenes Manuales'}" como entregados?`)) return;
+  
+  try {
+    const orderIds = group.orders.map(o => o.id);
+    const response = await fetchWithCsrf(`${apiBase.value}/confirm-file-delivery`, {
+      method: 'POST',
+      body: JSON.stringify({ order_ids: orderIds })
+    });
+    const data = await response.json();
+    if (data.success) {
+      showToast(`${data.updated || orderIds.length} items marcados como entregados`);
+      // Refresh project to update order statuses
+      if (selectedProject.value) {
+        await selectProject(selectedProject.value.id);
+      }
+    } else {
+      showToast(data.message || 'Error al confirmar entrega', 'error');
+    }
+  } catch (e) {
+    showToast('Error de conexión', 'error');
+  }
 };
 
 // Filter computed properties

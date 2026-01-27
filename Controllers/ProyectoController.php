@@ -469,6 +469,40 @@ class ProyectoController extends Controller
         }
     }
 
+    /**
+     * Confirm delivery of multiple orders (batch)
+     */
+    public function confirmFileDelivery(Request $request)
+    {
+        $request->validate([
+            'order_ids' => 'required|array',
+            'order_ids.*' => 'integer'
+        ]);
+
+        try {
+            $updated = DB::table('purchase_orders')
+                ->whereIn('id', $request->order_ids)
+                ->where('payment_confirmed', true)
+                ->update([
+                    'delivery_confirmed' => true,
+                    'delivery_confirmed_at' => now(),
+                    'delivery_confirmed_by' => auth()->id(),
+                    'updated_at' => now()
+                ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => $updated . ' órdenes marcadas como entregadas',
+                'updated' => $updated
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
     public function store(Request $request)
     {
         $request->validate([
