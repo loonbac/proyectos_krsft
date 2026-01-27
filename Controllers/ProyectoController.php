@@ -601,7 +601,7 @@ class ProyectoController extends Controller
         $modulePath = dirname(__DIR__);
         
         // Check for xlsx first (more common), then xls
-        $xlsxPath = $modulePath . '/Assets/Templates/Plantilla_Materiales_v2.xlsx';
+        $xlsxPath = $modulePath . '/Assets/Templates/Plantilla_Materiales_v3.xlsx';
         $xlsPath = $modulePath . '/Assets/Templates/plantilla_materiales.xls';
         
         if (file_exists($xlsxPath)) {
