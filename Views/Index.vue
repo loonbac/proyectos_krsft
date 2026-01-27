@@ -238,62 +238,46 @@
             </ul>
           </div>
 
-          <!-- SUPERVISOR SECTION: Delivery Tracking -->
-          <div v-if="isSupervisor" class="section-box delivery-section">
-            <h3>
+          <!-- SECTION: Items Pagados por Entregar -->
+          <div v-if="isSupervisor" class="section-box">
+             <h3>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M1 3h15v13H1z"/>
-                <path d="M16 8h4l3 3v5h-7V8z"/>
-                <circle cx="5.5" cy="18.5" r="2.5"/>
-                <circle cx="18.5" cy="18.5" r="2.5"/>
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                <line x1="12" y1="22.08" x2="12" y2="12"></line>
               </svg>
-              Materiales Pendientes de Entrega
-              <span v-if="deliveryOrders.length > 0" class="delivery-count">{{ deliveryOrders.length }}</span>
+              ITEMS PAGADOS (POR ENTREGAR)
             </h3>
-            
-            <div v-if="loadingDeliveryOrders" class="loading-mini">Cargando...</div>
-            
-            <div v-else-if="deliveryOrders.length === 0" class="empty-list">
-              <p>✓ No hay materiales pendientes de entrega</p>
+
+            <div v-if="loadingPaidOrders" class="loading-state">
+              Cargando items...
             </div>
-            
-            <div v-else>
-              <!-- Bulk action -->
-              <div class="delivery-actions-bar">
-                <label class="checkbox-label">
-                  <input type="checkbox" v-model="selectAllDelivery" @change="toggleAllDelivery" />
-                  Seleccionar todos
-                </label>
-                <button 
-                  @click="markSelectedDelivered" 
-                  :disabled="selectedDeliveryOrders.length === 0"
-                  class="btn-delivery-all"
-                >
-                  ✓ Marcar {{ selectedDeliveryOrders.length > 0 ? selectedDeliveryOrders.length : '' }} Entregados
+            <div v-else-if="paidOrders.length === 0" class="empty-list">
+              <p>No hay items pagados pendientes de entrega</p>
+            </div>
+            <div v-else class="paid-items-list">
+              <div v-for="order in paidOrders" :key="order.id" class="paid-item-card">
+                <div class="paid-item-info">
+                  <div class="item-header">
+                    <span class="item-id">#{{ order.item_number || 'N/A' }}</span>
+                    <span class="item-desc">{{ order.description }}</span>
+                  </div>
+                  <div class="item-details" v-if="order.materials && order.materials.length">
+                    <ul>
+                      <li v-for="(mat, idx) in order.materials" :key="idx">
+                        {{ mat.cantidad }} {{ mat.unidad }} - {{ mat.descripcion }}
+                        <span v-if="mat.diametro">({{ mat.diametro }})</span>
+                      </li>
+                    </ul>
+                  </div>
+                  <div class="item-meta">
+                    <span class="meta-date">Pagado: {{ formatDate(order.payment_confirmed_at) }}</span>
+                  </div>
+                </div>
+                <button @click="openDeliveryModal(order)" class="btn-confirm-delivery">
+                  Marcar Entregado
                 </button>
               </div>
-              
-              <!-- Orders list -->
-              <ul class="delivery-orders-list">
-                <li v-for="order in deliveryOrders" :key="order.id" class="delivery-order-item">
-                  <label class="checkbox-label">
-                    <input 
-                      type="checkbox" 
-                      :value="order.id" 
-                      v-model="selectedDeliveryOrders"
-                    />
-                  </label>
-                  <div class="delivery-order-info">
-                    <span class="delivery-order-desc">{{ order.description }}</span>
-                    <span class="delivery-order-meta">
-                      {{ order.qty }} {{ order.unit }} • {{ order.currency || 'PEN' }} {{ formatNumber(order.total_with_igv || order.amount || 0) }}
-                    </span>
-                  </div>
-                  <button @click="markSingleDelivered(order.id)" class="btn-delivery-single" title="Marcar entregado">
-                    ✓
-                  </button>
-                </li>
-              </ul>
             </div>
           </div>
 
@@ -478,6 +462,35 @@
         </div>
       </main>
 
+      <!-- Delivery Confirmation Modal -->
+      <Teleport to="body">
+        <div v-if="showDeliveryModal" class="modal-overlay" @click.self="closeDeliveryModal">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h2>Confirmar Entrega</h2>
+              <button @click="closeDeliveryModal" class="btn-close">×</button>
+            </div>
+            <div class="modal-body">
+              <p v-if="selectedOrderForDelivery">
+                ¿Confirmar que el item <strong>#{{ selectedOrderForDelivery.item_number }} - {{ selectedOrderForDelivery.description }}</strong> ha sido entregado en obra?
+              </p>
+              
+              <div class="form-group margin-top">
+                <label>Notas de Entrega (Opcional)</label>
+                <textarea v-model="deliveryNotes" class="input-field" rows="3" placeholder="Ej: Recibido por Juan Pérez, Guía de Remisión 001-123"></textarea>
+              </div>
+
+              <div class="modal-actions">
+                <button @click="closeDeliveryModal" class="btn-cancel">Cancelar</button>
+                <button @click="confirmDeliveryOrder" :disabled="confirmingDelivery" class="btn-confirm">
+                  {{ confirmingDelivery ? 'Confirmando...' : 'Confirmar Entrega' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Teleport>
+
       <!-- Create Modal (managers only) -->
       <Teleport to="body">
         <div v-if="showCreateModal" class="modal-overlay" @click.self="closeCreateModal">
@@ -569,10 +582,6 @@ const allWorkers = ref([]);
 const projectWorkers = ref([]);
 const projectOrders = ref([]);
 const projectSummary = ref({});
-const deliveryOrders = ref([]);
-const selectedDeliveryOrders = ref([]);
-const selectAllDelivery = ref(false);
-const loadingDeliveryOrders = ref(false);
 const toast = ref({ show: false, message: '', type: 'success' });
 const newMaterial = ref('');
 const newMaterialQty = ref(1);
@@ -593,6 +602,14 @@ const materialForm = ref({
 
 // Import state
 const importingFile = ref(false);
+
+// Paid Orders & Delivery State
+const paidOrders = ref([]);
+const loadingPaidOrders = ref(false);
+const showDeliveryModal = ref(false);
+const selectedOrderForDelivery = ref(null);
+const deliveryNotes = ref('');
+const confirmingDelivery = ref(false);
 
 // Filter state
 const statusFilter = ref('all');
@@ -820,62 +837,59 @@ const selectProject = async (project) => {
       projectOrders.value = data.orders || [];
       projectSummary.value = data.summary || {};
       editForm.value = { name: data.project.name, spending_threshold: data.project.spending_threshold, supervisor_id: data.project.supervisor_id };
-      // Load delivery orders for supervisor
-      if (props.isSupervisor) {
-        await loadDeliveryOrders();
+      
+      // Load paid orders if supervisor
+      if (isSupervisor.value) {
+        loadPaidOrders();
       }
     }
   } catch (e) { console.error(e); }
 };
 
-// Delivery Tracking
-const loadDeliveryOrders = async () => {
+const loadPaidOrders = async () => {
   if (!selectedProject.value) return;
-  loadingDeliveryOrders.value = true;
+  loadingPaidOrders.value = true;
   try {
-    const res = await fetch(`${apiBase.value}/${selectedProject.value.id}/orders`);
+    const res = await fetch(`${apiBase.value}/${selectedProject.value.id}/paid-orders`);
     const data = await res.json();
     if (data.success) {
-      deliveryOrders.value = data.orders || [];
-      selectedDeliveryOrders.value = [];
-      selectAllDelivery.value = false;
+      paidOrders.value = data.orders;
     }
   } catch (e) { console.error(e); }
-  loadingDeliveryOrders.value = false;
+  loadingPaidOrders.value = false;
 };
 
-const markSingleDelivered = async (orderId) => {
-  if (!selectedProject.value) return;
+// Delivery Confirmation
+const openDeliveryModal = (order) => {
+  selectedOrderForDelivery.value = order;
+  deliveryNotes.value = '';
+  showDeliveryModal.value = true;
+};
+
+const closeDeliveryModal = () => {
+  showDeliveryModal.value = false;
+  selectedOrderForDelivery.value = null;
+  deliveryNotes.value = '';
+};
+
+const confirmDeliveryOrder = async () => {
+  if (!selectedOrderForDelivery.value) return;
+  confirmingDelivery.value = true;
   try {
-    const res = await fetchWithCsrf(`${apiBase.value}/${selectedProject.value.id}/orders/${orderId}/delivered`, { method: 'POST' });
+    const res = await fetchWithCsrf(`${apiBase.value}/orders/${selectedOrderForDelivery.value.id}/confirm-delivery`, {
+      method: 'POST',
+      body: JSON.stringify({ notes: deliveryNotes.value })
+    });
     const data = await res.json();
     if (data.success) {
-      showToast('Material marcado como entregado', 'success');
-      await loadDeliveryOrders();
+      showToast('Entrega confirmada', 'success');
+      closeDeliveryModal();
+      loadPaidOrders(); // Refresh list
     } else {
       showToast(data.message || 'Error', 'error');
     }
-  } catch (e) { showToast('Error', 'error'); }
-};
-
-const toggleAllDelivery = () => {
-  if (selectAllDelivery.value) {
-    selectedDeliveryOrders.value = deliveryOrders.value.map(o => o.id);
-  } else {
-    selectedDeliveryOrders.value = [];
-  }
-};
-
-const markSelectedDelivered = async () => {
-  if (selectedDeliveryOrders.value.length === 0 || !selectedProject.value) return;
-  try {
-    // Mark each selected order
-    for (const orderId of selectedDeliveryOrders.value) {
-      await fetchWithCsrf(`${apiBase.value}/${selectedProject.value.id}/orders/${orderId}/delivered`, { method: 'POST' });
-    }
-    showToast(`${selectedDeliveryOrders.value.length} materiales marcados como entregados`, 'success');
-    await loadDeliveryOrders();
-  } catch (e) { showToast('Error', 'error'); }
+  } catch (e) { showToast('Error al confirmar', 'error'); }
+  confirmingDelivery.value = false;
 };
 
 // Workers

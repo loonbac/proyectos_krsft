@@ -21,11 +21,9 @@ Route::delete('/{id}/workers/{trabajadorId}', "{$ctrl}@removeWorker")->where(['i
 
 // Purchase orders
 Route::post('/{id}/order', "{$ctrl}@createPurchaseOrder")->where('id', '[0-9]+');
-Route::get('/{id}/orders', "{$ctrl}@getProjectOrders")->where('id', '[0-9]+');
-Route::post('/{id}/orders/{orderId}/delivered', "{$ctrl}@markOrderDelivered")->where(['id' => '[0-9]+', 'orderId' => '[0-9]+']);
-Route::post('/{id}/orders/delivered-all', "{$ctrl}@markAllOrdersDelivered")->where('id', '[0-9]+');
+Route::get('/{id}/paid-orders', "{$ctrl}@getPaidOrders")->where('id', '[0-9]+');
+Route::post('/orders/{orderId}/confirm-delivery', "{$ctrl}@confirmDelivery")->where('orderId', '[0-9]+');
 
 // Material import/export
 Route::get('/material-template', "{$ctrl}@downloadMaterialTemplate");
 Route::post('/{id}/import-materials', "{$ctrl}@importMaterials")->where('id', '[0-9]+');
-
