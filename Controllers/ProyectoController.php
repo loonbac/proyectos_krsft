@@ -749,7 +749,6 @@ class ProyectoController extends Controller
                 'success' => true,
                 'message' => $message,
                 'imported' => $imported,
-                'skipped_duplicates' => $skippedDuplicates,
                 'errors' => $errors
             ]);
         } catch (\Exception $e) {
