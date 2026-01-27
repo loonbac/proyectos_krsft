@@ -584,7 +584,7 @@ const selectedWorkerId = ref('');
 const materialForm = ref({
   item_number: null,
   qty: 1,
-  unit: 'UND',
+  unit: '',
   description: '',
   diameter: '',
   series: '',
@@ -1033,7 +1033,7 @@ const createOrder = async () => {
       materialForm.value = {
         item_number: null,
         qty: 1,
-        unit: 'UND',
+        unit: '',
         description: '',
         diameter: '',
         series: '',
