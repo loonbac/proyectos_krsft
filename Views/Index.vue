@@ -238,6 +238,65 @@
             </ul>
           </div>
 
+          <!-- SUPERVISOR SECTION: Delivery Tracking -->
+          <div v-if="isSupervisor" class="section-box delivery-section">
+            <h3>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 3h15v13H1z"/>
+                <path d="M16 8h4l3 3v5h-7V8z"/>
+                <circle cx="5.5" cy="18.5" r="2.5"/>
+                <circle cx="18.5" cy="18.5" r="2.5"/>
+              </svg>
+              Materiales Pendientes de Entrega
+              <span v-if="deliveryOrders.length > 0" class="delivery-count">{{ deliveryOrders.length }}</span>
+            </h3>
+            
+            <div v-if="loadingDeliveryOrders" class="loading-mini">Cargando...</div>
+            
+            <div v-else-if="deliveryOrders.length === 0" class="empty-list">
+              <p>✓ No hay materiales pendientes de entrega</p>
+            </div>
+            
+            <div v-else>
+              <!-- Bulk action -->
+              <div class="delivery-actions-bar">
+                <label class="checkbox-label">
+                  <input type="checkbox" v-model="selectAllDelivery" @change="toggleAllDelivery" />
+                  Seleccionar todos
+                </label>
+                <button 
+                  @click="markSelectedDelivered" 
+                  :disabled="selectedDeliveryOrders.length === 0"
+                  class="btn-delivery-all"
+                >
+                  ✓ Marcar {{ selectedDeliveryOrders.length > 0 ? selectedDeliveryOrders.length : '' }} Entregados
+                </button>
+              </div>
+              
+              <!-- Orders list -->
+              <ul class="delivery-orders-list">
+                <li v-for="order in deliveryOrders" :key="order.id" class="delivery-order-item">
+                  <label class="checkbox-label">
+                    <input 
+                      type="checkbox" 
+                      :value="order.id" 
+                      v-model="selectedDeliveryOrders"
+                    />
+                  </label>
+                  <div class="delivery-order-info">
+                    <span class="delivery-order-desc">{{ order.description }}</span>
+                    <span class="delivery-order-meta">
+                      {{ order.qty }} {{ order.unit }} • {{ order.currency || 'PEN' }} {{ formatNumber(order.total_with_igv || order.amount || 0) }}
+                    </span>
+                  </div>
+                  <button @click="markSingleDelivered(order.id)" class="btn-delivery-single" title="Marcar entregado">
+                    ✓
+                  </button>
+                </li>
+              </ul>
+            </div>
+          </div>
+
           <!-- SUPERVISOR SECTION: Add Expenses -->
           <div v-if="isSupervisor" class="section-box">
             <h3>
@@ -510,6 +569,10 @@ const allWorkers = ref([]);
 const projectWorkers = ref([]);
 const projectOrders = ref([]);
 const projectSummary = ref({});
+const deliveryOrders = ref([]);
+const selectedDeliveryOrders = ref([]);
+const selectAllDelivery = ref(false);
+const loadingDeliveryOrders = ref(false);
 const toast = ref({ show: false, message: '', type: 'success' });
 const newMaterial = ref('');
 const newMaterialQty = ref(1);
@@ -757,8 +820,62 @@ const selectProject = async (project) => {
       projectOrders.value = data.orders || [];
       projectSummary.value = data.summary || {};
       editForm.value = { name: data.project.name, spending_threshold: data.project.spending_threshold, supervisor_id: data.project.supervisor_id };
+      // Load delivery orders for supervisor
+      if (props.isSupervisor) {
+        await loadDeliveryOrders();
+      }
     }
   } catch (e) { console.error(e); }
+};
+
+// Delivery Tracking
+const loadDeliveryOrders = async () => {
+  if (!selectedProject.value) return;
+  loadingDeliveryOrders.value = true;
+  try {
+    const res = await fetch(`${apiBase.value}/${selectedProject.value.id}/orders`);
+    const data = await res.json();
+    if (data.success) {
+      deliveryOrders.value = data.orders || [];
+      selectedDeliveryOrders.value = [];
+      selectAllDelivery.value = false;
+    }
+  } catch (e) { console.error(e); }
+  loadingDeliveryOrders.value = false;
+};
+
+const markSingleDelivered = async (orderId) => {
+  if (!selectedProject.value) return;
+  try {
+    const res = await fetchWithCsrf(`${apiBase.value}/${selectedProject.value.id}/orders/${orderId}/delivered`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Material marcado como entregado', 'success');
+      await loadDeliveryOrders();
+    } else {
+      showToast(data.message || 'Error', 'error');
+    }
+  } catch (e) { showToast('Error', 'error'); }
+};
+
+const toggleAllDelivery = () => {
+  if (selectAllDelivery.value) {
+    selectedDeliveryOrders.value = deliveryOrders.value.map(o => o.id);
+  } else {
+    selectedDeliveryOrders.value = [];
+  }
+};
+
+const markSelectedDelivered = async () => {
+  if (selectedDeliveryOrders.value.length === 0 || !selectedProject.value) return;
+  try {
+    // Mark each selected order
+    for (const orderId of selectedDeliveryOrders.value) {
+      await fetchWithCsrf(`${apiBase.value}/${selectedProject.value.id}/orders/${orderId}/delivered`, { method: 'POST' });
+    }
+    showToast(`${selectedDeliveryOrders.value.length} materiales marcados como entregados`, 'success');
+    await loadDeliveryOrders();
+  } catch (e) { showToast('Error', 'error'); }
 };
 
 // Workers

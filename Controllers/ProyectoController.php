@@ -519,6 +519,100 @@ class ProyectoController extends Controller
     }
 
     /**
+     * Get purchase orders for a project (in_progress status = ready for delivery)
+     */
+    public function getProjectOrders($id)
+    {
+        try {
+            $orders = DB::table('purchase_orders')
+                ->where('project_id', $id)
+                ->where('status', 'in_progress')
+                ->orderBy('payment_confirmed_at', 'desc')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'orders' => $orders
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Mark a single order as delivered
+     */
+    public function markOrderDelivered(Request $request, $projectId, $orderId)
+    {
+        $order = DB::table('purchase_orders')
+            ->where('id', $orderId)
+            ->where('project_id', $projectId)
+            ->first();
+
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Orden no encontrada'], 404);
+        }
+
+        if ($order->status !== 'in_progress') {
+            return response()->json(['success' => false, 'message' => 'La orden no está lista para entrega'], 400);
+        }
+
+        try {
+            DB::table('purchase_orders')
+                ->where('id', $orderId)
+                ->update([
+                    'status' => 'delivered',
+                    'delivered_at' => now(),
+                    'delivered_by' => auth()->id(),
+                    'delivery_notes' => $request->input('notes', 'Entregado por supervisor'),
+                    'updated_at' => now()
+                ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Material marcado como entregado'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Mark all in_progress orders as delivered for a project
+     */
+    public function markAllOrdersDelivered(Request $request, $id)
+    {
+        try {
+            $count = DB::table('purchase_orders')
+                ->where('project_id', $id)
+                ->where('status', 'in_progress')
+                ->update([
+                    'status' => 'delivered',
+                    'delivered_at' => now(),
+                    'delivered_by' => auth()->id(),
+                    'delivery_notes' => $request->input('notes', 'Entregado por supervisor (lote)'),
+                    'updated_at' => now()
+                ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => "{$count} órdenes marcadas como entregadas"
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Download Excel template for material import
      * Serves file from Assets/Templates/
      */
