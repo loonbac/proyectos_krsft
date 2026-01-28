@@ -413,7 +413,14 @@
                               {{ getOrderStatusLabel(order) }}
                             </span>
                           </td>
-                          <td class="col-monto">{{ order.amount ? getCurrencySymbol(order.currency) + ' ' + formatNumber(order.total_with_igv || order.amount) : 'Por cotizar' }}</td>
+                          <td class="col-monto">
+                            <template v-if="order.amount">
+                              {{ getCurrencySymbol(order.currency) }} {{ formatNumber(order.total_with_igv || order.amount) }}
+                            </template>
+                            <template v-else>
+                              <span class="order-status status-unquoted">Por cotizar</span>
+                            </template>
+                          </td>
                         </tr>
                       </tbody>
                     </table>
