@@ -86,6 +86,16 @@
     --proyectos-badge-unquoted-bg-dark: rgba(245, 158, 11, 0.24);
     --proyectos-badge-unquoted-text-dark: #f8e9c0;
 
+    /* Badges - Project Status (light mode) */
+    --proyectos-badge-success-bg: rgba(16, 185, 129, 0.15);
+    --proyectos-badge-success-text: #10b981;
+
+    --proyectos-badge-warning-bg: rgba(245, 158, 11, 0.15);
+    --proyectos-badge-warning-text: #f59e0b;
+
+    --proyectos-badge-danger-bg: rgba(239, 68, 68, 0.15);
+    --proyectos-badge-danger-text: #ef4444;
+
     /* Badges - Default fallback */
     --proyectos-badge-default-bg: rgba(156, 163, 175, 0.3);
     --proyectos-badge-default-text: #9ca3af;
