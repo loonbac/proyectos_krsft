@@ -1539,9 +1539,10 @@ body.dark-mode .theme-toggle .sun-icon {
 
 /* Download Template Button */
 .btn-download-template {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
     gap: 8px;
     padding: 10px 20px;
     min-width: 180px;
@@ -1558,7 +1559,7 @@ body.dark-mode .theme-toggle .sun-icon {
     white-space: nowrap;
     text-decoration: none;
     line-height: 1;
-    flex-direction: row;
+    vertical-align: middle;
 }
 
 .btn-download-template:hover {
@@ -1573,12 +1574,15 @@ body.dark-mode .theme-toggle .sun-icon {
 }
 
 .btn-download-template svg {
-    width: 18px;
-    height: 18px;
-    flex-shrink: 0;
+    width: 18px !important;
+    height: 18px !important;
+    flex-shrink: 0 !important;
+    flex-grow: 0 !important;
     color: #ffffff !important;
     stroke: currentColor;
     fill: none;
+    display: inline-block !important;
+    vertical-align: middle !important;
 }
 
 /* Import Excel Button */

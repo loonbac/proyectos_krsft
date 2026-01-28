@@ -224,6 +224,9 @@ class ProyectoController extends Controller
             ? ($spent / $project->available_amount * 100) 
             : 0;
 
+        // Add usage_percent to project object
+        $project->usage_percent = $usagePercent;
+
         return response()->json([
             'success' => true,
             'project' => $project,
