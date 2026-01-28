@@ -1835,7 +1835,7 @@ body.dark-mode .materials-table tbody tr:hover {
 }
 
 .file-name {
-    font-weight: 600;
+    font-weight: 500;
     font-size: 14px;
     color: var(--proyectos-text);
 }
