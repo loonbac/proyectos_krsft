@@ -1544,6 +1544,7 @@ body.dark-mode .theme-toggle .sun-icon {
     justify-content: center;
     gap: 8px;
     padding: 10px 20px;
+    min-width: 180px;
     background: #0AA4A4 !important;
     border: none;
     border-radius: var(--proyectos-radius-md);
@@ -1557,6 +1558,7 @@ body.dark-mode .theme-toggle .sun-icon {
     white-space: nowrap;
     text-decoration: none;
     line-height: 1;
+    flex-direction: row;
 }
 
 .btn-download-template:hover {
@@ -1586,6 +1588,7 @@ body.dark-mode .theme-toggle .sun-icon {
     justify-content: center;
     gap: 8px;
     padding: 10px 20px;
+    min-width: 180px;
     background: #f59e0b !important;
     border: none;
     border-radius: var(--proyectos-radius-md);
@@ -1599,6 +1602,7 @@ body.dark-mode .theme-toggle .sun-icon {
     white-space: nowrap;
     text-decoration: none;
     line-height: 1;
+    flex-direction: row;
 }
 
 .btn-import-excel:hover {
