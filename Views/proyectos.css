@@ -826,6 +826,24 @@ body.dark-mode .theme-toggle .sun-icon {
     font-size: 14px;
 }
 
+/* Threshold row specific styles */
+.threshold-row {
+    background: rgba(239, 68, 68, 0.1);
+    border-left: 3px solid #ef4444;
+}
+
+.stat-value.threshold {
+    color: #ef4444;
+    font-weight: 700;
+}
+
+.threshold-amount {
+    font-size: 13px;
+    color: var(--proyectos-text-gray);
+    font-weight: 600;
+    margin-left: auto;
+}
+
 /* Donut Chart */
 .expense-chart {
     width: 220px;

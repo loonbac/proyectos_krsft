@@ -173,6 +173,11 @@
                 <span class="stat-label">Órdenes Pendientes</span>
                 <span class="stat-value">{{ projectSummary.pending_orders || 0 }}</span>
               </div>
+              <div class="stat-row threshold-row">
+                <span class="stat-label">Umbral de Alerta</span>
+                <span class="stat-value threshold">{{ selectedProject.spending_threshold || 75 }}%</span>
+                <span class="threshold-amount">{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber((selectedProject.available_amount * (selectedProject.spending_threshold || 75) / 100)) }}</span>
+              </div>
               <div class="stat-row">
                 <span class="stat-label">Supervisor</span>
                 <span class="stat-value muted">{{ selectedProject.supervisor_name || 'No asignado' }}</span>
@@ -194,6 +199,23 @@
                   :stroke-dasharray="getChartArc"
                   stroke-dashoffset="0"
                   transform="rotate(-90 60 60)"
+                />
+                <!-- Threshold indicator line -->
+                <line 
+                  :x1="getThresholdLineCoords.x1" 
+                  :y1="getThresholdLineCoords.y1" 
+                  :x2="getThresholdLineCoords.x2" 
+                  :y2="getThresholdLineCoords.y2" 
+                  stroke="#ef4444" 
+                  stroke-width="2" 
+                  stroke-dasharray="4,2"
+                />
+                <!-- Threshold marker circle -->
+                <circle 
+                  :cx="getThresholdLineCoords.x2" 
+                  :cy="getThresholdLineCoords.y2" 
+                  r="3" 
+                  fill="#ef4444"
                 />
               </svg>
               <div class="chart-center">
@@ -674,6 +696,17 @@ const getChartArc = computed(() => {
   const circumference = 2 * Math.PI * 50; // r=50
   const arcLength = (percent / 100) * circumference;
   return `${arcLength} ${circumference}`;
+});
+
+// Compute threshold indicator position on the chart
+const getThresholdLineCoords = computed(() => {
+  if (!selectedProject.value) return { x1: 60, y1: 60, x2: 60, y2: 10 };
+  const threshold = selectedProject.value.spending_threshold || 75;
+  const angle = (threshold / 100) * 2 * Math.PI - Math.PI / 2; // -90deg offset
+  const radius = 50;
+  const x = 60 + radius * Math.cos(angle);
+  const y = 60 + radius * Math.sin(angle);
+  return { x1: 60, y1: 60, x2: x, y2: y };
 });
 
 // Compute next item number for the selected project
