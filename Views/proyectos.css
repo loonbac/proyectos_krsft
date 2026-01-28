@@ -1720,23 +1720,23 @@ body.dark-mode .theme-toggle .sun-icon {
 }
 
 .materials-table .status-pending {
-    background: rgba(234, 179, 8, 0.18);
-    color: #92400e;
+    background: rgba(245, 158, 11, 0.16);
+    color: #b45309;
 }
 
 .materials-table .status-approved {
-    background: rgba(34, 197, 94, 0.18);
-    color: #0f5132;
+    background: rgba(16, 185, 129, 0.16);
+    color: #0f766e;
 }
 
 .materials-table .status-paid {
-    background: rgba(59, 130, 246, 0.18);
-    color: #0b4f9c;
+    background: rgba(59, 130, 246, 0.16);
+    color: #1d4ed8;
 }
 
 .materials-table .status-rejected {
-    background: rgba(239, 68, 68, 0.15);
-    color: #b91c1c;
+    background: rgba(239, 68, 68, 0.16);
+    color: #c53030;
 }
 
 /* Pill for unquoted (Por cotizar) */
@@ -1746,8 +1746,8 @@ body.dark-mode .theme-toggle .sun-icon {
     gap: 4px;
     padding: 4px 10px;
     border-radius: 999px;
-    background: rgba(251, 191, 36, 0.2);
-    color: #92400e;
+    background: rgba(245, 158, 11, 0.16);
+    color: #b45309;
     font-weight: 700;
     font-size: 11px;
 }
@@ -1792,27 +1792,27 @@ body.dark-mode .materials-table tbody tr:hover {
 
 /* Dark mode status pills for better contrast */
 body.dark-mode .materials-table .status-pending {
-    background: rgba(251, 191, 36, 0.22);
+    background: rgba(245, 158, 11, 0.24);
     color: #fef3c7;
 }
 
 body.dark-mode .materials-table .status-approved {
-    background: rgba(34, 197, 94, 0.22);
-    color: #bbf7d0;
+    background: rgba(16, 185, 129, 0.24);
+    color: #d1fae5;
 }
 
 body.dark-mode .materials-table .status-paid {
-    background: rgba(59, 130, 246, 0.22);
-    color: #bfdbfe;
+    background: rgba(59, 130, 246, 0.24);
+    color: #dbeafe;
 }
 
 body.dark-mode .materials-table .status-rejected {
-    background: rgba(239, 68, 68, 0.2);
+    background: rgba(239, 68, 68, 0.24);
     color: #fecdd3;
 }
 
 body.dark-mode .materials-table .status-unquoted {
-    background: rgba(251, 191, 36, 0.24);
+    background: rgba(245, 158, 11, 0.24);
     color: #fef3c7;
 }
 
