@@ -214,24 +214,6 @@
                   stroke-dashoffset="0"
                   transform="rotate(-90 60 60)"
                 />
-                
-                <!-- Threshold indicator line -->
-                <line 
-                  :x1="getThresholdLineCoords.x1" 
-                  :y1="getThresholdLineCoords.y1" 
-                  :x2="getThresholdLineCoords.x2" 
-                  :y2="getThresholdLineCoords.y2" 
-                  stroke="#ef4444" 
-                  stroke-width="2.5" 
-                  stroke-dasharray="4,2"
-                />
-                <!-- Threshold marker circle -->
-                <circle 
-                  :cx="getThresholdLineCoords.x2" 
-                  :cy="getThresholdLineCoords.y2" 
-                  r="4" 
-                  fill="#ef4444"
-                />
               </svg>
               <div class="chart-center">
                 <span class="chart-percent">{{ getUsagePercent }}%</span>
