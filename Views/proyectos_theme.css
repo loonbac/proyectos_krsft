@@ -54,39 +54,23 @@
     --proyectos-shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.3);
     --proyectos-shadow-primary: 0 4px 12px rgba(10, 164, 164, 0.4);
 
-    /* Badges - Estados de Proyecto (modo claro) */
-    --proyectos-badge-pending-bg: rgba(245, 158, 11, 0.16);
-    --proyectos-badge-pending-text: #b45309;
+    /* Badges - Material/Order Status (matches project status pattern) */
+    --proyectos-badge-pending-bg: rgba(245, 158, 11, 0.15);
+    --proyectos-badge-pending-text: #f59e0b;
 
-    --proyectos-badge-approved-bg: rgba(16, 185, 129, 0.16);
-    --proyectos-badge-approved-text: #0f766e;
+    --proyectos-badge-approved-bg: rgba(16, 185, 129, 0.15);
+    --proyectos-badge-approved-text: #10b981;
 
-    --proyectos-badge-paid-bg: rgba(59, 130, 246, 0.16);
-    --proyectos-badge-paid-text: #1d4ed8;
+    --proyectos-badge-paid-bg: rgba(59, 130, 246, 0.15);
+    --proyectos-badge-paid-text: #3b82f6;
 
-    --proyectos-badge-rejected-bg: rgba(239, 68, 68, 0.16);
-    --proyectos-badge-rejected-text: #c53030;
+    --proyectos-badge-rejected-bg: rgba(239, 68, 68, 0.15);
+    --proyectos-badge-rejected-text: #ef4444;
 
-    --proyectos-badge-unquoted-bg: rgba(245, 158, 11, 0.16);
-    --proyectos-badge-unquoted-text: #b45309;
+    --proyectos-badge-unquoted-bg: rgba(245, 158, 11, 0.15);
+    --proyectos-badge-unquoted-text: #f59e0b;
 
-    /* Badges - Estados de Proyecto (modo oscuro) */
-    --proyectos-badge-pending-bg-dark: rgba(245, 158, 11, 0.24);
-    --proyectos-badge-pending-text-dark: #f8e9c0;
-
-    --proyectos-badge-approved-bg-dark: rgba(16, 185, 129, 0.24);
-    --proyectos-badge-approved-text-dark: #c7f4e0;
-
-    --proyectos-badge-paid-bg-dark: rgba(59, 130, 246, 0.24);
-    --proyectos-badge-paid-text-dark: #d6e9ff;
-
-    --proyectos-badge-rejected-bg-dark: rgba(239, 68, 68, 0.24);
-    --proyectos-badge-rejected-text-dark: #f9d4d8;
-
-    --proyectos-badge-unquoted-bg-dark: rgba(245, 158, 11, 0.24);
-    --proyectos-badge-unquoted-text-dark: #f8e9c0;
-
-    /* Badges - Project Status (light mode) */
+    /* Badges - Project Status (Normal/Precaución/Crítico) */
     --proyectos-badge-success-bg: rgba(16, 185, 129, 0.15);
     --proyectos-badge-success-text: #10b981;
 
