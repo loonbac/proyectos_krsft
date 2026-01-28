@@ -161,13 +161,21 @@
                 <span class="stat-label">Monto Adjudicado</span>
                 <span class="stat-value primary">{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber(selectedProject.total_amount) }}</span>
               </div>
-              <div class="stat-row">
-                <span class="stat-label">Disponible</span>
-                <span class="stat-value success">{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber(projectSummary.remaining || selectedProject.available_amount) }}</span>
+              <div class="stat-row retained-row">
+                <span class="stat-label">Monto Retenido</span>
+                <span class="stat-value muted">{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber(selectedProject.retained_amount || 0) }}</span>
+              </div>
+              <div class="stat-row available-row">
+                <span class="stat-label">Monto Real Disponible</span>
+                <span class="stat-value info">{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber(selectedProject.available_amount) }}</span>
               </div>
               <div class="stat-row">
                 <span class="stat-label">Gastado</span>
                 <span class="stat-value warning">{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber(projectSummary.spent || 0) }}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Disponible Actual</span>
+                <span class="stat-value success">{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber(projectSummary.remaining || selectedProject.available_amount) }}</span>
               </div>
               <div class="stat-row">
                 <span class="stat-label">Órdenes Pendientes</span>

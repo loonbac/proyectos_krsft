@@ -826,6 +826,23 @@ body.dark-mode .theme-toggle .sun-icon {
     font-size: 14px;
 }
 
+.stat-value.info {
+    color: #3b82f6;
+    font-weight: 700;
+}
+
+/* Retained row specific styles */
+.retained-row {
+    background: rgba(148, 163, 184, 0.1);
+    border-left: 3px solid #94a3b8;
+}
+
+/* Available row specific styles */
+.available-row {
+    background: rgba(59, 130, 246, 0.1);
+    border-left: 3px solid #3b82f6;
+}
+
 /* Threshold row specific styles */
 .threshold-row {
     background: rgba(239, 68, 68, 0.1);
