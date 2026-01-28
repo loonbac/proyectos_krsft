@@ -1720,23 +1720,23 @@ body.dark-mode .theme-toggle .sun-icon {
 }
 
 .materials-table .status-pending {
-    background: rgba(245, 158, 11, 0.16);
-    color: #b45309;
+    background: var(--proyectos-badge-pending-bg);
+    color: var(--proyectos-badge-pending-text);
 }
 
 .materials-table .status-approved {
-    background: rgba(16, 185, 129, 0.16);
-    color: #0f766e;
+    background: var(--proyectos-badge-approved-bg);
+    color: var(--proyectos-badge-approved-text);
 }
 
 .materials-table .status-paid {
-    background: rgba(59, 130, 246, 0.16);
-    color: #1d4ed8;
+    background: var(--proyectos-badge-paid-bg);
+    color: var(--proyectos-badge-paid-text);
 }
 
 .materials-table .status-rejected {
-    background: rgba(239, 68, 68, 0.16);
-    color: #c53030;
+    background: var(--proyectos-badge-rejected-bg);
+    color: var(--proyectos-badge-rejected-text);
 }
 
 /* Pill for unquoted (Por cotizar) */
@@ -1746,8 +1746,8 @@ body.dark-mode .theme-toggle .sun-icon {
     gap: 4px;
     padding: 4px 10px;
     border-radius: 999px;
-    background: rgba(245, 158, 11, 0.16);
-    color: #b45309;
+    background: var(--proyectos-badge-unquoted-bg);
+    color: var(--proyectos-badge-unquoted-text);
     font-weight: 700;
     font-size: 11px;
 }
@@ -1792,28 +1792,28 @@ body.dark-mode .materials-table tbody tr:hover {
 
 /* Dark mode status pills for better contrast */
 body.dark-mode .materials-table .status-pending {
-    background: rgba(245, 158, 11, 0.24);
-    color: #fef3c7;
+    background: var(--proyectos-badge-pending-bg-dark);
+    color: var(--proyectos-badge-pending-text-dark);
 }
 
 body.dark-mode .materials-table .status-approved {
-    background: rgba(16, 185, 129, 0.24);
-    color: #d1fae5;
+    background: var(--proyectos-badge-approved-bg-dark);
+    color: var(--proyectos-badge-approved-text-dark);
 }
 
 body.dark-mode .materials-table .status-paid {
-    background: rgba(59, 130, 246, 0.24);
-    color: #dbeafe;
+    background: var(--proyectos-badge-paid-bg-dark);
+    color: var(--proyectos-badge-paid-text-dark);
 }
 
 body.dark-mode .materials-table .status-rejected {
-    background: rgba(239, 68, 68, 0.24);
-    color: #fecdd3;
+    background: var(--proyectos-badge-rejected-bg-dark);
+    color: var(--proyectos-badge-rejected-text-dark);
 }
 
 body.dark-mode .materials-table .status-unquoted {
-    background: rgba(245, 158, 11, 0.24);
-    color: #fef3c7;
+    background: var(--proyectos-badge-unquoted-bg-dark);
+    color: var(--proyectos-badge-unquoted-text-dark);
 }
 
 /* ============================================
