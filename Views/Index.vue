@@ -249,12 +249,8 @@
             </h3>
             
             <form @submit.prevent="createOrder" class="material-form">
-              <!-- Row 1: Item, Cantidad, Unidad, Descripción -->
+              <!-- Row 1: Cantidad, Unidad, Descripción -->
               <div class="material-form-row">
-                <div class="form-group form-group-xs">
-                  <label>ITEM</label>
-                  <input v-model.number="materialForm.item_number" type="number" min="1" class="input-field" :placeholder="nextItemNumber" title="Número de item (dejar vacío para auto-asignar)" />
-                </div>
                 <div class="form-group form-group-sm">
                   <label>CANT</label>
                   <input v-model.number="materialForm.qty" type="number" min="1" class="input-field" placeholder="1" />
