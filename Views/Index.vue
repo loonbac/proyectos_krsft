@@ -153,10 +153,19 @@
         <!-- Project Detail View -->
         <div v-if="selectedProject" class="project-detail">
 
-          <!-- Consolidated Stats with Chart -->
-          <div class="project-stats-panel">
-            <!-- Left: Stats List -->
-            <div class="stats-list">
+          <!-- Project Data Section -->
+          <div class="section-box">
+            <h3>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 19v-6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2zm0 0V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10m-6 0a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2m0 0V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-2a2 2 0 0 0-2-2z"/>
+              </svg>
+              DATOS DEL PROYECTO
+            </h3>
+
+            <!-- Consolidated Stats with Chart -->
+            <div class="project-stats-panel">
+              <!-- Left: Stats List -->
+              <div class="stats-list">
               <div class="stat-row">
                 <span class="stat-label">Monto Adjudicado</span>
                 <span class="stat-value primary">{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber(selectedProject.total_amount) }}</span>
@@ -229,8 +238,9 @@
               </div>
             </div>
           </div>
+        </div>
 
-          <!-- SUPERVISOR SECTION: Add Workers -->
+        <!-- SUPERVISOR SECTION: Add Workers -->
           <div v-if="isSupervisor" class="section-box">
             <h3>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

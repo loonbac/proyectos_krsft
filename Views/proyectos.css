@@ -863,9 +863,9 @@ body.dark-mode .theme-toggle .sun-icon {
 
 /* Donut Chart */
 .expense-chart {
-    flex: 0 0 340px;
-    width: 340px;
-    height: 340px;
+    flex: 0 0 380px;
+    width: 380px;
+    height: 380px;
     display: flex;
     align-items: center;
     justify-content: center;
