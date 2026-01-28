@@ -1835,9 +1835,14 @@ body.dark-mode .materials-table tbody tr:hover {
 }
 
 .file-name {
-    font-weight: 500;
+    font-weight: 600;
     font-size: 14px;
     color: var(--proyectos-text);
+}
+
+body.dark-mode .file-name {
+    font-weight: 500;
+    color: var(--proyectos-text-white);
 }
 
 .file-header-right {
