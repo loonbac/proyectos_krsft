@@ -188,18 +188,33 @@
             <div class="expense-chart">
               <svg viewBox="0 0 120 120" class="donut-chart">
                 <!-- Background circle -->
-                <circle cx="60" cy="60" r="50" fill="none" stroke="var(--proyectos-border)" stroke-width="12"/>
-                <!-- Spent arc -->
+                <circle cx="60" cy="60" r="50" fill="none" stroke="var(--proyectos-border)" stroke-width="14"/>
+                
+                <!-- Available (green) arc -->
                 <circle 
                   cx="60" cy="60" r="50" 
                   fill="none" 
-                  stroke="var(--proyectos-warning)" 
-                  stroke-width="12"
+                  stroke="#10b981" 
+                  stroke-width="14"
+                  stroke-linecap="round"
+                  :stroke-dasharray="getAvailableArc"
+                  :stroke-dashoffset="getSpentArcLength"
+                  transform="rotate(-90 60 60)"
+                  opacity="0.6"
+                />
+                
+                <!-- Spent (orange/red) arc -->
+                <circle 
+                  cx="60" cy="60" r="50" 
+                  fill="none" 
+                  :stroke="getSpentColor" 
+                  stroke-width="14"
                   stroke-linecap="round"
                   :stroke-dasharray="getChartArc"
                   stroke-dashoffset="0"
                   transform="rotate(-90 60 60)"
                 />
+                
                 <!-- Threshold indicator line -->
                 <line 
                   :x1="getThresholdLineCoords.x1" 
@@ -207,14 +222,14 @@
                   :x2="getThresholdLineCoords.x2" 
                   :y2="getThresholdLineCoords.y2" 
                   stroke="#ef4444" 
-                  stroke-width="2" 
+                  stroke-width="2.5" 
                   stroke-dasharray="4,2"
                 />
                 <!-- Threshold marker circle -->
                 <circle 
                   :cx="getThresholdLineCoords.x2" 
                   :cy="getThresholdLineCoords.y2" 
-                  r="3" 
+                  r="4" 
                   fill="#ef4444"
                 />
               </svg>
@@ -696,6 +711,29 @@ const getChartArc = computed(() => {
   const circumference = 2 * Math.PI * 50; // r=50
   const arcLength = (percent / 100) * circumference;
   return `${arcLength} ${circumference}`;
+});
+
+// Compute available (green) arc
+const getAvailableArc = computed(() => {
+  const percent = 100 - getUsagePercent.value; // remaining percentage
+  const circumference = 2 * Math.PI * 50;
+  const arcLength = (percent / 100) * circumference;
+  return `${arcLength} ${circumference}`;
+});
+
+// Compute spent arc length (for offsetting the available arc)
+const getSpentArcLength = computed(() => {
+  const percent = getUsagePercent.value;
+  const circumference = 2 * Math.PI * 50;
+  return -1 * (percent / 100) * circumference;
+});
+
+// Dynamic color: orange if below threshold, red if above
+const getSpentColor = computed(() => {
+  if (!selectedProject.value) return '#f59e0b';
+  const usage = getUsagePercent.value;
+  const threshold = selectedProject.value.spending_threshold || 75;
+  return usage >= threshold ? '#ef4444' : '#f59e0b';
 });
 
 // Compute threshold indicator position on the chart

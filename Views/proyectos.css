@@ -768,7 +768,7 @@ body.dark-mode .theme-toggle .sun-icon {
    ============================================ */
 .project-stats-panel {
     display: flex;
-    gap: 24px;
+    gap: 32px;
     background: var(--proyectos-bg-card);
     border: 1px solid var(--proyectos-border);
     border-radius: var(--proyectos-radius-lg);
@@ -778,7 +778,7 @@ body.dark-mode .theme-toggle .sun-icon {
 }
 
 .stats-list {
-    flex: 1;
+    flex: 0 0 450px;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -846,14 +846,13 @@ body.dark-mode .theme-toggle .sun-icon {
 
 /* Donut Chart */
 .expense-chart {
-    width: 220px;
-    min-width: 220px;
-    height: 220px;
+    flex: 1;
+    min-width: 320px;
+    height: 320px;
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
-    margin-right: auto;
 }
 
 .donut-chart {
