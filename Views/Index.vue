@@ -414,6 +414,7 @@
                           <th class="col-mat">MATERIAL</th>
                           <th class="col-estado">ESTADO</th>
                           <th class="col-monto">MONTO</th>
+                          <th v-if="!isSupervisor" class="col-actions">ACCIONES</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -427,8 +428,12 @@
                           <td class="col-mat">{{ order.material_type || '-' }}</td>
                           <td class="col-estado">
                             <span class="order-status" :class="getOrderStatusClass(order)">
+                              <!-- Draft icon (file) - Borrador -->
+                              <svg v-if="order.status === 'draft'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                              </svg>
                               <!-- Pending icon (clock) - En Espera -->
-                              <svg v-if="order.status === 'pending'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <svg v-else-if="order.status === 'pending'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                               </svg>
                               <!-- Approved icon (progress) - En Progreso -->
@@ -453,6 +458,21 @@
                             <template v-else>
                               <span class="order-status status-unquoted">Por cotizar</span>
                             </template>
+                          </td>
+                          <td v-if="!isSupervisor" class="col-actions">
+                            <div v-if="order.status === 'draft'" class="action-buttons">
+                              <button @click="approveMaterial(order.id)" class="btn-approve" title="Aprobar y enviar a Compras">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                  <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                              </button>
+                              <button @click="rejectMaterial(order.id)" class="btn-reject" title="Rechazar material">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                                </svg>
+                              </button>
+                            </div>
+                            <span v-else class="no-actions">-</span>
                           </td>
                         </tr>
                       </tbody>
@@ -902,9 +922,10 @@ const initDarkMode = () => {
   }
 };
 
-// Order status helpers (gray=pending, yellow=approved, red=rejected, green=paid)
+// Order status helpers (gray=pending, yellow=approved, red=rejected, green=paid, blue=draft)
 const getOrderStatusClass = (order) => {
   if (order.status === 'rejected') return 'status-rejected';
+  if (order.status === 'draft') return 'status-draft';
   if (order.status === 'pending') return 'status-pending';
   if (order.status === 'approved' && order.payment_confirmed) return 'status-paid';
   if (order.status === 'approved') return 'status-approved';
@@ -913,6 +934,7 @@ const getOrderStatusClass = (order) => {
 
 const getOrderStatusText = (order) => {
   if (order.status === 'rejected') return 'Rechazado';
+  if (order.status === 'draft') return 'Borrador';
   if (order.status === 'pending') return 'Pendiente';
   if (order.status === 'approved' && order.payment_confirmed) return 'Pagado';
   if (order.status === 'approved') return 'Aprobado';
@@ -921,7 +943,8 @@ const getOrderStatusText = (order) => {
 
 const getOrderStatusLabel = (order) => {
   if (order.status === 'rejected') return 'Rechazado';
-  if (order.status === 'pending') return 'En Espera';
+  if (order.status === 'draft') return 'Pend. Aprobación Jefe';
+  if (order.status === 'pending') return 'En Compras';
   if (order.status === 'approved' && order.payment_confirmed) return 'Aprobado';
   if (order.status === 'approved') return 'En Progreso';
   return 'En Espera';
@@ -1127,6 +1150,48 @@ const createOrder = async () => {
     }
   } catch (e) { showToast('Error', 'error'); }
   savingOrder.value = false;
+};
+
+// Approve material (Manager approves supervisor's material list)
+const approveMaterial = async (orderId) => {
+  if (!confirm('¿Aprobar este material y enviarlo al módulo de Compras?')) return;
+  
+  try {
+    const res = await fetchWithCsrf(`${apiBase.value}/orders/${orderId}/approve`, {
+      method: 'POST'
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(data.message || 'Material aprobado', 'success');
+      await selectProject({ id: selectedProject.value.id });
+    } else {
+      showToast(data.message || 'Error', 'error');
+    }
+  } catch (e) {
+    showToast('Error al aprobar material', 'error');
+  }
+};
+
+// Reject material (Manager rejects supervisor's material)
+const rejectMaterial = async (orderId) => {
+  const notes = prompt('¿Por qué se rechaza este material? (opcional)');
+  if (notes === null) return; // User cancelled
+  
+  try {
+    const res = await fetchWithCsrf(`${apiBase.value}/orders/${orderId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ notes: notes || 'Rechazado por el Jefe de Proyectos' })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(data.message || 'Material rechazado', 'success');
+      await selectProject({ id: selectedProject.value.id });
+    } else {
+      showToast(data.message || 'Error', 'error');
+    }
+  } catch (e) {
+    showToast('Error al rechazar material', 'error');
+  }
 };
 
 // Download Excel template

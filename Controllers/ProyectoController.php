@@ -319,7 +319,8 @@ class ProyectoController extends Controller
     }
 
     /**
-     * Create purchase order (for supervisors to send to Compras)
+     * Create purchase order (for supervisors to create material list)
+     * Los materiales se crean en estado 'draft' y requieren aprobación del jefe de proyectos
      */
     public function createPurchaseOrder(Request $request, $id)
     {
@@ -370,18 +371,25 @@ class ProyectoController extends Controller
             ];
 
             if ($request->type === 'service') {
+                // Services are auto-approved and go directly
                 $request->validate(['amount' => 'required|numeric|min:0.01']);
                 $orderData['amount'] = floatval($request->amount);
                 $orderData['status'] = 'approved';
                 $orderData['approved_by'] = auth()->id();
                 $orderData['approved_at'] = now();
             } else {
+                // Materials created by supervisor start as 'draft'
+                // They need manager approval before going to Compras module
                 $materials = $request->input('materials', []);
                 if (empty($materials)) {
                     return response()->json(['success' => false, 'message' => 'Agregue materiales'], 400);
                 }
                 $orderData['materials'] = json_encode($materials);
-                $orderData['status'] = 'pending';
+                $orderData['status'] = 'draft';
+                $orderData['supervisor_approved'] = true;
+                $orderData['supervisor_approved_by'] = auth()->id();
+                $orderData['supervisor_approved_at'] = now();
+                $orderData['manager_approved'] = false;
             }
 
             $orderId = DB::table('purchase_orders')->insertGetId($orderData);
@@ -390,8 +398,92 @@ class ProyectoController extends Controller
                 'success' => true,
                 'message' => $request->type === 'service' 
                     ? 'Gasto registrado' 
-                    : 'Orden enviada a Compras para aprobación',
+                    : 'Material agregado. Pendiente de aprobación del Jefe de Proyectos.',
                 'order_id' => $orderId
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Approve material order (Manager approves supervisor's list)
+     * Changes status from 'draft' to 'pending' and sends to Compras module
+     */
+    public function approveMaterialOrder(Request $request, $orderId)
+    {
+        $order = DB::table('purchase_orders')->find($orderId);
+
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Orden no encontrada'], 404);
+        }
+
+        if ($order->status !== 'draft') {
+            return response()->json(['success' => false, 'message' => 'Solo se pueden aprobar órdenes en borrador'], 400);
+        }
+
+        // Check user is manager (Jefe de Proyectos)
+        $userInfo = $this->getUserRoleInfo();
+        if ($userInfo['role'] !== 'manager' && $userInfo['role'] !== 'admin') {
+            return response()->json(['success' => false, 'message' => 'No tiene permisos para aprobar materiales'], 403);
+        }
+
+        try {
+            DB::table('purchase_orders')
+                ->where('id', $orderId)
+                ->update([
+                    'status' => 'pending',
+                    'manager_approved' => true,
+                    'manager_approved_by' => auth()->id(),
+                    'manager_approved_at' => now(),
+                    'updated_at' => now()
+                ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Material aprobado y enviado al módulo de Compras'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Reject material order (Manager rejects supervisor's list)
+     */
+    public function rejectMaterialOrder(Request $request, $orderId)
+    {
+        $order = DB::table('purchase_orders')->find($orderId);
+
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Orden no encontrada'], 404);
+        }
+
+        if ($order->status !== 'draft') {
+            return response()->json(['success' => false, 'message' => 'Solo se pueden rechazar órdenes en borrador'], 400);
+        }
+
+        // Check user is manager (Jefe de Proyectos)
+        $userInfo = $this->getUserRoleInfo();
+        if ($userInfo['role'] !== 'manager' && $userInfo['role'] !== 'admin') {
+            return response()->json(['success' => false, 'message' => 'No tiene permisos para rechazar materiales'], 403);
+        }
+
+        try {
+            $notes = $request->input('notes', 'Rechazado por el Jefe de Proyectos');
+            
+            DB::table('purchase_orders')
+                ->where('id', $orderId)
+                ->update([
+                    'status' => 'rejected',
+                    'manager_approved' => false,
+                    'notes' => $notes,
+                    'updated_at' => now()
+                ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Material rechazado'
             ]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);

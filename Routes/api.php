@@ -21,6 +21,8 @@ Route::delete('/{id}/workers/{trabajadorId}', "{$ctrl}@removeWorker")->where(['i
 
 // Purchase orders
 Route::post('/{id}/order', "{$ctrl}@createPurchaseOrder")->where('id', '[0-9]+');
+Route::post('/orders/{orderId}/approve', "{$ctrl}@approveMaterialOrder")->where('orderId', '[0-9]+');
+Route::post('/orders/{orderId}/reject', "{$ctrl}@rejectMaterialOrder")->where('orderId', '[0-9]+');
 Route::get('/{id}/paid-orders', "{$ctrl}@getPaidOrders")->where('id', '[0-9]+');
 Route::post('/orders/{orderId}/confirm-delivery', "{$ctrl}@confirmDelivery")->where('orderId', '[0-9]+');
 Route::post('/confirm-file-delivery', "{$ctrl}@confirmFileDelivery");
