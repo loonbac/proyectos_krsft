@@ -319,7 +319,7 @@ body.dark-mode .theme-toggle .sun-icon {
     gap: 8px;
     padding: 10px 16px;
     background: var(--proyectos-bg-card);
-    border: 1px solid var(--proyectos-border);
+    border: 1.5px solid var(--proyectos-border);
     border-radius: var(--proyectos-radius-md);
     color: var(--proyectos-text-gray);
     font-size: 13px;
@@ -348,6 +348,7 @@ body.dark-mode .theme-toggle .sun-icon {
     color: var(--proyectos-primary);
     border-color: var(--proyectos-filter-all-border);
     background: var(--proyectos-filter-all-bg);
+    border-width: 1.5px;
 }
 
 .filter-btn.all svg {
@@ -366,8 +367,9 @@ body.dark-mode .theme-toggle .sun-icon {
 
 .filter-btn.warning {
     color: var(--proyectos-warning);
-    border-color: rgba(245, 158, 11, 0.35);
+    border-color: rgba(245, 158, 11, 0.45);
     background: rgba(245, 158, 11, 0.12);
+    border-width: 1.5px;
 }
 
 .filter-btn.warning svg {
@@ -386,8 +388,9 @@ body.dark-mode .theme-toggle .sun-icon {
 
 .filter-btn.critical {
     color: var(--proyectos-danger);
-    border-color: rgba(239, 68, 68, 0.35);
+    border-color: rgba(239, 68, 68, 0.45);
     background: rgba(239, 68, 68, 0.12);
+    border-width: 1.5px;
 }
 
 .filter-btn.critical svg {
@@ -444,11 +447,12 @@ body.dark-mode .theme-toggle .sun-icon {
 .date-input {
     padding: 8px 12px;
     background: var(--proyectos-bg-card);
-    border: 1px solid var(--proyectos-border);
+    border: 1.5px solid var(--proyectos-border);
     border-radius: var(--proyectos-radius-sm);
     color: var(--proyectos-text-dark);
     font-size: 13px;
     color-scheme: light;
+    accent-color: var(--proyectos-primary);
 }
 
 body.dark-mode .date-input {
@@ -469,26 +473,36 @@ body.dark-mode .date-input {
 }
 
 .date-input::-webkit-calendar-picker-indicator:hover {
-    filter: brightness(0) invert(0.15);
-    opacity: 1;
-    color: var(--proyectos-text-light);
-}
+    filter: brightness(0) invert(0.05);
+    opacity: 0.9;
+    transform: scale(1.25);
+    padding: 4px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.04);
+    border: 1px solid var(--proyectos-border);
+    transition: filter 0.18s ease, opacity 0.18s ease, transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
 
 body.dark-mode .date-input::-webkit-calendar-picker-indicator {
     filter: brightness(0) invert(1);
-    opacity: 0.95;
-}
-
+    filter: brightness(0) invert(0.15);
+    opacity: 1;
+    transform: scale(1.32);
+    background: rgba(0, 0, 0, 0.07);
+    border-color: var(--proyectos-primary);
 body.dark-mode .date-input::-webkit-calendar-picker-indicator:hover {
     filter: brightness(0) invert(1);
     opacity: 1;
-}
-
+    filter: brightness(0) invert(1);
+    opacity: 0.95;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.15);
 .btn-clear-dates {
     width: 32px;
     height: 32px;
-    display: flex;
-    align-items: center;
+    filter: brightness(0) invert(1);
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.25);
     justify-content: center;
     background: var(--proyectos-bg-card);
     border: 1px solid var(--proyectos-border);
