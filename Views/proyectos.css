@@ -402,25 +402,25 @@ body.dark-mode .date-input {
 
 /* Improve calendar icon visibility in dark mode */
 .date-input::-webkit-calendar-picker-indicator {
-    filter: invert(0.1) brightness(0.9);
+    filter: brightness(0) invert(0.05);
     opacity: 0.9;
-    transform: scale(1.15);
+    transform: scale(1.25);
     transition: filter 0.18s ease, opacity 0.18s ease, transform 0.18s ease;
 }
 
 .date-input::-webkit-calendar-picker-indicator:hover {
-    filter: invert(0.15) brightness(1.1);
+    filter: brightness(0) invert(0.15);
     opacity: 1;
-    transform: scale(1.2);
+    transform: scale(1.3);
 }
 
 body.dark-mode .date-input::-webkit-calendar-picker-indicator {
-    filter: invert(1) brightness(1.8);
+    filter: brightness(0) invert(1);
     opacity: 0.95;
 }
 
 body.dark-mode .date-input::-webkit-calendar-picker-indicator:hover {
-    filter: invert(1) brightness(2.1);
+    filter: brightness(0) invert(1);
     opacity: 1;
 }
 
