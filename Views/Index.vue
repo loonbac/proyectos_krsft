@@ -69,7 +69,7 @@
             <button 
               v-for="filter in statusFilters" 
               :key="filter.value"
-              :class="['filter-btn', { active: statusFilter === filter.value }]"
+              :class="['filter-btn', filter.value, { active: statusFilter === filter.value }]"
               @click="statusFilter = filter.value"
             >
               <svg v-if="filter.icon" :viewBox="filter.viewBox || '0 0 24 24'" fill="none" stroke="currentColor" stroke-width="2">
@@ -717,7 +717,7 @@ const formatNumber = (num) => parseFloat(num || 0).toLocaleString('es-PE', { min
 const formatDate = (d) => d ? new Date(d).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' }) : '';
 const getCurrencySymbol = (c) => c === 'USD' ? '$' : 'S/';
 const getStatusLabel = (p) => { const u = parseFloat(p.usage_percent) || 0; if (u >= 90) return 'critical'; if (u >= (p.spending_threshold || 75)) return 'warning'; return 'good'; };
-const getStatusText = (s) => ({ good: 'Normal', warning: 'Precaución', critical: 'Crítico' }[s] || 'Normal');
+const getStatusText = (s) => ({ good: 'Normal', warning: 'ALERTA', critical: 'CRÍTICO' }[s] || 'Normal');
 
 // Chart computed properties
 const getUsagePercent = computed(() => {
@@ -872,16 +872,16 @@ const confirmFileDelivery = async (group) => {
 
 // Filter computed properties
 const statusFilters = computed(() => {
-  const counts = { all: projects.value.length, good: 0, warning: 0, critical: 0 };
+  const counts = { all: projects.value.length, warning: 0, critical: 0 };
   projects.value.forEach(p => {
     const label = getStatusLabel(p);
-    if (counts[label] !== undefined) counts[label]++;
+    if (label === 'warning') counts.warning++;
+    if (label === 'critical') counts.critical++;
   });
   return [
     { value: 'all', label: 'Todos', icon: 'all', count: counts.all },
-    { value: 'good', label: 'Activos', icon: 'good', count: counts.good },
-    { value: 'warning', label: 'Alerta', icon: 'warning', count: counts.warning },
-    { value: 'critical', label: 'Críticos', icon: 'critical', count: counts.critical }
+    { value: 'warning', label: 'ALERTA', icon: 'warning', count: counts.warning },
+    { value: 'critical', label: 'CRÍTICO', icon: 'critical', count: counts.critical }
   ];
 });
 

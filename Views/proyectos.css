@@ -344,6 +344,46 @@ body.dark-mode .theme-toggle .sun-icon {
     color: var(--proyectos-text-white);
 }
 
+.filter-btn.warning {
+    color: var(--proyectos-warning);
+    border-color: rgba(245, 158, 11, 0.35);
+    background: rgba(245, 158, 11, 0.12);
+}
+
+.filter-btn.warning svg {
+    color: var(--proyectos-warning);
+}
+
+.filter-btn.warning.active {
+    background: var(--proyectos-warning);
+    border-color: var(--proyectos-warning);
+    color: var(--proyectos-text-white);
+}
+
+.filter-btn.warning.active svg {
+    color: var(--proyectos-text-white);
+}
+
+.filter-btn.critical {
+    color: var(--proyectos-danger);
+    border-color: rgba(239, 68, 68, 0.35);
+    background: rgba(239, 68, 68, 0.12);
+}
+
+.filter-btn.critical svg {
+    color: var(--proyectos-danger);
+}
+
+.filter-btn.critical.active {
+    background: var(--proyectos-danger);
+    border-color: var(--proyectos-danger);
+    color: var(--proyectos-text-white);
+}
+
+.filter-btn.critical.active svg {
+    color: var(--proyectos-text-white);
+}
+
 .filter-btn svg {
     width: 18px;
     height: 18px;
