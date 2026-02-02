@@ -108,6 +108,10 @@
     --proyectos-progress-critical: #ef4444;
     --proyectos-progress-bg: rgba(0, 0, 0, 0.3);
 
+    /* Filtros */
+    --proyectos-filter-all-bg: rgba(10, 164, 164, 0.12);
+    --proyectos-filter-all-border: rgba(10, 164, 164, 0.35);
+
     /* Currency Badge */
     --proyectos-currency-bg: #3b82f6;
 
