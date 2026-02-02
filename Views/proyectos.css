@@ -388,11 +388,24 @@ body.dark-mode .theme-toggle .sun-icon {
     border-radius: var(--proyectos-radius-sm);
     color: var(--proyectos-text-dark);
     font-size: 13px;
+    color-scheme: dark;
 }
 
 .date-input:focus {
     outline: none;
     border-color: var(--proyectos-primary);
+}
+
+/* Improve calendar icon visibility in dark mode */
+.date-input::-webkit-calendar-picker-indicator {
+    filter: invert(0.9) brightness(1.35);
+    opacity: 0.9;
+    transition: filter 0.18s ease, opacity 0.18s ease;
+}
+
+.date-input::-webkit-calendar-picker-indicator:hover {
+    filter: invert(1) brightness(1.6);
+    opacity: 1;
 }
 
 .btn-clear-dates {
