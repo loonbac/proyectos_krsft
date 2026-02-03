@@ -92,6 +92,8 @@
                 v-model="dateFromDisplay"
                 class="date-input"
                 placeholder="dd/mm/aaaa"
+                @click="openDateFromPicker"
+                @focus="openDateFromPicker"
                 readonly
               />
             </div>
@@ -103,6 +105,8 @@
                 v-model="dateToDisplay"
                 class="date-input"
                 placeholder="dd/mm/aaaa"
+                @click="openDateToPicker"
+                @focus="openDateToPicker"
                 readonly
               />
             </div>
@@ -784,6 +788,7 @@ const syncDateDisplays = () => {
 
 const initDatePickers = async () => {
   try {
+    if (dateFromPicker || dateToPicker) return;
     const fp = await ensureFlatpickr();
     const commonOptions = {
       dateFormat: 'Y-m-d',
@@ -820,6 +825,16 @@ const initDatePickers = async () => {
   } catch (e) {
     console.error('No se pudo cargar flatpickr', e);
   }
+};
+
+const openDateFromPicker = async () => {
+  if (!dateFromPicker) await initDatePickers();
+  if (dateFromPicker) dateFromPicker.open();
+};
+
+const openDateToPicker = async () => {
+  if (!dateToPicker) await initDatePickers();
+  if (dateToPicker) dateToPicker.open();
 };
 
 // Helpers
@@ -991,7 +1006,7 @@ const statusFilters = computed(() => {
     if (label === 'critical') counts.critical++;
   });
   return [
-    { value: 'all', label: 'Todos', icon: 'all', count: counts.all },
+    { value: 'all', label: 'TODOS', icon: 'all', count: counts.all },
     { value: 'warning', label: 'ALERTA', icon: 'warning', count: counts.warning },
     { value: 'critical', label: 'CRÍTICO', icon: 'critical', count: counts.critical }
   ];
