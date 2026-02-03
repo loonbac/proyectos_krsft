@@ -2039,7 +2039,7 @@ body.dark-mode .modal-content.modal-confirm .modal-body p {
 
 .materials-table th {
     background: var(--proyectos-bg-dark);
-    color: var(--proyectos-text-gray);
+    color: #e2e8f0;
     font-weight: 700;
     font-size: 11px;
     text-transform: uppercase;
@@ -2100,6 +2100,11 @@ body.dark-mode .modal-content.modal-confirm .modal-body p {
     text-align: right;
     font-weight: 600;
     white-space: nowrap;
+}
+
+.col-actions {
+    width: 100px;
+    text-align: center;
 }
 
 /* Status colors in table */
@@ -2165,8 +2170,8 @@ body.dark-mode .modal-content.modal-confirm .modal-body p {
 
 /* Dark mode adjustments */
 body.dark-mode .materials-table th {
-    background: var(--proyectos-bg-container);
-    color: var(--proyectos-text-white-muted);
+    background: rgba(51, 65, 85, 0.6);
+    color: #ffffff;
     border-bottom-color: rgba(255, 255, 255, 0.08);
 }
 
@@ -2178,10 +2183,11 @@ body.dark-mode .table-scroll-container {
 body.dark-mode .materials-table td {
     color: var(--proyectos-text-white);
     border-bottom-color: rgba(255, 255, 255, 0.08);
+    background: rgba(51, 65, 85, 0.3);
 }
 
 body.dark-mode .materials-table tbody tr:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(51, 65, 85, 0.5);
 }
 
 /* ============================================
