@@ -1551,6 +1551,17 @@ body.dark-mode .flatpickr-months .flatpickr-next-month {
     border-bottom: 1px solid var(--proyectos-border);
 }
 
+.modal-content.modal-confirm .modal-header {
+    justify-content: center;
+}
+
+.modal-content.modal-confirm .modal-header h2 {
+    text-align: center;
+    width: 100%;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+}
+
 .modal-header h2 {
     margin: 0;
     font-size: 20px;
@@ -1574,12 +1585,53 @@ body.dark-mode .flatpickr-months .flatpickr-next-month {
     padding: 24px;
 }
 
+.modal-content.modal-confirm .modal-body {
+    text-align: center;
+}
+
+.modal-content.modal-confirm .modal-body p {
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--proyectos-text-white-muted);
+}
+
 .modal-footer {
     display: flex;
     gap: 12px;
     justify-content: flex-end;
     padding-top: 20px;
     border-top: 1px solid var(--proyectos-border);
+}
+
+.modal-content.modal-confirm .modal-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.modal-content.modal-confirm .modal-actions button {
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+}
+
+.modal-content.modal-confirm .btn-confirm {
+    background: var(--proyectos-primary);
+    color: var(--proyectos-text-white);
+    border: 1px solid transparent;
+}
+
+.modal-content.modal-confirm .btn-confirm.success {
+    background: var(--proyectos-badge-success-bg);
+    color: var(--proyectos-badge-success-text);
+    border-color: rgba(16, 185, 129, 0.5);
+}
+
+.modal-content.modal-confirm .btn-confirm.danger {
+    background: var(--proyectos-danger);
+    color: var(--proyectos-text-white);
+    border-color: rgba(239, 68, 68, 0.6);
 }
 
 /* ============================================

@@ -615,16 +615,19 @@
       <!-- Confirm Modal (custom confirm for actions) -->
       <Teleport to="body">
         <div v-if="showConfirmModal" class="modal-overlay" @click.self="closeConfirmModal">
-          <div class="modal-content">
+          <div class="modal-content modal-confirm">
             <div class="modal-header">
               <h2>{{ confirmTitle }}</h2>
-              <button @click="closeConfirmModal" class="btn-close">×</button>
             </div>
             <div class="modal-body">
               <p>{{ confirmMessage }}</p>
               <div class="modal-actions">
                 <button @click="closeConfirmModal" class="btn-cancel">Cancelar</button>
-                <button @click="runConfirmAction" :disabled="confirmProcessing" class="btn-confirm">
+                <button
+                  @click="runConfirmAction"
+                  :disabled="confirmProcessing"
+                  :class="['btn-confirm', confirmActionVariant]"
+                >
                   {{ confirmProcessing ? 'Procesando...' : confirmActionLabel }}
                 </button>
               </div>
@@ -662,6 +665,7 @@ const showConfirmModal = ref(false);
 const confirmTitle = ref('');
 const confirmMessage = ref('');
 const confirmActionLabel = ref('Confirmar');
+const confirmActionVariant = ref('');
 const confirmProcessing = ref(false);
 const confirmAction = ref(null);
 const errorMessage = ref('');
@@ -1000,6 +1004,7 @@ const confirmFileDelivery = (group) => {
     title: 'Confirmar entrega',
     message: `¿Marcar todos los ${group.orders.length} items de "${group.filename || 'Órdenes Manuales'}" como entregados?`,
     actionLabel: 'Confirmar',
+    variant: 'primary',
     onConfirm: async () => {
       try {
         const orderIds = group.orders.map(o => o.id);
@@ -1245,10 +1250,11 @@ const confirmDeliveryOrder = async () => {
 };
 
 // Custom confirm modal helpers
-const openConfirmModal = ({ title, message, actionLabel = 'Confirmar', onConfirm }) => {
+const openConfirmModal = ({ title, message, actionLabel = 'Confirmar', variant = '', onConfirm }) => {
   confirmTitle.value = title;
   confirmMessage.value = message;
   confirmActionLabel.value = actionLabel;
+  confirmActionVariant.value = variant;
   confirmAction.value = onConfirm;
   confirmProcessing.value = false;
   showConfirmModal.value = true;
@@ -1258,6 +1264,7 @@ const closeConfirmModal = () => {
   showConfirmModal.value = false;
   confirmProcessing.value = false;
   confirmAction.value = null;
+  confirmActionVariant.value = '';
 };
 
 const runConfirmAction = async () => {
@@ -1352,6 +1359,7 @@ const approveMaterial = (orderId) => {
     title: 'Aprobar material',
     message: '¿Aprobar este material y enviarlo al módulo de Compras?',
     actionLabel: 'Aprobar',
+    variant: 'success',
     onConfirm: async () => {
       try {
         const res = await fetchWithCsrf(`${apiBase.value}/orders/${orderId}/approve`, {
@@ -1466,6 +1474,7 @@ const confirmDeleteProject = async () => {
     title: 'Eliminar proyecto',
     message: `¿Eliminar "${selectedProject.value.name}"?`,
     actionLabel: 'Eliminar',
+    variant: 'danger',
     onConfirm: async () => {
       try {
         const res = await fetchWithCsrf(`${apiBase.value}/${selectedProject.value.id}`, { method: 'DELETE' });
