@@ -199,10 +199,6 @@
                 <span class="stat-label">Disponible Actual</span>
                 <span class="stat-value success">{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber(projectSummary.remaining || selectedProject.available_amount) }}</span>
               </div>
-              <div class="stat-row">
-                <span class="stat-label">Órdenes Pendientes</span>
-                <span class="stat-value">{{ projectSummary.pending_orders || 0 }}</span>
-              </div>
               <div class="stat-row threshold-row">
                 <span class="stat-label">Umbral de Alerta</span>
                 <span class="stat-value threshold">{{ selectedProject.spending_threshold || 75 }}%</span>
@@ -893,7 +889,7 @@ const getStatusText = (s) => ({ good: 'Normal', warning: 'ALERTA', critical: 'CR
 const getUsagePercent = computed(() => {
   if (!selectedProject.value) return 0;
   const usage = parseFloat(selectedProject.value.usage_percent) || 0;
-  return Math.min(100, Math.round(usage));
+  return parseFloat(Math.min(100, usage).toFixed(1));
 });
 
 const getChartArc = computed(() => {

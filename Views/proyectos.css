@@ -2028,6 +2028,7 @@ body.dark-mode .modal-content.modal-confirm .modal-body p {
     min-width: 1100px;
     border-collapse: collapse;
     font-size: 12px;
+    table-layout: auto;
 }
 
 .materials-table thead {
@@ -2062,19 +2063,16 @@ body.dark-mode .modal-content.modal-confirm .modal-body p {
 
 /* Column widths */
 .col-item {
-    width: 50px;
     text-align: center;
     font-weight: 600;
 }
 
 .col-cant {
-    width: 60px;
     text-align: center;
     font-weight: 600;
 }
 
 .col-und {
-    width: 50px;
     text-align: center;
 }
 
@@ -2083,29 +2081,25 @@ body.dark-mode .modal-content.modal-confirm .modal-body p {
 }
 
 .col-diam {
-    width: 100px;
+    white-space: nowrap;
 }
 
 .col-serie {
-    width: 100px;
+    white-space: nowrap;
 }
 
 .col-mat {
-    width: 150px;
-}
-
-.col-norma {
-    width: 130px;
+    white-space: nowrap;
 }
 
 .col-estado {
-    width: 100px;
+    white-space: nowrap;
 }
 
 .col-monto {
-    width: 100px;
     text-align: right;
     font-weight: 600;
+    white-space: nowrap;
 }
 
 /* Status colors in table */

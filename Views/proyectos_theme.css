@@ -34,6 +34,8 @@
     --proyectos-bg-card-dark: rgba(255, 255, 255, 0.1);
     --proyectos-bg-light: #f8fafc;
     --proyectos-bg-input: #ffffff;
+    --proyectos-bg-dark: #1e293b;
+    --proyectos-hover-bg: rgba(241, 245, 249, 0.5);
 
     /* Textos - Modo Claro */
     --proyectos-text-dark: #1e293b;
@@ -147,6 +149,8 @@ body.dark-mode {
     --proyectos-bg-card-dark: rgba(255, 255, 255, 0.1);
     --proyectos-bg-light: #334155;
     --proyectos-bg-input: #1e293b;
+    --proyectos-bg-dark: #334155;
+    --proyectos-hover-bg: rgba(51, 65, 85, 0.5);
 
     /* Textos - Modo Oscuro */
     --proyectos-text-dark: #f1f5f9;
