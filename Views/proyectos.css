@@ -1,7 +1,7 @@
 /* ============================================
    MÓDULO PROYECTOS_KRSFT - ESTILOS DE COMPONENTES
    Layout, paneles, botones y elementos UI
-   Versión 3.1.7 - Fixed Orders Qty + Status Icons
+   Versión 5.3.3 - Improved Import Preview Modal
    ============================================ */
 
 /* ============================================
@@ -1581,7 +1581,7 @@ body.dark-mode .flatpickr-months .flatpickr-next-month {
     background: var(--proyectos-bg-card);
     border-radius: var(--proyectos-radius-xl);
     width: 90%;
-    max-width: 520px;
+    max-width: 750px;
     max-height: 90vh;
     overflow-y: auto;
     box-shadow: var(--proyectos-shadow-lg);
@@ -1647,7 +1647,7 @@ body.dark-mode .modal-content.modal-confirm .modal-body p {
     display: flex;
     gap: 12px;
     justify-content: flex-end;
-    padding-top: 20px;
+    padding: 24px;
     border-top: 1px solid var(--proyectos-border);
 }
 
@@ -1690,6 +1690,15 @@ body.dark-mode .modal-content.modal-confirm .modal-body p {
 
 body.dark-mode .export-items-list {
     background: rgba(0, 0, 0, 0.2);
+}
+
+/* Import preview text color in dark mode */
+.import-preview-text {
+    color: var(--proyectos-text-dark);
+}
+
+body.dark-mode .import-preview-text {
+    color: var(--proyectos-text-white-muted);
 }
 
 .modal-content.modal-confirm .modal-actions {
