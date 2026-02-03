@@ -336,7 +336,7 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                     {{ savingOrder ? 'Agregando...' : 'Agregar Material' }}
                   </button>
-                  <p class="hint">Cada material se envía individualmente para aprobación en Compras</p>
+                  <p class="hint">Cada material se agregará a la lisa de <strong>Órdenes manuales</strong> a la espera de su aprobación</p>
                 </div>
                 <div class="actions-right">
                   <button type="button" @click="downloadTemplate" class="btn-download-template">
