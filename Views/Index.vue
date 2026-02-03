@@ -86,11 +86,25 @@
           <div class="filter-dates">
             <div class="date-input-group">
               <label>Desde:</label>
-              <input type="date" v-model="dateFrom" class="date-input" />
+              <input
+                type="text"
+                ref="dateFromInput"
+                v-model="dateFromDisplay"
+                class="date-input"
+                placeholder="dd/mm/aaaa"
+                readonly
+              />
             </div>
             <div class="date-input-group">
               <label>Hasta:</label>
-              <input type="date" v-model="dateTo" class="date-input" />
+              <input
+                type="text"
+                ref="dateToInput"
+                v-model="dateToDisplay"
+                class="date-input"
+                placeholder="dd/mm/aaaa"
+                readonly
+              />
             </div>
             <button v-if="dateFrom || dateTo" @click="clearDateFilters" class="btn-clear-dates">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -608,7 +622,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import './proyectos_theme.css';
 import './proyectos.css';
 
@@ -666,6 +680,12 @@ const confirmingDelivery = ref(false);
 const statusFilter = ref('all');
 const dateFrom = ref('');
 const dateTo = ref('');
+const dateFromDisplay = ref('');
+const dateToDisplay = ref('');
+const dateFromInput = ref(null);
+const dateToInput = ref(null);
+let dateFromPicker = null;
+let dateToPicker = null;
 
 const isSupervisor = computed(() => props.isSupervisor);
 
@@ -708,6 +728,98 @@ const getCsrfToken = () => document.querySelector('meta[name="csrf-token"]')?.co
 const fetchWithCsrf = (url, options = {}) => {
   const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': getCsrfToken(), ...options.headers };
   return fetch(url, { ...options, headers });
+};
+
+// Flatpickr loader (CDN) for custom datepicker
+const ensureFlatpickr = () => new Promise((resolve, reject) => {
+  if (window.flatpickr) return resolve(window.flatpickr);
+
+  const existingLink = document.getElementById('flatpickr-css-proyectos');
+  if (!existingLink) {
+    const link = document.createElement('link');
+    link.id = 'flatpickr-css-proyectos';
+    link.rel = 'stylesheet';
+    link.href = 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css';
+    document.head.appendChild(link);
+  }
+
+  const scriptId = 'flatpickr-js-proyectos';
+  if (document.getElementById(scriptId)) {
+    document.getElementById(scriptId).addEventListener('load', () => resolve(window.flatpickr));
+    document.getElementById(scriptId).addEventListener('error', reject);
+    return;
+  }
+
+  const script = document.createElement('script');
+  script.id = scriptId;
+  script.src = 'https://cdn.jsdelivr.net/npm/flatpickr';
+  script.async = true;
+  script.onload = () => resolve(window.flatpickr);
+  script.onerror = reject;
+  document.body.appendChild(script);
+});
+
+const formatIso = (dateObj) => {
+  if (!dateObj) return '';
+  const year = dateObj.getFullYear();
+  const month = `${dateObj.getMonth() + 1}`.padStart(2, '0');
+  const day = `${dateObj.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const formatDisplayFromIso = (iso) => {
+  if (!iso) return '';
+  const dateObj = new Date(iso);
+  if (isNaN(dateObj)) return '';
+  const day = `${dateObj.getDate()}`.padStart(2, '0');
+  const month = `${dateObj.getMonth() + 1}`.padStart(2, '0');
+  const year = dateObj.getFullYear();
+  return `${day}/${month}/${year}`;
+};
+
+const syncDateDisplays = () => {
+  dateFromDisplay.value = formatDisplayFromIso(dateFrom.value);
+  dateToDisplay.value = formatDisplayFromIso(dateTo.value);
+};
+
+const initDatePickers = async () => {
+  try {
+    const fp = await ensureFlatpickr();
+    const commonOptions = {
+      dateFormat: 'Y-m-d',
+      allowInput: false,
+      disableMobile: true,
+      locale: 'es',
+      clickOpens: true,
+      monthSelectorType: 'static'
+    };
+
+    if (dateFromInput.value) {
+      dateFromPicker = fp(dateFromInput.value, {
+        ...commonOptions,
+        defaultDate: dateFrom.value || null,
+        onChange: (selectedDates) => {
+          const iso = selectedDates[0] ? formatIso(selectedDates[0]) : '';
+          dateFrom.value = iso;
+          dateFromDisplay.value = formatDisplayFromIso(iso);
+        }
+      });
+    }
+
+    if (dateToInput.value) {
+      dateToPicker = fp(dateToInput.value, {
+        ...commonOptions,
+        defaultDate: dateTo.value || null,
+        onChange: (selectedDates) => {
+          const iso = selectedDates[0] ? formatIso(selectedDates[0]) : '';
+          dateTo.value = iso;
+          dateToDisplay.value = formatDisplayFromIso(iso);
+        }
+      });
+    }
+  } catch (e) {
+    console.error('No se pudo cargar flatpickr', e);
+  }
 };
 
 // Helpers
@@ -907,7 +1019,21 @@ const filteredProjects = computed(() => {
 const clearDateFilters = () => {
   dateFrom.value = '';
   dateTo.value = '';
+  dateFromDisplay.value = '';
+  dateToDisplay.value = '';
+  if (dateFromPicker) dateFromPicker.clear();
+  if (dateToPicker) dateToPicker.clear();
 };
+
+watch(dateFrom, (val) => {
+  dateFromDisplay.value = formatDisplayFromIso(val);
+  if (dateFromPicker) dateFromPicker.setDate(val || null, false, 'Y-m-d');
+});
+
+watch(dateTo, (val) => {
+  dateToDisplay.value = formatDisplayFromIso(val);
+  if (dateToPicker) dateToPicker.setDate(val || null, false, 'Y-m-d');
+});
 
 // Dark mode toggle
 const toggleDarkMode = () => {
@@ -1272,6 +1398,8 @@ const confirmDeleteProject = async () => {
 
 onMounted(() => {
   initDarkMode();
+  syncDateDisplays();
+  initDatePickers();
   loadProjects();
   loadStats();
   loadSupervisors();
