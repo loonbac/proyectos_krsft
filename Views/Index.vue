@@ -1506,73 +1506,15 @@ const downloadTemplate = () => {
   window.location.href = `${apiBase.value}/material-template`;
 };
 
-// Import materials from Excel
+// Import materials from Excel - Show preview
 const importExcel = async (event) => {
   const file = event.target.files[0];
   if (!file || !selectedProject.value) return;
 
-  try {
-    // Parse Excel file in frontend
-    const fileContent = await file.arrayBuffer();
-    const rows = parseExcelFile(fileContent, file.name);
-    
-    if (rows.length === 0) {
-      showToast('No se encontraron filas válidas en el archivo', 'error');
-      event.target.value = '';
-      return;
-    }
-
-    // Show preview modal with parsed items
-    importPreviewItems.value = rows.map((row, idx) => ({
-      number: idx + 1,
-      quantity: row[0] || 1,
-      unit: row[1] || 'UND',
-      description: row[2] || '',
-      diameter: row[3] || '',
-      series: row[4] || '',
-      material_type: row[5] || ''
-    }));
-
-    pendingImportFile.value = file;
-    showImportPreview.value = true;
-  } catch (e) {
-    showToast('Error al leer el archivo: ' + e.message, 'error');
-  }
-  
-  // Reset file input
-  event.target.value = '';
-};
-
-// Parse Excel/CSV file
-const parseExcelFile = (buffer, filename) => {
-  const ext = filename.toLowerCase().split('.').pop();
-  
-  if (ext === 'csv' || ext === 'txt') {
-    // Parse CSV
-    const decoder = new TextDecoder();
-    const text = decoder.decode(buffer);
-    const lines = text.split('\n').filter(line => line.trim());
-    return lines.map(line => line.split(',').map(cell => cell.trim()));
-  }
-  
-  // For XLSX, we'll need to handle it differently
-  // Use a simple CSV fallback or show error
-  if (ext === 'xlsx' || ext === 'xls') {
-    showToast('Por favor usa formato CSV para importar', 'warning');
-    return [];
-  }
-  
-  return [];
-};
-
-// Confirm import after preview
-const confirmImport = async () => {
-  if (!pendingImportFile.value || !selectedProject.value) return;
-
   importingFile.value = true;
   try {
     const formData = new FormData();
-    formData.append('file', pendingImportFile.value);
+    formData.append('file', file);
     formData.append('check_duplicate', 'true');
 
     const res = await fetch(`${apiBase.value}/${selectedProject.value.id}/import-materials`, {
@@ -1587,18 +1529,74 @@ const confirmImport = async () => {
       duplicateData.value = {
         originalFilename: data.originalFilename,
         existingId: data.existingId,
-        file: pendingImportFile.value,
+        file: file,
         skipDuplicate: false
       };
-      showImportPreview.value = false;
       showDuplicateModal.value = true;
+    } else if (data.preview) {
+      // Show preview modal with items from server
+      importPreviewItems.value = data.preview.items.map((item, idx) => ({
+        number: idx + 1,
+        quantity: item.quantity || 1,
+        unit: item.unit || 'UND',
+        description: item.description || '',
+        diameter: item.diameter || '',
+        series: item.series || '',
+        material_type: item.material_type || ''
+      }));
+
+      pendingImportFile.value = file;
+      showImportPreview.value = true;
     } else if (data.success) {
+      // Direct import (shouldn't reach here, but just in case)
+      showToast(data.message, 'success');
+      await selectProject({ id: selectedProject.value.id });
+    } else {
+      showToast(data.message || 'Error al procesar archivo', 'error');
+    }
+  } catch (e) {
+    showToast('Error al importar archivo: ' + e.message, 'error');
+  }
+  
+  importingFile.value = false;
+  // Reset file input
+  event.target.value = '';
+};
+
+// Confirm import after preview
+const confirmImport = async () => {
+  if (!pendingImportFile.value || !selectedProject.value) return;
+
+  importingFile.value = true;
+  try {
+    const formData = new FormData();
+    formData.append('file', pendingImportFile.value);
+    formData.append('confirmed_import', 'true');
+
+    const res = await fetch(`${apiBase.value}/${selectedProject.value.id}/import-materials`, {
+      method: 'POST',
+      headers: { 'X-CSRF-TOKEN': getCsrfToken() },
+      body: formData
+    });
+    const data = await res.json();
+
+    if (data.success) {
       showImportPreview.value = false;
       showToast(data.message, 'success');
       await selectProject({ id: selectedProject.value.id });
       if (data.errors?.length > 0) {
         console.warn('Import errors:', data.errors);
       }
+    } else if (data.duplicate) {
+      // Show duplicate modal
+      duplicateData.value = {
+        originalFilename: data.originalFilename,
+        existingId: data.existingId,
+        file: pendingImportFile.value,
+        skipDuplicate: false
+      };
+      showImportPreview.value = false;
+      showDuplicateModal.value = true;
     } else {
       showToast(data.message || 'Error al importar', 'error');
     }

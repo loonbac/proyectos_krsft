@@ -842,6 +842,29 @@ class ProyectoController extends Controller
                 $rows = $this->parseCsv($content);
             }
 
+            // If check_duplicate=true and no confirmed_import=true, return preview
+            if ($request->input('check_duplicate') === 'true' && $request->input('confirmed_import') !== 'true') {
+                // Return preview data
+                $previewItems = [];
+                foreach ($rows as $index => $columns) {
+                    if (count($columns) < 3) continue;
+                    
+                    $previewItems[] = [
+                        'quantity' => intval($columns[0] ?? 1),
+                        'unit' => trim($columns[1] ?? 'UND'),
+                        'description' => trim($columns[2] ?? ''),
+                        'diameter' => trim($columns[3] ?? ''),
+                        'series' => trim($columns[4] ?? ''),
+                        'material_type' => trim($columns[5] ?? '')
+                    ];
+                }
+
+                return response()->json([
+                    'preview' => ['items' => $previewItems],
+                    'filename' => $sourceFilename
+                ]);
+            }
+
             $imported = 0;
             $errors = [];
 
