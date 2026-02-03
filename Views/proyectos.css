@@ -1,7 +1,7 @@
 /* ============================================
     MÓDULO PROYECTOS_KRSFT - ESTILOS DE COMPONENTES
     Layout, paneles, botones y elementos UI
-    Versión 5.3.6 - Duplicate/Import Modal Pills
+    Versión 5.3.7 - Modal Size & Centering
     ============================================ */
 
 /* ============================================
@@ -1608,6 +1608,14 @@ body.dark-mode .btn-secondary {
     box-shadow: var(--proyectos-shadow-lg);
 }
 
+.modal-content.modal-md {
+    max-width: 560px;
+}
+
+.modal-content.modal-lg {
+    max-width: 680px;
+}
+
 .modal-header {
     display: flex;
     justify-content: space-between;
@@ -1697,6 +1705,15 @@ body.dark-mode .duplicate-modal-hint {
 }
 
 .duplicate-modal-footer {
+    justify-content: center;
+    gap: 14px;
+}
+
+.import-modal-header {
+    justify-content: center;
+}
+
+.import-modal-footer {
     justify-content: center;
     gap: 14px;
 }

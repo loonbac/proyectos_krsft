@@ -639,7 +639,7 @@
       <Teleport to="body">
         <div v-if="showImportPreview" class="modal-overlay" @click.self="showImportPreview = false">
           <div class="modal-content modal-lg">
-            <div class="modal-header">
+            <div class="modal-header import-modal-header">
               <h3 class="import-modal-title">VISTA PREVIA DE IMPORTACIÓN</h3>
             </div>
             <div class="modal-body">
@@ -659,7 +659,7 @@
                 </div>
               </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer import-modal-footer">
               <button @click="showImportPreview = false" class="btn-cancel">Cancelar</button>
               <button @click="confirmImport" class="btn-submit">Confirmar Importación</button>
             </div>
