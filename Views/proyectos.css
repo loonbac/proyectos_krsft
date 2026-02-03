@@ -542,6 +542,19 @@ body.dark-mode .flatpickr-weekdays {
     color: var(--proyectos-text-white);
 }
 
+body.dark-mode .flatpickr-weekday,
+body.dark-mode .flatpickr-months .flatpickr-month,
+body.dark-mode .flatpickr-current-month,
+body.dark-mode .flatpickr-current-month .numInputWrapper input,
+body.dark-mode .flatpickr-day {
+    color: #ffffff;
+}
+
+body.dark-mode .flatpickr-day.prevMonthDay,
+body.dark-mode .flatpickr-day.nextMonthDay {
+    color: rgba(255, 255, 255, 0.45);
+}
+
 .flatpickr-day {
     border-radius: 10px;
     color: var(--proyectos-text-dark);
@@ -1614,24 +1627,28 @@ body.dark-mode .flatpickr-months .flatpickr-next-month {
     text-transform: uppercase;
     font-weight: 700;
     letter-spacing: 0.3px;
+    border-radius: var(--proyectos-radius-full);
+    padding: 12px 24px;
 }
 
 .modal-content.modal-confirm .btn-confirm {
     background: var(--proyectos-primary);
     color: var(--proyectos-text-white);
-    border: 1px solid transparent;
+    border: none;
 }
 
 .modal-content.modal-confirm .btn-confirm.success {
-    background: var(--proyectos-badge-success-bg);
-    color: var(--proyectos-badge-success-text);
-    border-color: rgba(16, 185, 129, 0.5);
+    background: #10b981;
+    color: #ffffff;
 }
 
 .modal-content.modal-confirm .btn-confirm.danger {
-    background: var(--proyectos-danger);
-    color: var(--proyectos-text-white);
-    border-color: rgba(239, 68, 68, 0.6);
+    background: #ef4444;
+    color: #ffffff;
+}
+
+.modal-content.modal-confirm .btn-cancel {
+    border-radius: var(--proyectos-radius-full);
 }
 
 /* ============================================

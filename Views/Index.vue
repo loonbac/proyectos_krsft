@@ -645,7 +645,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, computed, watch, nextTick } from 'vue';
 import './proyectos_theme.css';
 import './proyectos.css';
 
@@ -814,7 +814,12 @@ const syncDateDisplays = () => {
 
 const initDatePickers = async () => {
   try {
-    if (dateFromPicker || dateToPicker) return;
+    if (dateFromPicker || dateToPicker) {
+      if (dateFromPicker) dateFromPicker.destroy();
+      if (dateToPicker) dateToPicker.destroy();
+      dateFromPicker = null;
+      dateToPicker = null;
+    }
     const fp = await ensureFlatpickr();
     const commonOptions = {
       dateFormat: 'Y-m-d',
@@ -822,7 +827,8 @@ const initDatePickers = async () => {
       disableMobile: true,
       locale: 'es',
       clickOpens: true,
-      monthSelectorType: 'static'
+      monthSelectorType: 'static',
+      appendTo: document.body
     };
 
     if (dateFromInput.value) {
@@ -850,6 +856,17 @@ const initDatePickers = async () => {
     }
   } catch (e) {
     console.error('No se pudo cargar flatpickr', e);
+  }
+};
+
+const destroyDatePickers = () => {
+  if (dateFromPicker) {
+    dateFromPicker.destroy();
+    dateFromPicker = null;
+  }
+  if (dateToPicker) {
+    dateToPicker.destroy();
+    dateToPicker = null;
   }
 };
 
@@ -1080,6 +1097,15 @@ watch(dateFrom, (val) => {
 watch(dateTo, (val) => {
   dateToDisplay.value = formatDisplayFromIso(val);
   if (dateToPicker) dateToPicker.setDate(val || null, false, 'Y-m-d');
+});
+
+watch(selectedProject, async (val) => {
+  if (val) {
+    destroyDatePickers();
+    return;
+  }
+  await nextTick();
+  initDatePickers();
 });
 
 // Dark mode toggle
