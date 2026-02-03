@@ -512,16 +512,16 @@ body.dark-mode .date-input::-webkit-calendar-picker-indicator:hover {
     border: 1.5px solid var(--proyectos-border);
     box-shadow: var(--proyectos-shadow-md);
     border-radius: var(--proyectos-radius-lg);
-    padding: 4px 0 8px 0;
+    padding: 2px 0 4px 0;
     font-family: inherit;
-    font-size: 12px;
+    font-size: 11px;
 }
 
 body.dark-mode .flatpickr-calendar {
-    background: #1f2937;
+    background: #0f172a;
     color: var(--proyectos-text-white);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
 }
 
 .flatpickr-months .flatpickr-month {
@@ -540,7 +540,7 @@ body.dark-mode .flatpickr-calendar {
 }
 
 .flatpickr-weekday {
-    font-size: 11px;
+    font-size: 10px;
 }
 
 body.dark-mode .flatpickr-weekdays {
@@ -561,11 +561,11 @@ body.dark-mode .flatpickr-day.nextMonthDay {
 }
 
 .flatpickr-day {
-    border-radius: 10px;
+    border-radius: 8px;
     color: var(--proyectos-text-dark);
-    height: 32px;
-    line-height: 32px;
-    max-width: 32px;
+    height: 28px;
+    line-height: 28px;
+    max-width: 28px;
 }
 
 body.dark-mode .flatpickr-day {
