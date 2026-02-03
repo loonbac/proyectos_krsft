@@ -671,13 +671,13 @@
       <Teleport to="body">
         <div v-if="showDuplicateModal" class="modal-overlay" @click.self="showDuplicateModal = false">
           <div class="modal-content modal-md">
-            <div class="modal-header">
-              <h3>Lista Duplicada</h3>
+            <div class="modal-header duplicate-modal-header">
+              <h3 class="duplicate-modal-title">Lista Duplicada</h3>
               <button @click="showDuplicateModal = false" class="btn-close">×</button>
             </div>
             <div class="modal-body">
-              <p>Una lista con el nombre <strong>{{ duplicateData?.originalFilename }}</strong> ya existe en este proyecto.</p>
-              <p style="margin-top: 10px; color: #666; font-size: 0.9rem;">¿Deseas subir el archivo nuevamente con un nombre diferente?</p>
+              <p class="duplicate-modal-text">Una lista con el nombre <strong>{{ duplicateData?.originalFilename }}</strong> ya existe en este proyecto.</p>
+              <p class="duplicate-modal-hint">¿Deseas subir el archivo nuevamente con un nombre diferente?</p>
             </div>
             <div class="modal-footer">
               <button @click="showDuplicateModal = false" class="btn-cancel">Cancelar</button>

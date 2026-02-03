@@ -1,8 +1,8 @@
 /* ============================================
-   MÓDULO PROYECTOS_KRSFT - ESTILOS DE COMPONENTES
-   Layout, paneles, botones y elementos UI
-   Versión 5.3.4 - Improved Import Modal Title Styling
-   ============================================ */
+    MÓDULO PROYECTOS_KRSFT - ESTILOS DE COMPONENTES
+    Layout, paneles, botones y elementos UI
+    Versión 5.3.5 - Duplicate Modal Styling
+    ============================================ */
 
 /* ============================================
    LAYOUT PRINCIPAL
@@ -1350,6 +1350,27 @@ body.dark-mode .flatpickr-months .flatpickr-next-month {
     background: var(--proyectos-border);
 }
 
+.btn-secondary {
+    padding: 12px 24px;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.45);
+    border-radius: var(--proyectos-radius-md);
+    color: #ef4444;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--proyectos-transition-fast);
+}
+
+.btn-secondary:hover {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+body.dark-mode .btn-secondary {
+    background: rgba(239, 68, 68, 0.16);
+    border-color: rgba(239, 68, 68, 0.6);
+    color: #f87171;
+}
+
 .btn-edit {
     padding: 8px 16px;
     background: var(--proyectos-btn-edit-bg);
@@ -1595,6 +1616,18 @@ body.dark-mode .flatpickr-months .flatpickr-next-month {
     border-bottom: 1px solid var(--proyectos-border);
 }
 
+.duplicate-modal-header {
+    justify-content: center;
+    position: relative;
+}
+
+.duplicate-modal-header .btn-close {
+    position: absolute;
+    right: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
 .modal-content.modal-confirm .modal-header {
     justify-content: center;
 }
@@ -1627,6 +1660,47 @@ body.dark-mode .flatpickr-months .flatpickr-next-month {
 
 .modal-body {
     padding: 24px;
+}
+
+.duplicate-modal-title {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 16px;
+    border-radius: 999px;
+    background: rgba(6, 182, 212, 0.16);
+    border: 1px solid rgba(6, 182, 212, 0.4);
+    color: #06b6d4;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    margin: 0;
+}
+
+body.dark-mode .duplicate-modal-title {
+    background: rgba(6, 182, 212, 0.2);
+    border-color: rgba(6, 182, 212, 0.5);
+    color: #06b6d4;
+}
+
+.duplicate-modal-text {
+    margin: 0;
+    color: var(--proyectos-text-dark);
+}
+
+.duplicate-modal-hint {
+    margin-top: 10px;
+    color: var(--proyectos-text-light);
+    font-size: 0.9rem;
+}
+
+body.dark-mode .duplicate-modal-text {
+    color: var(--proyectos-text-white);
+}
+
+body.dark-mode .duplicate-modal-hint {
+    color: var(--proyectos-text-white-muted);
 }
 
 .modal-content.modal-confirm .modal-body {
