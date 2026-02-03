@@ -233,23 +233,6 @@
                   fill="#10b981" 
                   opacity="0.8"/>
               </svg>
-              <div class="chart-legend">
-                <div class="legend-item retained">
-                  <span class="legend-color"></span>
-                  <span class="legend-label">Retenido</span>
-                  <span class="legend-value">{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber(selectedProject.retained_amount || 0) }}</span>
-                </div>
-                <div class="legend-item spent">
-                  <span class="legend-color"></span>
-                  <span class="legend-label">Gastado</span>
-                  <span class="legend-value">{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber(projectSummary.spent || 0) }}</span>
-                </div>
-                <div class="legend-item available">
-                  <span class="legend-color"></span>
-                  <span class="legend-label">Disponible</span>
-                  <span class="legend-value">{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber(projectSummary.remaining || selectedProject.available_amount) }}</span>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -977,26 +960,29 @@ const getUsagePercent = computed(() => {
   return parseFloat(Math.min(100, usage).toFixed(1));
 });
 
-// Calculate pie segments: Retenido, Gastado, Disponible Actual
+// Calculate pie segments based on MONTO ADJUDICADO distribution:
+// MONTO ADJUDICADO = RETENIDO + GASTADO + DISPONIBLE ACTUAL
+// Where: RETENIDO + REAL DISPONIBLE = ADJUDICADO
+//        GASTADO + DISPONIBLE ACTUAL = REAL DISPONIBLE
 const getPieSegments = computed(() => {
   if (!selectedProject.value) {
     return { retainedAngle: 0, spentAngle: 0, availableAngle: 360 };
   }
   
+  const totalAdjudicado = parseFloat(selectedProject.value.total_amount || 0);
   const retained = parseFloat(selectedProject.value.retained_amount || 0);
   const spent = parseFloat(projectSummary.value.spent || 0);
-  const available = parseFloat(projectSummary.value.remaining || selectedProject.value.available_amount || 0);
+  const availableActual = parseFloat(projectSummary.value.remaining || selectedProject.value.available_amount || 0);
   
-  const total = retained + spent + available;
-  
-  if (total === 0) {
+  if (totalAdjudicado === 0) {
     return { retainedAngle: 0, spentAngle: 0, availableAngle: 360 };
   }
   
+  // Calculate percentages based on MONTO ADJUDICADO
   return {
-    retainedAngle: (retained / total) * 360,
-    spentAngle: (spent / total) * 360,
-    availableAngle: (available / total) * 360
+    retainedAngle: (retained / totalAdjudicado) * 360,
+    spentAngle: (spent / totalAdjudicado) * 360,
+    availableAngle: (availableActual / totalAdjudicado) * 360
   };
 });
 

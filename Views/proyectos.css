@@ -1,7 +1,7 @@
 /* ============================================
     MÓDULO PROYECTOS_KRSFT - ESTILOS DE COMPONENTES
     Layout, paneles, botones y elementos UI
-   Versión 5.5.0 - Pie Chart Visualization
+   Versión 5.5.1 - Pie Chart Distribution Fix
    LAYOUT PRINCIPAL
    ============================================ */
 .proyectos-layout {
@@ -1086,71 +1086,14 @@ body.dark-mode .flatpickr-months .flatpickr-next-month {
 .expense-chart {
     flex: 0 0 auto;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 24px;
 }
 
 .pie-chart {
     width: 200px;
     height: 200px;
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.08));
-}
-
-/* Chart Legend */
-.chart-legend {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    width: 100%;
-}
-
-.legend-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 12px;
-    background: var(--proyectos-bg-light);
-    border-radius: 6px;
-    font-size: 13px;
-}
-
-.legend-item.retained .legend-color {
-    background-color: #9ca3af;
-    opacity: 0.7;
-}
-
-.legend-item.spent .legend-color {
-    background-color: #f59e0b;
-}
-
-body.dark-mode .legend-item.spent .legend-color {
-    background-color: #ef4444;
-}
-
-.legend-item.available .legend-color {
-    background-color: #10b981;
-    opacity: 0.8;
-}
-
-.legend-color {
-    width: 14px;
-    height: 14px;
-    border-radius: 3px;
-    flex-shrink: 0;
-}
-
-.legend-label {
-    font-weight: 600;
-    color: var(--proyectos-text-dark);
-    flex: 1;
-}
-
-.legend-value {
-    font-weight: 700;
-    color: var(--proyectos-text-dark);
-    white-space: nowrap;
 }
 
 @media (max-width: 768px) {
