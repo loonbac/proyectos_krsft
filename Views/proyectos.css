@@ -2038,7 +2038,7 @@ body.dark-mode .modal-content.modal-confirm .modal-body p {
 }
 
 .materials-table th {
-    background: var(--proyectos-bg-dark);
+    background: #475569;
     color: #e2e8f0;
     font-weight: 700;
     font-size: 11px;
@@ -2102,8 +2102,16 @@ body.dark-mode .modal-content.modal-confirm .modal-body p {
     white-space: nowrap;
 }
 
+.materials-table th.col-monto {
+    text-align: right;
+}
+
 .col-actions {
     width: 100px;
+    text-align: center;
+}
+
+.materials-table th.col-actions {
     text-align: center;
 }
 
