@@ -758,7 +758,26 @@ const fetchWithCsrf = (url, options = {}) => {
 
 // Flatpickr loader (CDN) for custom datepicker
 const ensureFlatpickr = () => new Promise((resolve, reject) => {
-  if (window.flatpickr) return resolve(window.flatpickr);
+  const loadLocale = () => new Promise((resolveLocale, rejectLocale) => {
+    const localeId = 'flatpickr-locale-es-proyectos';
+    if (window.flatpickr?.l10ns?.es) return resolveLocale();
+    if (document.getElementById(localeId)) {
+      document.getElementById(localeId).addEventListener('load', resolveLocale);
+      document.getElementById(localeId).addEventListener('error', rejectLocale);
+      return;
+    }
+    const localeScript = document.createElement('script');
+    localeScript.id = localeId;
+    localeScript.src = 'https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js';
+    localeScript.async = true;
+    localeScript.onload = () => resolveLocale();
+    localeScript.onerror = rejectLocale;
+    document.body.appendChild(localeScript);
+  });
+
+  if (window.flatpickr) {
+    return loadLocale().then(() => resolve(window.flatpickr)).catch(reject);
+  }
 
   const existingLink = document.getElementById('flatpickr-css-proyectos');
   if (!existingLink) {
@@ -780,7 +799,11 @@ const ensureFlatpickr = () => new Promise((resolve, reject) => {
   script.id = scriptId;
   script.src = 'https://cdn.jsdelivr.net/npm/flatpickr';
   script.async = true;
-  script.onload = () => resolve(window.flatpickr);
+  script.onload = () => {
+    loadLocale()
+      .then(() => resolve(window.flatpickr))
+      .catch(reject);
+  };
   script.onerror = reject;
   document.body.appendChild(script);
 });
@@ -821,7 +844,7 @@ const initDatePickers = async () => {
       dateFormat: 'Y-m-d',
       allowInput: false,
       disableMobile: true,
-      locale: 'es',
+      locale: fp?.l10ns?.es || 'es',
       clickOpens: true,
       monthSelectorType: 'static',
       appendTo: document.body
