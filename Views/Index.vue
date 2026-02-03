@@ -640,7 +640,7 @@
         <div v-if="showImportPreview" class="modal-overlay" @click.self="showImportPreview = false">
           <div class="modal-content modal-lg">
             <div class="modal-header">
-              <h3 style="text-transform: uppercase; letter-spacing: 0.5px;">VISTA PREVIA DE IMPORTACIÓN</h3>
+              <h3 class="import-modal-title">VISTA PREVIA DE IMPORTACIÓN</h3>
             </div>
             <div class="modal-body">
               <p class="import-preview-text" style="margin-bottom: 15px;">Se importarán {{ importPreviewItems.length }} materiales:</p>

@@ -1701,6 +1701,21 @@ body.dark-mode .import-preview-text {
     color: var(--proyectos-text-white-muted);
 }
 
+/* Import modal title styling */
+.import-modal-title {
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+    text-align: center;
+    width: 100%;
+    color: var(--proyectos-text-dark);
+    margin: 0;
+}
+
+body.dark-mode .import-modal-title {
+    color: #06b6d4;
+}
+
 .modal-content.modal-confirm .modal-actions {
     display: flex;
     justify-content: center;
