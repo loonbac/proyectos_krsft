@@ -75,6 +75,19 @@
     gap: 20px;
 }
 
+.header-left.project-detail-header {
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.header-left.project-detail-header .header-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--proyectos-text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
 .header-left h1 {
     display: flex;
     align-items: center;
@@ -1468,8 +1481,8 @@ body.dark-mode .flatpickr-months .flatpickr-next-month {
 }
 
 .order-status.status-pending {
-    background: rgba(14, 116, 144, 0.18);
-    color: #0e7490;
+    background: rgba(6, 182, 212, 0.2);
+    color: #06b6d4;
 }
 
 .order-status.status-draft {
@@ -2132,8 +2145,8 @@ body.dark-mode .modal-content.modal-confirm .modal-body p {
 }
 
 .materials-table .status-pending {
-    background: rgba(14, 116, 144, 0.18);
-    color: #0e7490;
+    background: rgba(6, 182, 212, 0.2);
+    color: #06b6d4;
 }
 
 .materials-table .status-approved {

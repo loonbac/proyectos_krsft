@@ -31,10 +31,13 @@
               <path d="M19 12H5M5 12L12 19M5 12L12 5"/>
             </svg>
           </button>
+          <span class="header-label">PROYECTO:</span>
           <span class="project-name-pill" :style="{ background: getProjectColor(selectedProject.id) }">
             {{ selectedProject.name }}
           </span>
+          <span class="header-label">MONEDA:</span>
           <span class="currency-pill">{{ selectedProject.currency || 'PEN' }}</span>
+          <span class="header-label">ESTADO:</span>
           <span class="status-badge" :class="getStatusLabel(selectedProject)">{{ getStatusText(getStatusLabel(selectedProject)) }}</span>
         </div>
         
