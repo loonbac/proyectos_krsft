@@ -469,33 +469,35 @@ body.dark-mode .date-input {
     filter: brightness(0) invert(0.05);
     opacity: 0.9;
     transform: scale(1.25);
-    transition: filter 0.18s ease, opacity 0.18s ease, transform 0.18s ease;
-}
-
-.date-input::-webkit-calendar-picker-indicator:hover {
-    filter: brightness(0) invert(0.05);
-    opacity: 0.9;
-    transform: scale(1.25);
     padding: 4px;
     border-radius: 8px;
     background: rgba(0, 0, 0, 0.04);
     border: 1px solid var(--proyectos-border);
     transition: filter 0.18s ease, opacity 0.18s ease, transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
 
-body.dark-mode .date-input::-webkit-calendar-picker-indicator {
-    filter: brightness(0) invert(1);
+.date-input::-webkit-calendar-picker-indicator:hover {
     filter: brightness(0) invert(0.15);
     opacity: 1;
     transform: scale(1.32);
     background: rgba(0, 0, 0, 0.07);
     border-color: var(--proyectos-primary);
-body.dark-mode .date-input::-webkit-calendar-picker-indicator:hover {
-    filter: brightness(0) invert(1);
-    opacity: 1;
+}
+
+body.dark-mode .date-input::-webkit-calendar-picker-indicator {
     filter: brightness(0) invert(1);
     opacity: 0.95;
     background: rgba(255, 255, 255, 0.07);
     border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+body.dark-mode .date-input::-webkit-calendar-picker-indicator:hover {
+    filter: brightness(0) invert(1);
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
 .btn-clear-dates {
     width: 32px;
     height: 32px;
