@@ -1,7 +1,7 @@
 /* ============================================
     MÓDULO PROYECTOS_KRSFT - ESTILOS DE COMPONENTES
     Layout, paneles, botones y elementos UI
-   Versión 5.3.9 - Updated Hint Text
+   Versión 5.5.0 - Pie Chart Visualization
    LAYOUT PRINCIPAL
    ============================================ */
 .proyectos-layout {
@@ -1082,43 +1082,75 @@ body.dark-mode .flatpickr-months .flatpickr-next-month {
     margin-left: auto;
 }
 
-/* Donut Chart */
+/* Pie Chart */
 .expense-chart {
-    flex: 0 0 380px;
-    width: 380px;
-    height: 380px;
+    flex: 0 0 auto;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    position: relative;
+    gap: 24px;
 }
 
-.donut-chart {
+.pie-chart {
+    width: 200px;
+    height: 200px;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.08));
+}
+
+/* Chart Legend */
+.chart-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
     width: 100%;
-    height: 100%;
 }
 
-.chart-center {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    text-align: center;
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--proyectos-bg-light);
+    border-radius: 6px;
+    font-size: 13px;
 }
 
-.chart-percent {
-    display: block;
-    font-size: 28px;
-    font-weight: 800;
+.legend-item.retained .legend-color {
+    background-color: #9ca3af;
+    opacity: 0.7;
+}
+
+.legend-item.spent .legend-color {
+    background-color: #f59e0b;
+}
+
+body.dark-mode .legend-item.spent .legend-color {
+    background-color: #ef4444;
+}
+
+.legend-item.available .legend-color {
+    background-color: #10b981;
+    opacity: 0.8;
+}
+
+.legend-color {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.legend-label {
+    font-weight: 600;
     color: var(--proyectos-text-dark);
-    line-height: 1;
+    flex: 1;
 }
 
-.chart-label {
-    display: block;
-    font-size: 12px;
-    color: var(--proyectos-text-gray);
-    margin-top: 4px;
+.legend-value {
+    font-weight: 700;
+    color: var(--proyectos-text-dark);
+    white-space: nowrap;
 }
 
 @media (max-width: 768px) {

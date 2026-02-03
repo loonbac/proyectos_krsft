@@ -213,40 +213,42 @@
               </div>
             </div>
             
-            <!-- Right: Donut Chart -->
+            <!-- Right: Pie Chart -->
             <div class="expense-chart">
-              <svg viewBox="0 0 120 120" class="donut-chart">
-                <!-- Background circle -->
-                <circle cx="60" cy="60" r="50" fill="none" stroke="var(--proyectos-border)" stroke-width="14"/>
+              <svg viewBox="0 0 120 120" class="pie-chart">
+                <!-- Retenido (Gray) -->
+                <path v-if="getPieSegments.retainedAngle > 0" 
+                  :d="getPieSegmentPath('retained')" 
+                  fill="#9ca3af" 
+                  opacity="0.7"/>
                 
-                <!-- Available (green) arc -->
-                <circle 
-                  cx="60" cy="60" r="50" 
-                  fill="none" 
-                  stroke="#10b981" 
-                  stroke-width="14"
-                  stroke-linecap="round"
-                  :stroke-dasharray="getAvailableArc"
-                  :stroke-dashoffset="getSpentArcLength"
-                  transform="rotate(-90 60 60)"
-                  opacity="0.6"
-                />
+                <!-- Gastado (Orange/Red) -->
+                <path v-if="getPieSegments.spentAngle > 0" 
+                  :d="getPieSegmentPath('spent')" 
+                  :fill="getSpentColor"/>
                 
-                <!-- Spent (orange/red) arc -->
-                <circle 
-                  cx="60" cy="60" r="50" 
-                  fill="none" 
-                  :stroke="getSpentColor" 
-                  stroke-width="14"
-                  stroke-linecap="round"
-                  :stroke-dasharray="getChartArc"
-                  stroke-dashoffset="0"
-                  transform="rotate(-90 60 60)"
-                />
+                <!-- Disponible Actual (Green) -->
+                <path v-if="getPieSegments.availableAngle > 0" 
+                  :d="getPieSegmentPath('available')" 
+                  fill="#10b981" 
+                  opacity="0.8"/>
               </svg>
-              <div class="chart-center">
-                <span class="chart-percent">{{ getUsagePercent }}%</span>
-                <span class="chart-label">Usado</span>
+              <div class="chart-legend">
+                <div class="legend-item retained">
+                  <span class="legend-color"></span>
+                  <span class="legend-label">Retenido</span>
+                  <span class="legend-value">{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber(selectedProject.retained_amount || 0) }}</span>
+                </div>
+                <div class="legend-item spent">
+                  <span class="legend-color"></span>
+                  <span class="legend-label">Gastado</span>
+                  <span class="legend-value">{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber(projectSummary.spent || 0) }}</span>
+                </div>
+                <div class="legend-item available">
+                  <span class="legend-color"></span>
+                  <span class="legend-label">Disponible</span>
+                  <span class="legend-value">{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber(projectSummary.remaining || selectedProject.available_amount) }}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -336,7 +338,7 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                     {{ savingOrder ? 'Agregando...' : 'Agregar Material' }}
                   </button>
-                  <p class="hint">Cada material se agregará a la lisa de <strong>Órdenes manuales</strong> a la espera de su aprobación</p>
+                  <p class="hint">Cada material se agregará a la lista de <strong>Órdenes Manuales</strong> a la espera de su aprobación</p>
                 </div>
                 <div class="actions-right">
                   <button type="button" @click="downloadTemplate" class="btn-download-template">
@@ -968,35 +970,70 @@ const getCurrencySymbol = (c) => c === 'USD' ? '$' : 'S/';
 const getStatusLabel = (p) => { const u = parseFloat(p.usage_percent) || 0; if (u >= 90) return 'critical'; if (u >= (p.spending_threshold || 75)) return 'warning'; return 'good'; };
 const getStatusText = (s) => ({ good: 'Normal', warning: 'ALERTA', critical: 'CRÍTICO' }[s] || 'Normal');
 
-// Chart computed properties
+// Pie Chart computed properties
 const getUsagePercent = computed(() => {
   if (!selectedProject.value) return 0;
   const usage = parseFloat(selectedProject.value.usage_percent) || 0;
   return parseFloat(Math.min(100, usage).toFixed(1));
 });
 
-const getChartArc = computed(() => {
-  const percent = getUsagePercent.value;
-  const circumference = 2 * Math.PI * 50; // r=50
-  const arcLength = (percent / 100) * circumference;
-  return `${arcLength} ${circumference}`;
+// Calculate pie segments: Retenido, Gastado, Disponible Actual
+const getPieSegments = computed(() => {
+  if (!selectedProject.value) {
+    return { retainedAngle: 0, spentAngle: 0, availableAngle: 360 };
+  }
+  
+  const retained = parseFloat(selectedProject.value.retained_amount || 0);
+  const spent = parseFloat(projectSummary.value.spent || 0);
+  const available = parseFloat(projectSummary.value.remaining || selectedProject.value.available_amount || 0);
+  
+  const total = retained + spent + available;
+  
+  if (total === 0) {
+    return { retainedAngle: 0, spentAngle: 0, availableAngle: 360 };
+  }
+  
+  return {
+    retainedAngle: (retained / total) * 360,
+    spentAngle: (spent / total) * 360,
+    availableAngle: (available / total) * 360
+  };
 });
 
-// Compute available (green) arc based on total adjudicated amount
-const getAvailableArc = computed(() => {
-  if (!selectedProject.value) return '0 314.16';
-  const remainingPercent = Math.max(0, 100 - getUsagePercent.value);
-  const circumference = 2 * Math.PI * 50;
-  const arcLength = (remainingPercent / 100) * circumference;
-  return `${arcLength} ${circumference}`;
-});
-
-// Compute spent arc length (for offsetting the available arc)
-const getSpentArcLength = computed(() => {
-  if (!selectedProject.value) return 0;
-  const circumference = 2 * Math.PI * 50;
-  return -1 * (getUsagePercent.value / 100) * circumference;
-});
+// Helper function to generate SVG pie segment path
+const getPieSegmentPath = (segment) => {
+  const segments = getPieSegments.value;
+  const radius = 45;
+  const cx = 60, cy = 60;
+  
+  let startAngle = 0;
+  let angle = 0;
+  
+  if (segment === 'retained') {
+    angle = segments.retainedAngle;
+  } else if (segment === 'spent') {
+    startAngle = segments.retainedAngle;
+    angle = segments.spentAngle;
+  } else if (segment === 'available') {
+    startAngle = segments.retainedAngle + segments.spentAngle;
+    angle = segments.availableAngle;
+  }
+  
+  // Convert to radians (subtract 90 to start from top)
+  const startRad = (startAngle - 90) * (Math.PI / 180);
+  const endRad = (startAngle + angle - 90) * (Math.PI / 180);
+  
+  const x1 = cx + radius * Math.cos(startRad);
+  const y1 = cy + radius * Math.sin(startRad);
+  const x2 = cx + radius * Math.cos(endRad);
+  const y2 = cy + radius * Math.sin(endRad);
+  
+  // Large arc flag
+  const largeArc = angle > 180 ? 1 : 0;
+  
+  // Path: Move to center, line to start point, arc to end point, close
+  return `M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+};
 
 // Dynamic color: orange if below threshold, red if above
 const getSpentColor = computed(() => {
