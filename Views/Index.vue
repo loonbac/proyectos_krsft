@@ -906,24 +906,17 @@ const getChartArc = computed(() => {
 // Compute available (green) arc based on total adjudicated amount
 const getAvailableArc = computed(() => {
   if (!selectedProject.value) return '0 314.16';
-  const totalAmount = parseFloat(selectedProject.value.total_amount) || 0;
-  if (totalAmount === 0) return '0 314.16';
-  const remaining = parseFloat(projectSummary.value.remaining || selectedProject.value.available_amount) || 0;
-  const percent = (remaining / totalAmount) * 100;
+  const remainingPercent = Math.max(0, 100 - getUsagePercent.value);
   const circumference = 2 * Math.PI * 50;
-  const arcLength = (percent / 100) * circumference;
+  const arcLength = (remainingPercent / 100) * circumference;
   return `${arcLength} ${circumference}`;
 });
 
 // Compute spent arc length (for offsetting the available arc)
 const getSpentArcLength = computed(() => {
   if (!selectedProject.value) return 0;
-  const totalAmount = parseFloat(selectedProject.value.total_amount) || 0;
-  if (totalAmount === 0) return 0;
-  const spent = parseFloat(projectSummary.value.spent || 0);
-  const percent = (spent / totalAmount) * 100;
   const circumference = 2 * Math.PI * 50;
-  return -1 * (percent / 100) * circumference;
+  return -1 * (getUsagePercent.value / 100) * circumference;
 });
 
 // Dynamic color: orange if below threshold, red if above
