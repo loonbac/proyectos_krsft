@@ -2038,14 +2038,14 @@ body.dark-mode .modal-content.modal-confirm .modal-body p {
 }
 
 .materials-table th {
-    background: #475569;
-    color: #e2e8f0;
+    background: #e8eef5;
+    color: #1e293b;
     font-weight: 700;
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     padding: 12px 10px;
-    text-align: left;
+    text-align: center;
     border-bottom: 2px solid var(--proyectos-border);
     white-space: nowrap;
 }
@@ -2055,6 +2055,7 @@ body.dark-mode .modal-content.modal-confirm .modal-body p {
     border-bottom: 1px solid var(--proyectos-border-light);
     color: var(--proyectos-text-dark);
     vertical-align: middle;
+    text-align: center;
 }
 
 .materials-table tbody tr:hover {
@@ -2077,7 +2078,7 @@ body.dark-mode .modal-content.modal-confirm .modal-body p {
 }
 
 .col-desc {
-    min-width: 250px;
+    text-align: left;
 }
 
 .col-diam {
@@ -2097,17 +2098,11 @@ body.dark-mode .modal-content.modal-confirm .modal-body p {
 }
 
 .col-monto {
-    text-align: right;
     font-weight: 600;
     white-space: nowrap;
 }
 
-.materials-table th.col-monto {
-    text-align: right;
-}
-
 .col-actions {
-    width: 100px;
     text-align: center;
 }
 
@@ -2178,8 +2173,8 @@ body.dark-mode .modal-content.modal-confirm .modal-body p {
 
 /* Dark mode adjustments */
 body.dark-mode .materials-table th {
-    background: rgba(51, 65, 85, 0.6);
-    color: #ffffff;
+    background: #2d3b52;
+    color: #e2e8f0;
     border-bottom-color: rgba(255, 255, 255, 0.08);
 }
 
