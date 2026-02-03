@@ -1,7 +1,7 @@
 {
     "name": "ProyectosKrsft",
     "display_name": "Gestión de Proyectos",
-    "version": "5.2.4",
+    "version": "5.2.5",
     "description": "Sistema completo de gestión de proyectos con tracking de presupuesto, gastos, tiempo y estados. Nuevo flujo: Supervisor crea materiales → Jefe aprueba → Se envía a Compras.",
     "icon": "icon.svg",
     "color": "#0AA4A4",
