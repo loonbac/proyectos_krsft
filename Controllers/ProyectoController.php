@@ -807,6 +807,27 @@ class ProyectoController extends Controller
             $extension = strtolower($file->getClientOriginalExtension());
             $sourceFilename = $file->getClientOriginalName(); // Save original filename
             
+            // Check for duplicate filename
+            $existingFile = DB::table('purchase_orders')
+                ->where('project_id', $id)
+                ->where('source_filename', $sourceFilename)
+                ->first();
+            
+            if ($existingFile && $request->input('check_duplicate') === 'true') {
+                return response()->json([
+                    'duplicate' => true,
+                    'originalFilename' => $sourceFilename,
+                    'existingId' => $existingFile->id
+                ]);
+            }
+            
+            // Handle rename duplicate
+            if ($existingFile && $request->input('rename_duplicate') === 'true') {
+                $baseName = pathinfo($sourceFilename, PATHINFO_FILENAME);
+                $extension_file = pathinfo($sourceFilename, PATHINFO_EXTENSION);
+                $sourceFilename = $baseName . ' (2).' . $extension_file;
+            }
+            
             $rows = [];
             
             // Check file type and parse accordingly

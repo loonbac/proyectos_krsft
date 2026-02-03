@@ -1651,6 +1651,47 @@ body.dark-mode .modal-content.modal-confirm .modal-body p {
     border-top: 1px solid var(--proyectos-border);
 }
 
+.export-preview {
+    min-height: 200px;
+}
+
+.export-items-list {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid var(--proyectos-border);
+    border-radius: var(--proyectos-radius);
+    padding: 12px 0;
+    background: var(--proyectos-bg-light);
+}
+
+.export-item-row {
+    display: flex;
+    gap: 12px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--proyectos-border);
+    align-items: flex-start;
+}
+
+.export-item-row:last-child {
+    border-bottom: none;
+}
+
+.export-item-row .item-number {
+    min-width: 30px;
+    font-weight: 600;
+    color: var(--proyectos-text-gray);
+}
+
+.export-item-row .item-text {
+    color: var(--proyectos-text-dark);
+    word-break: break-word;
+    flex: 1;
+}
+
+body.dark-mode .export-items-list {
+    background: rgba(0, 0, 0, 0.2);
+}
+
 .modal-content.modal-confirm .modal-actions {
     display: flex;
     justify-content: center;

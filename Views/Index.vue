@@ -635,6 +635,52 @@
         </div>
       </Teleport>
 
+      <!-- Duplicate File Modal -->
+      <Teleport to="body">
+        <div v-if="showDuplicateModal" class="modal-overlay" @click.self="showDuplicateModal = false">
+          <div class="modal-content modal-md">
+            <div class="modal-header">
+              <h3>Lista Duplicada</h3>
+              <button @click="showDuplicateModal = false" class="btn-close">×</button>
+            </div>
+            <div class="modal-body">
+              <p>Una lista con el nombre <strong>{{ duplicateData?.originalFilename }}</strong> ya existe en este proyecto.</p>
+              <p style="margin-top: 10px; color: #666; font-size: 0.9rem;">¿Deseas subir el archivo nuevamente con un nombre diferente?</p>
+            </div>
+            <div class="modal-footer">
+              <button @click="showDuplicateModal = false" class="btn-cancel">Cancelar</button>
+              <button @click="confirmDuplicateUpload(false)" class="btn-secondary">Sobreescribir</button>
+              <button @click="confirmDuplicateUpload(true)" class="btn-submit">Subir como {{ duplicateData?.originalFilename }} (2)</button>
+            </div>
+          </div>
+        </div>
+      </Teleport>
+
+      <!-- Export Preview Modal -->
+      <Teleport to="body">
+        <div v-if="showExportPreview" class="modal-overlay" @click.self="showExportPreview = false">
+          <div class="modal-content modal-lg">
+            <div class="modal-header">
+              <h3>Vista Previa de Exportación</h3>
+              <button @click="showExportPreview = false" class="btn-close">×</button>
+            </div>
+            <div class="modal-body export-preview">
+              <p style="margin-bottom: 15px; color: #666;">Se exportarán {{ exportPreviewItems.length }} items:</p>
+              <div class="export-items-list">
+                <div v-for="(item, idx) in exportPreviewItems" :key="idx" class="export-item-row">
+                  <span class="item-number">{{ idx + 1 }}.</span>
+                  <span class="item-text">{{ item.description }}</span>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button @click="showExportPreview = false" class="btn-cancel">Cancelar</button>
+              <button @click="proceedWithExport" class="btn-submit">Exportar</button>
+            </div>
+          </div>
+        </div>
+      </Teleport>
+
       <!-- Toast -->
       <Teleport to="body">
         <div v-if="toast.show" class="toast" :class="toast.type">{{ toast.message }}</div>
@@ -696,6 +742,10 @@ const materialForm = ref({
 
 // Import state
 const importingFile = ref(false);
+const showDuplicateModal = ref(false);
+const duplicateData = ref(null);
+const showExportPreview = ref(false);
+const exportPreviewItems = ref([]);
 
 // Paid Orders & Delivery State
 const paidOrders = ref([]);
@@ -1456,6 +1506,7 @@ const importExcel = async (event) => {
   try {
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('check_duplicate', 'true');
 
     const res = await fetch(`${apiBase.value}/${selectedProject.value.id}/import-materials`, {
       method: 'POST',
@@ -1464,7 +1515,16 @@ const importExcel = async (event) => {
     });
     const data = await res.json();
 
-    if (data.success) {
+    if (data.duplicate) {
+      // Show duplicate modal
+      duplicateData.value = {
+        originalFilename: data.originalFilename,
+        existingId: data.existingId,
+        file: file,
+        skipDuplicate: false
+      };
+      showDuplicateModal.value = true;
+    } else if (data.success) {
       showToast(data.message, 'success');
       await selectProject({ id: selectedProject.value.id });
       if (data.errors?.length > 0) {
@@ -1479,6 +1539,36 @@ const importExcel = async (event) => {
   importingFile.value = false;
   // Reset file input
   event.target.value = '';
+};
+
+const confirmDuplicateUpload = async (renameFile = false) => {
+  if (!duplicateData.value) return;
+  
+  importingFile.value = true;
+  try {
+    const formData = new FormData();
+    formData.append('file', duplicateData.value.file);
+    formData.append('rename_duplicate', renameFile.toString());
+
+    const res = await fetch(`${apiBase.value}/${selectedProject.value.id}/import-materials`, {
+      method: 'POST',
+      headers: { 'X-CSRF-TOKEN': getCsrfToken() },
+      body: formData
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      showToast(data.message, 'success');
+      await selectProject({ id: selectedProject.value.id });
+    } else {
+      showToast(data.message || 'Error al importar', 'error');
+    }
+  } catch (e) {
+    showToast('Error al importar archivo', 'error');
+  }
+  importingFile.value = false;
+  showDuplicateModal.value = false;
+  duplicateData.value = null;
 };
 
 // Create/Update/Delete (managers only)
