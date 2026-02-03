@@ -635,6 +635,39 @@
         </div>
       </Teleport>
 
+      <!-- Import Preview Modal -->
+      <Teleport to="body">
+        <div v-if="showImportPreview" class="modal-overlay" @click.self="showImportPreview = false">
+          <div class="modal-content modal-lg">
+            <div class="modal-header">
+              <h3>Vista Previa de Importación</h3>
+              <button @click="showImportPreview = false" class="btn-close">×</button>
+            </div>
+            <div class="modal-body">
+              <p style="margin-bottom: 15px; color: #666;">Se importarán {{ importPreviewItems.length }} materiales:</p>
+              <div class="import-items-list">
+                <div v-for="item in importPreviewItems" :key="item.number" class="import-item-row">
+                  <div class="item-header">
+                    <span class="item-number">#{{ item.number }}</span>
+                    <span class="item-desc">{{ item.description }}</span>
+                  </div>
+                  <div class="item-details">
+                    <span class="detail">Cant: {{ item.quantity }} {{ item.unit }}</span>
+                    <span v-if="item.diameter" class="detail">Diámetro: {{ item.diameter }}</span>
+                    <span v-if="item.series" class="detail">Serie: {{ item.series }}</span>
+                    <span v-if="item.material_type" class="detail">Material: {{ item.material_type }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button @click="showImportPreview = false" class="btn-cancel">Cancelar</button>
+              <button @click="confirmImport" class="btn-submit">Confirmar Importación</button>
+            </div>
+          </div>
+        </div>
+      </Teleport>
+
       <!-- Duplicate File Modal -->
       <Teleport to="body">
         <div v-if="showDuplicateModal" class="modal-overlay" @click.self="showDuplicateModal = false">
@@ -651,31 +684,6 @@
               <button @click="showDuplicateModal = false" class="btn-cancel">Cancelar</button>
               <button @click="confirmDuplicateUpload(false)" class="btn-secondary">Sobreescribir</button>
               <button @click="confirmDuplicateUpload(true)" class="btn-submit">Subir como {{ duplicateData?.originalFilename }} (2)</button>
-            </div>
-          </div>
-        </div>
-      </Teleport>
-
-      <!-- Export Preview Modal -->
-      <Teleport to="body">
-        <div v-if="showExportPreview" class="modal-overlay" @click.self="showExportPreview = false">
-          <div class="modal-content modal-lg">
-            <div class="modal-header">
-              <h3>Vista Previa de Exportación</h3>
-              <button @click="showExportPreview = false" class="btn-close">×</button>
-            </div>
-            <div class="modal-body export-preview">
-              <p style="margin-bottom: 15px; color: #666;">Se exportarán {{ exportPreviewItems.length }} items:</p>
-              <div class="export-items-list">
-                <div v-for="(item, idx) in exportPreviewItems" :key="idx" class="export-item-row">
-                  <span class="item-number">{{ idx + 1 }}.</span>
-                  <span class="item-text">{{ item.description }}</span>
-                </div>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button @click="showExportPreview = false" class="btn-cancel">Cancelar</button>
-              <button @click="proceedWithExport" class="btn-submit">Exportar</button>
             </div>
           </div>
         </div>
@@ -744,8 +752,9 @@ const materialForm = ref({
 const importingFile = ref(false);
 const showDuplicateModal = ref(false);
 const duplicateData = ref(null);
-const showExportPreview = ref(false);
-const exportPreviewItems = ref([]);
+const showImportPreview = ref(false);
+const importPreviewItems = ref([]);
+const pendingImportFile = ref(null);
 
 // Paid Orders & Delivery State
 const paidOrders = ref([]);
@@ -1502,10 +1511,68 @@ const importExcel = async (event) => {
   const file = event.target.files[0];
   if (!file || !selectedProject.value) return;
 
+  try {
+    // Parse Excel file in frontend
+    const fileContent = await file.arrayBuffer();
+    const rows = parseExcelFile(fileContent, file.name);
+    
+    if (rows.length === 0) {
+      showToast('No se encontraron filas válidas en el archivo', 'error');
+      event.target.value = '';
+      return;
+    }
+
+    // Show preview modal with parsed items
+    importPreviewItems.value = rows.map((row, idx) => ({
+      number: idx + 1,
+      quantity: row[0] || 1,
+      unit: row[1] || 'UND',
+      description: row[2] || '',
+      diameter: row[3] || '',
+      series: row[4] || '',
+      material_type: row[5] || ''
+    }));
+
+    pendingImportFile.value = file;
+    showImportPreview.value = true;
+  } catch (e) {
+    showToast('Error al leer el archivo: ' + e.message, 'error');
+  }
+  
+  // Reset file input
+  event.target.value = '';
+};
+
+// Parse Excel/CSV file
+const parseExcelFile = (buffer, filename) => {
+  const ext = filename.toLowerCase().split('.').pop();
+  
+  if (ext === 'csv' || ext === 'txt') {
+    // Parse CSV
+    const decoder = new TextDecoder();
+    const text = decoder.decode(buffer);
+    const lines = text.split('\n').filter(line => line.trim());
+    return lines.map(line => line.split(',').map(cell => cell.trim()));
+  }
+  
+  // For XLSX, we'll need to handle it differently
+  // Use a simple CSV fallback or show error
+  if (ext === 'xlsx' || ext === 'xls') {
+    showToast('Por favor usa formato CSV para importar', 'warning');
+    return [];
+  }
+  
+  return [];
+};
+
+// Confirm import after preview
+const confirmImport = async () => {
+  if (!pendingImportFile.value || !selectedProject.value) return;
+
   importingFile.value = true;
   try {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', pendingImportFile.value);
     formData.append('check_duplicate', 'true');
 
     const res = await fetch(`${apiBase.value}/${selectedProject.value.id}/import-materials`, {
@@ -1520,11 +1587,13 @@ const importExcel = async (event) => {
       duplicateData.value = {
         originalFilename: data.originalFilename,
         existingId: data.existingId,
-        file: file,
+        file: pendingImportFile.value,
         skipDuplicate: false
       };
+      showImportPreview.value = false;
       showDuplicateModal.value = true;
     } else if (data.success) {
+      showImportPreview.value = false;
       showToast(data.message, 'success');
       await selectProject({ id: selectedProject.value.id });
       if (data.errors?.length > 0) {
@@ -1537,8 +1606,7 @@ const importExcel = async (event) => {
     showToast('Error al importar archivo', 'error');
   }
   importingFile.value = false;
-  // Reset file input
-  event.target.value = '';
+  pendingImportFile.value = null;
 };
 
 const confirmDuplicateUpload = async (renameFile = false) => {
