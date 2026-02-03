@@ -512,15 +512,15 @@ body.dark-mode .date-input::-webkit-calendar-picker-indicator:hover {
     border: 1.5px solid var(--proyectos-border);
     box-shadow: var(--proyectos-shadow-md);
     border-radius: var(--proyectos-radius-lg);
-    padding: 2px 0 4px 0;
+    padding: 0;
     font-family: inherit;
-    font-size: 11px;
+    font-size: 10px;
 }
 
 body.dark-mode .flatpickr-calendar {
-    background: #0f172a;
+    background: #1a2332;
     color: var(--proyectos-text-white);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.15);
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
 }
 
@@ -540,7 +540,7 @@ body.dark-mode .flatpickr-calendar {
 }
 
 .flatpickr-weekday {
-    font-size: 10px;
+    font-size: 9px;
 }
 
 body.dark-mode .flatpickr-weekdays {
@@ -561,11 +561,11 @@ body.dark-mode .flatpickr-day.nextMonthDay {
 }
 
 .flatpickr-day {
-    border-radius: 8px;
+    border-radius: 6px;
     color: var(--proyectos-text-dark);
-    height: 28px;
-    line-height: 28px;
-    max-width: 28px;
+    height: 24px;
+    line-height: 24px;
+    max-width: 24px;
 }
 
 body.dark-mode .flatpickr-day {
@@ -590,6 +590,9 @@ body.dark-mode .flatpickr-day {
 body.dark-mode .flatpickr-day.selected,
 body.dark-mode .flatpickr-day.startRange,
 body.dark-mode .flatpickr-day.endRange {
+    background: #475569;
+    border-color: #64748b;
+    color: #ffffff;
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
 }
 
