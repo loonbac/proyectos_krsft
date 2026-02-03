@@ -1,7 +1,7 @@
 /* ============================================
     MÓDULO PROYECTOS_KRSFT - ESTILOS DE COMPONENTES
     Layout, paneles, botones y elementos UI
-    Versión 5.3.7 - Modal Size & Centering
+    Versión 5.3.8 - Modal Title Size
     ============================================ */
 
 /* ============================================
@@ -1667,13 +1667,13 @@ body.dark-mode .btn-secondary {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 6px 18px;
+    padding: 5px 16px;
     border-radius: 999px;
     background: #ef4444;
     border: 1px solid #ef4444;
     color: #ffffff;
     font-weight: 800;
-    font-size: 13px;
+    font-size: 15px;
     letter-spacing: 0.6px;
     text-transform: uppercase;
     margin: 0;
@@ -1722,13 +1722,13 @@ body.dark-mode .duplicate-modal-hint {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 6px 18px;
+    padding: 5px 16px;
     border-radius: 999px;
     background: #06b6d4;
     border: 1px solid #06b6d4;
     color: #ffffff;
     font-weight: 800;
-    font-size: 13px;
+    font-size: 15px;
     letter-spacing: 0.6px;
     text-transform: uppercase;
     margin: 0;
