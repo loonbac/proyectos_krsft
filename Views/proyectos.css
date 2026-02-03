@@ -1468,8 +1468,8 @@ body.dark-mode .flatpickr-months .flatpickr-next-month {
 }
 
 .order-status.status-pending {
-    background: var(--proyectos-badge-default-bg);
-    color: var(--proyectos-badge-default-text);
+    background: rgba(14, 116, 144, 0.18);
+    color: #0e7490;
 }
 
 .order-status.status-draft {
@@ -1478,8 +1478,8 @@ body.dark-mode .flatpickr-months .flatpickr-next-month {
 }
 
 .order-status.status-approved {
-    background: var(--proyectos-badge-success-bg);
-    color: var(--proyectos-badge-success-text);
+    background: rgba(16, 185, 129, 0.18);
+    color: #10b981;
 }
 
 .order-status.status-rejected {
@@ -1488,8 +1488,8 @@ body.dark-mode .flatpickr-months .flatpickr-next-month {
 }
 
 .order-status.status-paid {
-    background: var(--proyectos-badge-success-bg);
-    color: var(--proyectos-badge-success-text);
+    background: rgba(16, 185, 129, 0.18);
+    color: #10b981;
 }
 
 /* Action Buttons */
@@ -2132,18 +2132,18 @@ body.dark-mode .modal-content.modal-confirm .modal-body p {
 }
 
 .materials-table .status-pending {
-    background: var(--proyectos-badge-pending-bg);
-    color: var(--proyectos-badge-pending-text);
+    background: rgba(14, 116, 144, 0.18);
+    color: #0e7490;
 }
 
 .materials-table .status-approved {
-    background: var(--proyectos-badge-success-bg);
-    color: var(--proyectos-badge-success-text);
+    background: rgba(16, 185, 129, 0.18);
+    color: #10b981;
 }
 
 .materials-table .status-paid {
-    background: var(--proyectos-badge-paid-bg);
-    color: var(--proyectos-badge-paid-text);
+    background: rgba(16, 185, 129, 0.18);
+    color: #10b981;
 }
 
 .materials-table .status-rejected {
