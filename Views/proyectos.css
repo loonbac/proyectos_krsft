@@ -597,8 +597,8 @@ body.dark-mode .flatpickr-day {
 body.dark-mode .flatpickr-day.selected,
 body.dark-mode .flatpickr-day.startRange,
 body.dark-mode .flatpickr-day.endRange {
-    background: #0f172a;
-    border: 1px solid #475569;
+    background: transparent;
+    border: 1px solid rgba(226, 232, 240, 0.5);
     color: #e2e8f0;
     box-shadow: none;
 }
