@@ -110,11 +110,6 @@
                 readonly
               />
             </div>
-            <button v-if="dateFrom || dateTo" @click="clearDateFilters" class="btn-clear-dates">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-              </svg>
-            </button>
           </div>
         </div>
 
@@ -617,6 +612,27 @@
         </div>
       </Teleport>
 
+      <!-- Confirm Modal (custom confirm for actions) -->
+      <Teleport to="body">
+        <div v-if="showConfirmModal" class="modal-overlay" @click.self="closeConfirmModal">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h2>{{ confirmTitle }}</h2>
+              <button @click="closeConfirmModal" class="btn-close">×</button>
+            </div>
+            <div class="modal-body">
+              <p>{{ confirmMessage }}</p>
+              <div class="modal-actions">
+                <button @click="closeConfirmModal" class="btn-cancel">Cancelar</button>
+                <button @click="runConfirmAction" :disabled="confirmProcessing" class="btn-confirm">
+                  {{ confirmProcessing ? 'Procesando...' : confirmActionLabel }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Teleport>
+
       <!-- Toast -->
       <Teleport to="body">
         <div v-if="toast.show" class="toast" :class="toast.type">{{ toast.message }}</div>
@@ -642,6 +658,12 @@ const loading = ref(false);
 const saving = ref(false);
 const savingOrder = ref(false);
 const showCreateModal = ref(false);
+const showConfirmModal = ref(false);
+const confirmTitle = ref('');
+const confirmMessage = ref('');
+const confirmActionLabel = ref('Confirmar');
+const confirmProcessing = ref(false);
+const confirmAction = ref(null);
 const errorMessage = ref('');
 const projects = ref([]);
 const selectedProject = ref(null);
@@ -1063,7 +1085,7 @@ const initDarkMode = () => {
   }
 };
 
-// Order status helpers (gray=pending, yellow=approved, red=rejected, green=paid, blue=draft)
+// Order status helpers (gray=pending, green=approved/paid, red=rejected, blue=draft)
 const getOrderStatusClass = (order) => {
   if (order.status === 'rejected') return 'status-rejected';
   if (order.status === 'draft') return 'status-draft';
@@ -1087,7 +1109,7 @@ const getOrderStatusLabel = (order) => {
   if (order.status === 'draft') return 'Pend. Aprobación Jefe';
   if (order.status === 'pending') return 'En Compras';
   if (order.status === 'approved' && order.payment_confirmed) return 'Aprobado';
-  if (order.status === 'approved') return 'En Progreso';
+  if (order.status === 'approved') return 'Aprobado';
   return 'En Espera';
 };
 
@@ -1217,6 +1239,32 @@ const confirmDeliveryOrder = async () => {
   confirmingDelivery.value = false;
 };
 
+// Custom confirm modal helpers
+const openConfirmModal = ({ title, message, actionLabel = 'Confirmar', onConfirm }) => {
+  confirmTitle.value = title;
+  confirmMessage.value = message;
+  confirmActionLabel.value = actionLabel;
+  confirmAction.value = onConfirm;
+  confirmProcessing.value = false;
+  showConfirmModal.value = true;
+};
+
+const closeConfirmModal = () => {
+  showConfirmModal.value = false;
+  confirmProcessing.value = false;
+  confirmAction.value = null;
+};
+
+const runConfirmAction = async () => {
+  if (!confirmAction.value || confirmProcessing.value) return;
+  confirmProcessing.value = true;
+  try {
+    await confirmAction.value();
+  } finally {
+    closeConfirmModal();
+  }
+};
+
 // Workers
 const addWorkerToProject = async () => {
   if (!selectedWorkerId.value || !selectedProject.value) return;
@@ -1294,23 +1342,28 @@ const createOrder = async () => {
 };
 
 // Approve material (Manager approves supervisor's material list)
-const approveMaterial = async (orderId) => {
-  if (!confirm('¿Aprobar este material y enviarlo al módulo de Compras?')) return;
-  
-  try {
-    const res = await fetchWithCsrf(`${apiBase.value}/orders/${orderId}/approve`, {
-      method: 'POST'
-    });
-    const data = await res.json();
-    if (data.success) {
-      showToast(data.message || 'Material aprobado', 'success');
-      await selectProject({ id: selectedProject.value.id });
-    } else {
-      showToast(data.message || 'Error', 'error');
+const approveMaterial = (orderId) => {
+  openConfirmModal({
+    title: 'Aprobar material',
+    message: '¿Aprobar este material y enviarlo al módulo de Compras?',
+    actionLabel: 'Aprobar',
+    onConfirm: async () => {
+      try {
+        const res = await fetchWithCsrf(`${apiBase.value}/orders/${orderId}/approve`, {
+          method: 'POST'
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message || 'Material aprobado', 'success');
+          await selectProject({ id: selectedProject.value.id });
+        } else {
+          showToast(data.message || 'Error', 'error');
+        }
+      } catch (e) {
+        showToast('Error al aprobar material', 'error');
+      }
     }
-  } catch (e) {
-    showToast('Error al aprobar material', 'error');
-  }
+  });
 };
 
 // Reject material (Manager rejects supervisor's material)
@@ -1403,12 +1456,26 @@ const updateProject = async () => {
 };
 
 const confirmDeleteProject = async () => {
-  if (!selectedProject.value || !confirm(`¿Eliminar "${selectedProject.value.name}"?`)) return;
-  try {
-    const res = await fetchWithCsrf(`${apiBase.value}/${selectedProject.value.id}`, { method: 'DELETE' });
-    const data = await res.json();
-    if (data.success) { showToast('Eliminado', 'success'); selectedProject.value = null; await loadProjects(); await loadStats(); }
-  } catch (e) { showToast('Error', 'error'); }
+  if (!selectedProject.value) return;
+  openConfirmModal({
+    title: 'Eliminar proyecto',
+    message: `¿Eliminar "${selectedProject.value.name}"?`,
+    actionLabel: 'Eliminar',
+    onConfirm: async () => {
+      try {
+        const res = await fetchWithCsrf(`${apiBase.value}/${selectedProject.value.id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Eliminado', 'success');
+          selectedProject.value = null;
+          await loadProjects();
+          await loadStats();
+        }
+      } catch (e) {
+        showToast('Error', 'error');
+      }
+    }
+  });
 };
 
 onMounted(() => {

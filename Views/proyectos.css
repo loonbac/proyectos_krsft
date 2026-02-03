@@ -1470,8 +1470,8 @@ body.dark-mode .flatpickr-months .flatpickr-next-month {
 }
 
 .order-status.status-approved {
-    background: var(--proyectos-badge-warning-bg);
-    color: var(--proyectos-badge-warning-text);
+    background: var(--proyectos-badge-success-bg);
+    color: var(--proyectos-badge-success-text);
 }
 
 .order-status.status-rejected {
@@ -2067,8 +2067,8 @@ body.dark-mode .flatpickr-months .flatpickr-next-month {
 }
 
 .materials-table .status-approved {
-    background: var(--proyectos-badge-approved-bg);
-    color: var(--proyectos-badge-approved-text);
+    background: var(--proyectos-badge-success-bg);
+    color: var(--proyectos-badge-success-text);
 }
 
 .materials-table .status-paid {
