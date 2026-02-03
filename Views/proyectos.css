@@ -597,30 +597,7 @@ body.dark-mode .flatpickr-months .flatpickr-next-month {
 }
 
 .btn-clear-dates {
-    width: 32px;
-    height: 32px;
-    filter: brightness(0) invert(1);
-    opacity: 1;
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.25);
-    justify-content: center;
-    background: var(--proyectos-bg-card);
-    border: 1px solid var(--proyectos-border);
-    border-radius: var(--proyectos-radius-full);
-    color: var(--proyectos-text-gray);
-    cursor: pointer;
-    transition: var(--proyectos-transition-fast);
-}
-
-.btn-clear-dates:hover {
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
-    border-color: #ef4444;
-}
-
-.btn-clear-dates svg {
-    width: 14px;
-    height: 14px;
+    display: none;
 }
 
 /* ============================================

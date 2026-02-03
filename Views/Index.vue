@@ -995,28 +995,33 @@ const toggleFileSection = (filename) => {
 };
 
 // Confirm delivery for all orders in a file group
-const confirmFileDelivery = async (group) => {
-  if (!confirm(`¿Marcar todos los ${group.orders.length} items de "${group.filename || 'Órdenes Manuales'}" como entregados?`)) return;
-  
-  try {
-    const orderIds = group.orders.map(o => o.id);
-    const response = await fetchWithCsrf(`${apiBase.value}/confirm-file-delivery`, {
-      method: 'POST',
-      body: JSON.stringify({ order_ids: orderIds })
-    });
-    const data = await response.json();
-    if (data.success) {
-      showToast(`${data.updated || orderIds.length} items marcados como entregados`);
-      // Refresh project to update order statuses
-      if (selectedProject.value) {
-        await selectProject(selectedProject.value.id);
+const confirmFileDelivery = (group) => {
+  openConfirmModal({
+    title: 'Confirmar entrega',
+    message: `¿Marcar todos los ${group.orders.length} items de "${group.filename || 'Órdenes Manuales'}" como entregados?`,
+    actionLabel: 'Confirmar',
+    onConfirm: async () => {
+      try {
+        const orderIds = group.orders.map(o => o.id);
+        const response = await fetchWithCsrf(`${apiBase.value}/confirm-file-delivery`, {
+          method: 'POST',
+          body: JSON.stringify({ order_ids: orderIds })
+        });
+        const data = await response.json();
+        if (data.success) {
+          showToast(`${data.updated || orderIds.length} items marcados como entregados`);
+          // Refresh project to update order statuses
+          if (selectedProject.value) {
+            await selectProject(selectedProject.value.id);
+          }
+        } else {
+          showToast(data.message || 'Error al confirmar entrega', 'error');
+        }
+      } catch (e) {
+        showToast('Error de conexión', 'error');
       }
-    } else {
-      showToast(data.message || 'Error al confirmar entrega', 'error');
     }
-  } catch (e) {
-    showToast('Error de conexión', 'error');
-  }
+  });
 };
 
 // Filter computed properties
