@@ -687,7 +687,10 @@ import './proyectos.css';
 
 // Polling interval para tiempo real
 let pollingInterval = null;
-const POLLING_INTERVAL_MS = 5000; // 5 segundos
+const POLLING_INTERVAL_MS = 3000; // 3 segundos
+
+// Helper para comparar arrays y evitar re-renders innecesarios
+const arraysEqual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 // Props from Inertia
 const props = defineProps({
@@ -1274,22 +1277,29 @@ const availableWorkersFiltered = computed(() => {
   return allWorkers.value.filter(w => !assignedIds.includes(w.id));
 });
 
-// Load data
-const loadProjects = async () => {
-  loading.value = true;
+// Load data - Solo actualiza si hay cambios para evitar parpadeo
+const loadProjects = async (showLoading = false) => {
+  if (showLoading) loading.value = true;
   try {
     const res = await fetch(`${apiBase.value}/list`);
     const data = await res.json();
-    if (data.success) projects.value = data.projects || [];
+    if (data.success) {
+      const newProjects = data.projects || [];
+      if (!arraysEqual(projects.value, newProjects)) {
+        projects.value = newProjects;
+      }
+    }
   } catch (e) { console.error(e); }
-  loading.value = false;
+  if (showLoading) loading.value = false;
 };
 
 const loadStats = async () => {
   try {
     const res = await fetch(`${apiBase.value}/stats`);
     const data = await res.json();
-    if (data.success) stats.value = data.stats;
+    if (data.success && JSON.stringify(stats.value) !== JSON.stringify(data.stats)) {
+      stats.value = data.stats;
+    }
   } catch (e) { console.error(e); }
 };
 
@@ -1718,12 +1728,12 @@ onMounted(() => {
   initDarkMode();
   syncDateDisplays();
   initDatePickers();
-  loadProjects();
+  loadProjects(true);
   loadStats();
   loadSupervisors();
   if (props.isSupervisor) loadAllWorkers();
   
-  // Iniciar polling para tiempo real
+  // Iniciar polling para tiempo real (sin loading spinner)
   pollingInterval = setInterval(() => {
     loadProjects();
     loadStats();

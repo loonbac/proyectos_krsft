@@ -2,7 +2,7 @@
     "name": "ProyectosKrsft",
     "slug": "proyectos_krsft",
     "display_name": "Gestión de Proyectos",
-    "version": "5.6.0",
+    "version": "5.6.1",
     "description": "Sistema completo de gestión de proyectos con tracking de presupuesto. Actualización en tiempo real cada 5 segundos. Flujo: Supervisor crea materiales → Jefe aprueba → Se envía a Compras.",
     "icon": "icon.svg",
     "color": "#0AA4A4",
