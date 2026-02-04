@@ -86,6 +86,14 @@
     --proyectos-badge-default-bg: rgba(156, 163, 175, 0.3);
     --proyectos-badge-default-text: #9ca3af;
 
+    /* Project Lifecycle Pills */
+    --proyectos-project-state-active-bg: #10b981;
+    --proyectos-project-state-active-text: #ffffff;
+    --proyectos-project-state-completed-bg: #374151;
+    --proyectos-project-state-completed-text: #ffffff;
+    --proyectos-project-age-bg: rgba(59, 130, 246, 0.15);
+    --proyectos-project-age-text: #3b82f6;
+
     /* Botones de Acción */
     --proyectos-btn-edit-bg: rgba(59, 130, 246, 0.1);
     --proyectos-btn-edit-text: #3b82f6;
@@ -173,4 +181,12 @@ body.dark-mode {
 
     /* Toggle Border - Modo Oscuro */
     --proyectos-toggle-border: #f59e0b;
+
+    /* Project Lifecycle Pills - Modo Oscuro */
+    --proyectos-project-state-active-bg: #10b981;
+    --proyectos-project-state-active-text: #0f172a;
+    --proyectos-project-state-completed-bg: #1f2937;
+    --proyectos-project-state-completed-text: #f8fafc;
+    --proyectos-project-age-bg: rgba(59, 130, 246, 0.25);
+    --proyectos-project-age-text: #93c5fd;
 }

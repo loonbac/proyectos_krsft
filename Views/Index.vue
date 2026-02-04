@@ -35,9 +35,21 @@
           <span class="project-name-pill" :style="{ background: getProjectColor(selectedProject.id) }">
             {{ selectedProject.name }}
           </span>
+          <span class="project-state-pill" :class="[getProjectStateClass(selectedProject), { clickable: canFinalizeProject(selectedProject), disabled: !canFinalizeProject(selectedProject) }]" @click="handleProjectStateClick(selectedProject)">
+            <svg class="state-icon" v-if="getProjectStateClass(selectedProject) === 'in-progress'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="10" rx="2"/>
+              <path d="M7 11V7a5 5 0 0 1 9.5-2"/>
+            </svg>
+            <svg class="state-icon" v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="10" rx="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            {{ getProjectStateLabel(selectedProject) }}
+          </span>
+          <span class="project-age-pill">{{ getProjectDaysAlive(selectedProject) }} días</span>
           <span class="header-label">MONEDA:</span>
           <span class="currency-pill">{{ selectedProject.currency || 'PEN' }}</span>
-          <span class="header-label">ESTADO:</span>
+          <span class="header-label">RIESGO:</span>
           <span class="status-badge" :class="getStatusLabel(selectedProject)">{{ getStatusText(getStatusLabel(selectedProject)) }}</span>
         </div>
         
@@ -138,7 +150,23 @@
         <!-- Projects Grid -->
         <div v-else-if="!selectedProject" class="projects-grid">
           <div v-for="project in filteredProjects" :key="project.id" class="project-card" :style="{ borderLeftColor: getProjectColor(project.id) }" @click="selectProject(project)">
-            <h3 :style="{ color: getProjectColor(project.id) }">{{ project.name }}</h3>
+            <div class="project-card-header">
+              <h3 :style="{ color: getProjectColor(project.id) }">{{ project.name }}</h3>
+              <div class="project-card-pills">
+                <span class="project-state-pill" :class="getProjectStateClass(project)">
+                  <svg class="state-icon" v-if="getProjectStateClass(project) === 'in-progress'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="10" rx="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 9.5-2"/>
+                  </svg>
+                  <svg class="state-icon" v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="10" rx="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                  {{ getProjectStateLabel(project) }}
+                </span>
+                <span class="project-age-pill small">{{ getProjectDaysAlive(project) }} días</span>
+              </div>
+            </div>
             <p class="project-meta">
               <span class="currency-badge">{{ project.currency || 'PEN' }}</span>
               Supervisor: {{ project.supervisor_name || 'No asignado' }}
@@ -206,6 +234,28 @@
                 <span class="stat-label">Umbral de Alerta</span>
                 <span class="stat-value threshold">{{ selectedProject.spending_threshold || 75 }}%</span>
                 <span class="threshold-amount">{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber((selectedProject.available_amount * (selectedProject.spending_threshold || 75) / 100)) }}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Estado</span>
+                <span class="stat-value">
+                  <span class="project-state-pill" :class="[getProjectStateClass(selectedProject), { clickable: canFinalizeProject(selectedProject), disabled: !canFinalizeProject(selectedProject) }]" @click="handleProjectStateClick(selectedProject)">
+                    <svg class="state-icon" v-if="getProjectStateClass(selectedProject) === 'in-progress'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="3" y="11" width="18" height="10" rx="2"/>
+                      <path d="M7 11V7a5 5 0 0 1 9.5-2"/>
+                    </svg>
+                    <svg class="state-icon" v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="3" y="11" width="18" height="10" rx="2"/>
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                    {{ getProjectStateLabel(selectedProject) }}
+                  </span>
+                </span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Días vivo</span>
+                <span class="stat-value">
+                  <span class="project-age-pill">{{ getProjectDaysAlive(selectedProject) }} días</span>
+                </span>
               </div>
               <div class="stat-row">
                 <span class="stat-label">Supervisor</span>
@@ -751,6 +801,7 @@ const newMaterialQty = ref(1);
 const newExpenseDesc = ref('');
 const newExpenseQty = ref(1);
 const selectedWorkerId = ref('');
+const updatingProjectState = ref(false);
 
 // Material specification form
 const materialForm = ref({
@@ -984,6 +1035,44 @@ const formatDate = (d) => d ? new Date(d).toLocaleDateString('es-PE', { day: '2-
 const getCurrencySymbol = (c) => c === 'USD' ? '$' : 'S/';
 const getStatusLabel = (p) => { const u = parseFloat(p.usage_percent) || 0; if (u >= 90) return 'critical'; if (u >= (p.spending_threshold || 75)) return 'warning'; return 'good'; };
 const getStatusText = (s) => ({ good: 'Normal', warning: 'ALERTA', critical: 'CRÍTICO' }[s] || 'Normal');
+const getProjectStateClass = (project) => {
+  const status = (project?.status || '').toLowerCase();
+  return status === 'completed' ? 'completed' : 'in-progress';
+};
+const getProjectStateLabel = (project) => (getProjectStateClass(project) === 'completed' ? 'FINALIZADO' : 'EN PROGRESO');
+const getProjectDaysAlive = (project) => {
+  const createdAt = project?.created_at;
+  if (!createdAt) return 0;
+  const createdDate = new Date(createdAt);
+  if (isNaN(createdDate)) return 0;
+  const diffMs = Date.now() - createdDate.getTime();
+  const days = Math.floor(diffMs / 86400000) + 1;
+  return Math.max(1, days);
+};
+const canFinalizeProject = (project) => getProjectStateClass(project) !== 'completed';
+const handleProjectStateClick = async (project) => {
+  if (!project || !canFinalizeProject(project) || updatingProjectState.value) return;
+  updatingProjectState.value = true;
+  try {
+    const res = await fetchWithCsrf(`${apiBase.value}/${project.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status: 'completed' })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Proyecto finalizado', 'success');
+      await loadProjects();
+      if (selectedProject.value && selectedProject.value.id === project.id) {
+        await selectProject({ id: project.id });
+      }
+    } else {
+      showToast(data.message || 'Error al actualizar estado', 'error');
+    }
+  } catch (e) {
+    showToast('Error de conexión', 'error');
+  }
+  updatingProjectState.value = false;
+};
 
 // Pie Chart computed properties
 const getUsagePercent = computed(() => {

@@ -68,16 +68,22 @@
 
 .header-left {
     display: flex;
+
+.project-card-header {
     align-items: center;
     gap: 20px;
 }
 
 .header-left.project-detail-header {
+
+.project-card-pills {
     gap: 12px;
     flex-wrap: wrap;
 }
 
 .header-left.project-detail-header .header-label {
+
+.project-state-pill {
     font-size: 12px;
     font-weight: 700;
     color: var(--proyectos-text-light);
@@ -89,21 +95,33 @@
     display: flex;
     align-items: center;
     gap: 12px;
+
+.project-state-pill.in-progress {
     font-size: 22px;
     font-weight: 700;
     color: var(--proyectos-text-dark);
+
+.project-state-pill.completed {
     margin: 0;
 }
 
+
+.project-state-pill.clickable {
 .title-icon {
     width: 28px;
     height: 28px;
+
+.project-state-pill.clickable:hover {
     color: var(--proyectos-primary);
 }
 
+
+.project-state-pill.disabled {
 .btn-back {
     display: flex;
     align-items: center;
+
+.project-age-pill {
     gap: 8px;
     padding: 10px 20px;
     background: var(--proyectos-primary);
@@ -115,9 +133,13 @@
     transition: var(--proyectos-transition-fast);
 }
 
+
+.project-age-pill.small {
 .btn-back:hover {
     background: var(--proyectos-primary-dark);
     transform: translateY(-2px);
+
+.state-icon {
     box-shadow: var(--proyectos-shadow-primary);
 }
 
