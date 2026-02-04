@@ -2565,6 +2565,14 @@ body.dark-mode .file-name {
     background: #7c3aed;
     border: none;
     color: #ffffff;
+    outline: none;
+    box-shadow: none;
+}
+
+.btn-bulk-approve.outline:focus,
+.btn-bulk-approve.outline:focus-visible {
+    outline: none;
+    box-shadow: none;
 }
 
 .btn-bulk-approve:disabled {
