@@ -35,6 +35,11 @@
           <span class="project-name-pill" :style="{ background: getProjectColor(selectedProject.id) }">
             {{ selectedProject.name }}
           </span>
+          <span class="header-label">MONEDA:</span>
+          <span class="currency-pill">{{ selectedProject.currency || 'PEN' }}</span>
+          <span class="header-label">RIESGO:</span>
+          <span class="status-badge" :class="getStatusLabel(selectedProject)">{{ getStatusText(getStatusLabel(selectedProject)) }}</span>
+          <span class="header-label">ESTADO:</span>
           <span class="project-state-pill" :class="[getProjectStateClass(selectedProject), { clickable: canFinalizeProject(selectedProject), disabled: !canFinalizeProject(selectedProject) }]" @click="handleProjectStateClick(selectedProject)">
             <svg class="state-icon" v-if="getProjectStateClass(selectedProject) === 'in-progress'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="11" width="18" height="10" rx="2"/>
@@ -47,10 +52,6 @@
             {{ getProjectStateLabel(selectedProject) }}
           </span>
           <span class="project-age-pill">{{ getProjectDaysAlive(selectedProject) }} días</span>
-          <span class="header-label">MONEDA:</span>
-          <span class="currency-pill">{{ selectedProject.currency || 'PEN' }}</span>
-          <span class="header-label">RIESGO:</span>
-          <span class="status-badge" :class="getStatusLabel(selectedProject)">{{ getStatusText(getStatusLabel(selectedProject)) }}</span>
         </div>
         
         <div class="header-right">
@@ -182,11 +183,6 @@
                 <div class="amount-value">{{ getCurrencySymbol(project.currency) }} {{ formatNumber(project.remaining) }}</div>
               </div>
             </div>
-
-            <div class="progress-bar">
-              <div class="progress-fill" :class="getStatusLabel(project)" :style="{ width: Math.min(parseFloat(project.usage_percent) || 0, 100) + '%' }"></div>
-            </div>
-            <small>{{ parseFloat(project.usage_percent || 0).toFixed(1) }}% utilizado</small>
 
             <div class="project-footer">
               <span>Creado por: {{ project.creator_name || 'Desconocido' }}</span>
@@ -1046,8 +1042,8 @@ const getProjectDaysAlive = (project) => {
   const createdDate = new Date(createdAt);
   if (isNaN(createdDate)) return 0;
   const diffMs = Date.now() - createdDate.getTime();
-  const days = Math.floor(diffMs / 86400000) + 1;
-  return Math.max(1, days);
+  const days = Math.floor(diffMs / 86400000);
+  return Math.max(0, days);
 };
 const canFinalizeProject = (project) => getProjectStateClass(project) !== 'completed';
 const handleProjectStateClick = async (project) => {
