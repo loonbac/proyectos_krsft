@@ -689,8 +689,33 @@ import './proyectos.css';
 let pollingInterval = null;
 const POLLING_INTERVAL_MS = 3000; // 3 segundos
 
-// Helper para comparar arrays y evitar re-renders innecesarios
+// ============= SISTEMA DE CACHÉ =============
+const CACHE_PREFIX = 'proyectos_cache_';
+
+// Helper para comparar y evitar re-renders
 const arraysEqual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+// Guardar en caché
+const saveToCache = (key, data) => {
+    try {
+        localStorage.setItem(CACHE_PREFIX + key, JSON.stringify({
+            data,
+            timestamp: Date.now()
+        }));
+    } catch (e) { console.warn('Cache save error:', e); }
+};
+
+// Cargar desde caché
+const loadFromCache = (key) => {
+    try {
+        const cached = localStorage.getItem(CACHE_PREFIX + key);
+        if (cached) {
+            const { data } = JSON.parse(cached);
+            return data;
+        }
+    } catch (e) { console.warn('Cache load error:', e); }
+    return null;
+};
 
 // Props from Inertia
 const props = defineProps({
@@ -1277,7 +1302,7 @@ const availableWorkersFiltered = computed(() => {
   return allWorkers.value.filter(w => !assignedIds.includes(w.id));
 });
 
-// Load data - Solo actualiza si hay cambios para evitar parpadeo
+// Load data - Con sistema de caché para carga instantánea
 const loadProjects = async (showLoading = false) => {
   if (showLoading) loading.value = true;
   try {
@@ -1287,6 +1312,7 @@ const loadProjects = async (showLoading = false) => {
       const newProjects = data.projects || [];
       if (!arraysEqual(projects.value, newProjects)) {
         projects.value = newProjects;
+        saveToCache('projects', newProjects);
       }
     }
   } catch (e) { console.error(e); }
@@ -1299,8 +1325,17 @@ const loadStats = async () => {
     const data = await res.json();
     if (data.success && JSON.stringify(stats.value) !== JSON.stringify(data.stats)) {
       stats.value = data.stats;
+      saveToCache('stats', data.stats);
     }
   } catch (e) { console.error(e); }
+};
+
+// Inicializar datos desde caché inmediatamente
+const initFromCache = () => {
+  const cachedProjects = loadFromCache('projects');
+  const cachedStats = loadFromCache('stats');
+  if (cachedProjects) projects.value = cachedProjects;
+  if (cachedStats) stats.value = cachedStats;
 };
 
 const loadSupervisors = async () => {
@@ -1728,12 +1763,17 @@ onMounted(() => {
   initDarkMode();
   syncDateDisplays();
   initDatePickers();
-  loadProjects(true);
+  
+  // 1. Cargar datos cacheados INMEDIATAMENTE
+  initFromCache();
+  
+  // 2. Fetch en background
+  loadProjects();
   loadStats();
   loadSupervisors();
   if (props.isSupervisor) loadAllWorkers();
   
-  // Iniciar polling para tiempo real (sin loading spinner)
+  // 3. Iniciar polling para tiempo real
   pollingInterval = setInterval(() => {
     loadProjects();
     loadStats();
