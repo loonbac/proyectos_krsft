@@ -681,9 +681,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch, nextTick } from 'vue';
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
 import './proyectos_theme.css';
 import './proyectos.css';
+
+// Polling interval para tiempo real
+let pollingInterval = null;
+const POLLING_INTERVAL_MS = 5000; // 5 segundos
 
 // Props from Inertia
 const props = defineProps({
@@ -1718,5 +1722,19 @@ onMounted(() => {
   loadStats();
   loadSupervisors();
   if (props.isSupervisor) loadAllWorkers();
+  
+  // Iniciar polling para tiempo real
+  pollingInterval = setInterval(() => {
+    loadProjects();
+    loadStats();
+  }, POLLING_INTERVAL_MS);
+});
+
+onUnmounted(() => {
+  // Limpiar polling al salir del componente
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+    pollingInterval = null;
+  }
 });
 </script>
