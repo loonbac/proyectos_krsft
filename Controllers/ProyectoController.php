@@ -707,7 +707,14 @@ class ProyectoController extends Controller
 
         $totalProjects = $query->count();
         $totalBudget = $query->sum('available_amount');
-        $activeProjects = $query->where('status', 'active')->count();
+        $activeProjects = (clone $query)->where('status', 'active')->count();
+        
+        // Calcular gasto total real de órdenes aprobadas
+        $projectIds = (clone $query)->pluck('id');
+        $totalSpent = DB::table('purchase_orders')
+            ->whereIn('project_id', $projectIds)
+            ->where('status', 'approved')
+            ->sum(DB::raw('COALESCE(amount_pen, amount, 0)'));
 
         return response()->json([
             'success' => true,
@@ -715,8 +722,8 @@ class ProyectoController extends Controller
                 'total_projects' => $totalProjects,
                 'active_projects' => $activeProjects,
                 'total_budget' => $totalBudget,
-                'total_spent' => 0,
-                'total_remaining' => $totalBudget
+                'total_spent' => $totalSpent,
+                'total_remaining' => $totalBudget - $totalSpent
             ]
         ]);
     }

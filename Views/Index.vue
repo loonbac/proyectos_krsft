@@ -1380,10 +1380,57 @@ const loadPaidOrders = async () => {
     const res = await fetch(`${apiBase.value}/${selectedProject.value.id}/paid-orders`);
     const data = await res.json();
     if (data.success) {
-      paidOrders.value = data.orders;
+      // Solo actualizar si hay cambios
+      if (!arraysEqual(paidOrders.value, data.orders)) {
+        paidOrders.value = data.orders;
+      }
     }
   } catch (e) { console.error(e); }
   loadingPaidOrders.value = false;
+};
+
+// Refrescar proyecto seleccionado sin perder estado visual (para polling)
+const refreshSelectedProject = async () => {
+  if (!selectedProject.value) return;
+  
+  try {
+    const res = await fetch(`${apiBase.value}/${selectedProject.value.id}`);
+    const data = await res.json();
+    if (data.success) {
+      // Actualizar datos del proyecto solo si cambiaron
+      const newProject = data.project;
+      const newWorkers = data.workers || [];
+      const newOrders = data.orders || [];
+      const newSummary = data.summary || {};
+      
+      // Comparar y actualizar solo si hay cambios reales
+      if (JSON.stringify(selectedProject.value) !== JSON.stringify(newProject)) {
+        selectedProject.value = newProject;
+        editForm.value = { 
+          name: newProject.name, 
+          spending_threshold: newProject.spending_threshold, 
+          supervisor_id: newProject.supervisor_id 
+        };
+      }
+      
+      if (!arraysEqual(projectWorkers.value, newWorkers)) {
+        projectWorkers.value = newWorkers;
+      }
+      
+      if (!arraysEqual(projectOrders.value, newOrders)) {
+        projectOrders.value = newOrders;
+      }
+      
+      if (JSON.stringify(projectSummary.value) !== JSON.stringify(newSummary)) {
+        projectSummary.value = newSummary;
+      }
+      
+      // Refrescar órdenes pagadas si es supervisor
+      if (isSupervisor.value) {
+        loadPaidOrders();
+      }
+    }
+  } catch (e) { console.error(e); }
 };
 
 // Delivery Confirmation
@@ -1777,6 +1824,8 @@ onMounted(() => {
   pollingInterval = setInterval(() => {
     loadProjects();
     loadStats();
+    // Si hay un proyecto seleccionado, refrescarlo también
+    refreshSelectedProject();
   }, POLLING_INTERVAL_MS);
 });
 
