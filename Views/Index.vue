@@ -232,22 +232,6 @@
                 <span class="threshold-amount">{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber((selectedProject.available_amount * (selectedProject.spending_threshold || 75) / 100)) }}</span>
               </div>
               <div class="stat-row">
-                <span class="stat-label">Estado</span>
-                <span class="stat-value">
-                  <span class="project-state-pill" :class="[getProjectStateClass(selectedProject), { clickable: canFinalizeProject(selectedProject), disabled: !canFinalizeProject(selectedProject) }]" @click="handleProjectStateClick(selectedProject)">
-                    <svg class="state-icon" v-if="getProjectStateClass(selectedProject) === 'in-progress'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <rect x="3" y="11" width="18" height="10" rx="2"/>
-                      <path d="M7 11V7a5 5 0 0 1 9.5-2"/>
-                    </svg>
-                    <svg class="state-icon" v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <rect x="3" y="11" width="18" height="10" rx="2"/>
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                    </svg>
-                    {{ getProjectStateLabel(selectedProject) }}
-                  </span>
-                </span>
-              </div>
-              <div class="stat-row">
                 <span class="stat-label">Días vivo</span>
                 <span class="stat-value">
                   <span class="project-age-pill">{{ getProjectDaysAlive(selectedProject) }} días</span>
