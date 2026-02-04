@@ -2,7 +2,7 @@
     "name": "ProyectosKrsft",
     "slug": "proyectos_krsft",
     "display_name": "Gestión de Proyectos",
-    "version": "5.8.4",
+    "version": "5.8.6",
     "description": "Sistema completo de gestión de proyectos con tracking de presupuesto en tiempo real. Sincronización entre vista Jefe y Supervisor. Estadísticas de gasto actualizadas automáticamente cuando Compras paga órdenes.",
     "icon": "icon.svg",
     "color": "#0AA4A4",

@@ -416,6 +416,22 @@
                     <span v-else class="file-status-badge" :class="{ 'complete': group.allPaid }">
                       {{ group.paidCount }}/{{ group.totalCount }} pagados
                     </span>
+                    <div v-if="!isSupervisor" class="file-header-actions">
+                      <button
+                        class="btn-bulk-approve"
+                        :disabled="getGroupDraftCount(group) === 0"
+                        @click.stop="approveAllInGroup(group)"
+                      >
+                        Aprobar todo ({{ getGroupDraftCount(group) }})
+                      </button>
+                      <button
+                        class="btn-bulk-approve outline"
+                        :disabled="getSelectedCount(group) === 0"
+                        @click.stop="approveSelectedInGroup(group)"
+                      >
+                        Aprobar seleccionados ({{ getSelectedCount(group) }})
+                      </button>
+                    </div>
                     <button 
                       v-if="group.allPaid && !group.allDelivered && isSupervisor" 
                       class="btn-confirm-all"
@@ -432,6 +448,9 @@
                     <table class="materials-table">
                       <thead>
                         <tr>
+                          <th v-if="!isSupervisor" class="col-select">
+                            <span>SEL</span>
+                          </th>
                           <th class="col-item">ITEM</th>
                           <th class="col-cant">CANT</th>
                           <th class="col-und">UND</th>
@@ -446,6 +465,17 @@
                       </thead>
                       <tbody>
                         <tr v-for="order in group.orders" :key="order.id" :class="getOrderRowClass(order)">
+                          <td v-if="!isSupervisor" class="col-select">
+                            <label class="select-checkbox">
+                              <input
+                                type="checkbox"
+                                :disabled="order.status !== 'draft'"
+                                :checked="isOrderSelected(group, order.id)"
+                                @change="toggleOrderSelection(group, order)"
+                              />
+                              <span class="checkmark"></span>
+                            </label>
+                          </td>
                           <td class="col-item">{{ order.item_number || '-' }}</td>
                           <td class="col-cant">{{ getOrderQuantity(order) }}</td>
                           <td class="col-und">{{ order.unit || 'UND' }}</td>
@@ -775,6 +805,7 @@ const projectWorkers = ref([]);
 const projectOrders = ref([]);
 const projectSummary = ref({});
 const expandedFiles = ref({}); // Track expanded file sections
+const selectedOrders = ref({});
 const toast = ref({ show: false, message: '', type: 'success' });
 const newMaterial = ref('');
 const newMaterialQty = ref(1);
@@ -1349,6 +1380,30 @@ const getOrderRowClass = (order) => {
   return 'order-row-' + getOrderStatusClass(order).replace('status-', '');
 };
 
+const getGroupKey = (group) => group?.filename || '__manual__';
+const getGroupDraftOrders = (group) => (group?.orders || []).filter(o => o.status === 'draft');
+const getGroupDraftCount = (group) => getGroupDraftOrders(group).length;
+const getSelectedIds = (group) => selectedOrders.value[getGroupKey(group)] || [];
+const getSelectedCount = (group) => getSelectedIds(group).length;
+const isOrderSelected = (group, orderId) => getSelectedIds(group).includes(orderId);
+const toggleOrderSelection = (group, order) => {
+  if (!order || order.status !== 'draft') return;
+  const orderId = order.id;
+  const key = getGroupKey(group);
+  const current = new Set(getSelectedIds(group));
+  if (current.has(orderId)) current.delete(orderId);
+  else current.add(orderId);
+  selectedOrders.value = { ...selectedOrders.value, [key]: Array.from(current) };
+};
+const clearGroupSelection = (group) => {
+  const key = getGroupKey(group);
+  if (selectedOrders.value[key]) {
+    const next = { ...selectedOrders.value };
+    delete next[key];
+    selectedOrders.value = next;
+  }
+};
+
 // Extract quantity from materials array or description
 const getOrderQuantity = (order) => {
   // Try to get from materials array first
@@ -1663,6 +1718,52 @@ const approveMaterial = (orderId) => {
       }
     }
   });
+};
+
+const approveMaterialsBulk = (orderIds, titleLabel) => {
+  if (!orderIds || orderIds.length === 0) return;
+  openConfirmModal({
+    title: titleLabel,
+    message: `¿Aprobar ${orderIds.length} items y enviarlos al módulo de Compras?`,
+    actionLabel: 'Aprobar',
+    variant: 'success',
+    onConfirm: async () => {
+      let successCount = 0;
+      let failCount = 0;
+      for (const orderId of orderIds) {
+        try {
+          const res = await fetchWithCsrf(`${apiBase.value}/orders/${orderId}/approve`, {
+            method: 'POST'
+          });
+          const data = await res.json();
+          if (data.success) successCount++;
+          else failCount++;
+        } catch (e) {
+          failCount++;
+        }
+      }
+      if (successCount > 0) {
+        showToast(`${successCount} items aprobados`, 'success');
+        await selectProject({ id: selectedProject.value.id });
+      }
+      if (failCount > 0) {
+        showToast(`${failCount} items no pudieron aprobarse`, 'error');
+      }
+    }
+  });
+};
+
+const approveAllInGroup = (group) => {
+  const orderIds = getGroupDraftOrders(group).map(o => o.id);
+  approveMaterialsBulk(orderIds, 'Aprobar toda la lista');
+  clearGroupSelection(group);
+};
+
+const approveSelectedInGroup = (group) => {
+  const selectedIds = getSelectedIds(group);
+  if (!selectedIds.length) return;
+  approveMaterialsBulk(selectedIds, 'Aprobar seleccionados');
+  clearGroupSelection(group);
 };
 
 // Reject material (Manager rejects supervisor's material)
