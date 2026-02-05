@@ -603,10 +603,18 @@
         <div v-if="showCreateModal" class="modal-overlay" @click.self="closeCreateModal">
           <div class="modal-content">
             <div class="modal-header">
-              <h2>Crear Nuevo Proyecto</h2>
-              <button @click="closeCreateModal" class="btn-close">×</button>
+              <h2>
+                <svg class="modal-title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 4v16m8-8H4" stroke-linecap="round" stroke-linejoin="round"/>
+                  <rect x="3" y="3" width="18" height="18" rx="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                CREAR NUEVO PROYECTO
+              </h2>
             </div>
-            <div class="modal-body">
+            <div class="modal-description">
+              Crea un nuevo proyecto especificando su presupuesto, moneda y supervisor responsable.
+            </div>
+            <div class="modal-body"
               <form @submit.prevent="createProject">
                 <div class="form-group">
                   <label>Nombre del Proyecto</label>

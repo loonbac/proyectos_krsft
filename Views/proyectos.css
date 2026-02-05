@@ -1294,6 +1294,7 @@ body.dark-mode .flatpickr-months .flatpickr-next-month {
     display: flex;
     align-items: center;
     gap: 16px;
+    color: var(--proyectos-text-dark);
 }
 
 .igv-input {
@@ -1384,17 +1385,18 @@ body.dark-mode .flatpickr-months .flatpickr-next-month {
 
 .btn-cancel {
     padding: 12px 24px;
-    background: var(--proyectos-bg-light);
-    border: 1px solid var(--proyectos-border);
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.45);
     border-radius: var(--proyectos-radius-md);
-    color: var(--proyectos-text-gray);
+    color: #ef4444;
     font-weight: 600;
     cursor: pointer;
     transition: var(--proyectos-transition-fast);
 }
 
 .btn-cancel:hover {
-    background: var(--proyectos-border);
+    background: rgba(239, 68, 68, 0.2);
+    border-color: #ef4444;
 }
 
 .btn-secondary {
@@ -1681,6 +1683,25 @@ body.dark-mode .btn-secondary {
     margin: 0;
     font-size: 20px;
     color: var(--proyectos-text-dark);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-weight: 700;
+}
+
+.modal-title-icon {
+    width: 24px;
+    height: 24px;
+    color: var(--proyectos-primary);
+}
+
+.modal-description {
+    padding: 16px 24px 0 24px;
+    color: var(--proyectos-text-gray);
+    font-size: 14px;
+    line-height: 1.5;
 }
 
 .btn-close {
