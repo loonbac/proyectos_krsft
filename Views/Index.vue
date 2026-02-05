@@ -232,7 +232,7 @@
                 <span class="threshold-amount">{{ getCurrencySymbol(selectedProject.currency) }} {{ formatNumber((selectedProject.available_amount * (selectedProject.spending_threshold || 75) / 100)) }}</span>
               </div>
               <div class="stat-row">
-                <span class="stat-label">Días vivo</span>
+                <span class="stat-label">Días activo</span>
                 <span class="stat-value">
                   <span class="project-age-pill">{{ getProjectDaysAlive(selectedProject) }} días</span>
                 </span>
