@@ -614,7 +614,7 @@
             <div class="modal-description">
               Crea un nuevo proyecto especificando su presupuesto, moneda y supervisor responsable.
             </div>
-            <div class="modal-body"
+            <div class="modal-body">
               <form @submit.prevent="createProject">
                 <div class="form-group">
                   <label>Nombre del Proyecto</label>
