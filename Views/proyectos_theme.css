@@ -18,6 +18,7 @@
 
     /* Toggle Border - Modo Claro */
     --proyectos-toggle-border: #94a3b8;
+    --proyectos-toggle-border-dark: #ffffff;
 
     /* Colores de Estado */
     --proyectos-success: #10b981;
@@ -180,7 +181,7 @@ body.dark-mode {
     --proyectos-bg-color-2: #1e293b;
 
     /* Toggle Border - Modo Oscuro */
-    --proyectos-toggle-border: #f59e0b;
+    --proyectos-toggle-border: #ffffff;
 
     /* Project Lifecycle Pills - Modo Oscuro */
     --proyectos-project-state-active-bg: #10b981;

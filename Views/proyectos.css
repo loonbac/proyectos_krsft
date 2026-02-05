@@ -1038,10 +1038,10 @@ body.dark-mode .flatpickr-months .flatpickr-next-month {
 .project-name-pill {
     display: inline-flex;
     align-items: center;
-    padding: 10px 20px;
+    padding: 8.5px 17px;
     border-radius: var(--proyectos-radius-full);
     color: var(--proyectos-text-white);
-    font-size: 16px;
+    font-size: 13.6px;
     font-weight: 700;
     letter-spacing: 0.5px;
     box-shadow: var(--proyectos-shadow-sm);
@@ -1166,8 +1166,8 @@ body.dark-mode .flatpickr-months .flatpickr-next-month {
 }
 
 .pie-chart {
-    width: 270px;
-    height: 270px;
+    width: 540px;
+    height: 540px;
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.08));
 }
 
