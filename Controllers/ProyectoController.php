@@ -29,6 +29,7 @@ class ProyectoController extends Controller
 
     /**
      * Determine user role and supervisor status
+     * Supports role simulation for admins via ?simulate_role parameter
      */
     protected function getUserRoleInfo(): array
     {
@@ -38,7 +39,34 @@ class ProyectoController extends Controller
             return ['role' => 'guest', 'isSupervisor' => false, 'trabajadorId' => null];
         }
 
-        // Admin always has full access
+        // === SIMULACIÓN DE ROL (solo para admins) ===
+        if ($user->role === 'admin' && request()->has('simulate_role')) {
+            $simulatedRole = request()->input('simulate_role');
+            
+            if ($simulatedRole === 'supervisor') {
+                // Buscar un trabajador con cargo supervisor
+                $supervisor = DB::table('trabajadores')
+                    ->whereRaw('LOWER(cargo) LIKE ?', ['%supervisor%'])
+                    ->where('estado', 'LIKE', '%activo%')
+                    ->first();
+                
+                return [
+                    'role' => 'supervisor', 
+                    'isSupervisor' => true, 
+                    'trabajadorId' => $supervisor ? $supervisor->id : $user->trabajador_id
+                ];
+            }
+            
+            if ($simulatedRole === 'jefe') {
+                // Jefe de proyectos / manager
+                return ['role' => 'manager', 'isSupervisor' => false, 'trabajadorId' => $user->trabajador_id];
+            }
+            
+            // admin - vista normal de admin
+            return ['role' => 'admin', 'isSupervisor' => false, 'trabajadorId' => $user->trabajador_id];
+        }
+
+        // Admin always has full access (sin simulación)
         if ($user->role === 'admin') {
             return ['role' => 'admin', 'isSupervisor' => false, 'trabajadorId' => $user->trabajador_id];
         }
