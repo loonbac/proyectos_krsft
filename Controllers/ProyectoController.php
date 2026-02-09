@@ -57,12 +57,7 @@ class ProyectoController extends Controller
                 ];
             }
             
-            if ($simulatedRole === 'jefe') {
-                // Jefe de proyectos / manager
-                return ['role' => 'manager', 'isSupervisor' => false, 'trabajadorId' => $user->trabajador_id];
-            }
-            
-            // admin - vista normal de admin
+            // admin - vista normal de jefe/manager
             return ['role' => 'admin', 'isSupervisor' => false, 'trabajadorId' => $user->trabajador_id];
         }
 
