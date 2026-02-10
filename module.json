@@ -2,8 +2,8 @@
     "name": "ProyectosKrsft",
     "slug": "proyectos_krsft",
     "display_name": "PROYECTOS",
-    "version": "5.10.0",
-    "description": "Sistema completo de gestión de proyectos con tracking de presupuesto en tiempo real. Incluye simulación de roles para Admins (click derecho en Dashboard). Sincronización entre vista Jefe y Supervisor.",
+    "version": "5.10.1",
+    "description": "Sistema completo de gestión de proyectos con tracking de presupuesto en tiempo real. v5.10.1: Fix audit issues"
     "icon": "icon.svg",
     "color": "#0AA4A4",
     "gradient": "linear-gradient(135deg, #0AA4A4, #2F6FBF)",
