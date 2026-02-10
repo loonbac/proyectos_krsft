@@ -5,12 +5,15 @@ namespace Modulos_ERP\ProyectosKrsft\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class ProyectoController extends Controller
 {
     protected $projectsTable = 'projects';
     protected $expensesTable = 'project_expenses';
+
+    private static ?bool $trabajadoresTableExists = null;
 
     const RETENTION_RATE = 0.12;
     const AVAILABLE_RATE = 0.88;
@@ -25,6 +28,17 @@ class ProyectoController extends Controller
             'isSupervisor' => $userInfo['isSupervisor'],
             'trabajadorId' => $userInfo['trabajadorId']
         ]);
+    }
+
+    /**
+     * Cache the hasTable check to avoid repeated schema queries per request
+     */
+    protected function hasTrabajadoresTable(): bool
+    {
+        if (self::$trabajadoresTableExists === null) {
+            self::$trabajadoresTableExists = DB::getSchemaBuilder()->hasTable('trabajadores');
+        }
+        return self::$trabajadoresTableExists;
     }
 
     /**
@@ -67,7 +81,7 @@ class ProyectoController extends Controller
         }
 
         // Check if user has linked trabajador with cargo
-        if ($user->trabajador_id && DB::getSchemaBuilder()->hasTable('trabajadores')) {
+        if ($user->trabajador_id && $this->hasTrabajadoresTable()) {
             $trabajador = DB::table('trabajadores')->find($user->trabajador_id);
             
             if ($trabajador) {
@@ -95,7 +109,7 @@ class ProyectoController extends Controller
     public function getSupervisors()
     {
         try {
-            if (!DB::getSchemaBuilder()->hasTable('trabajadores')) {
+            if (!$this->hasTrabajadoresTable()) {
                 return response()->json(['success' => false, 'supervisors' => []]);
             }
 
@@ -110,7 +124,8 @@ class ProyectoController extends Controller
 
             return response()->json(['success' => true, 'supervisors' => $supervisors]);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'supervisors' => [], 'message' => $e->getMessage()]);
+            Log::error('Error en getSupervisors', ['error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'supervisors' => [], 'message' => 'Error interno']);
         }
     }
 
@@ -120,7 +135,7 @@ class ProyectoController extends Controller
     public function getAllWorkers()
     {
         try {
-            if (!DB::getSchemaBuilder()->hasTable('trabajadores')) {
+            if (!$this->hasTrabajadoresTable()) {
                 return response()->json(['success' => false, 'workers' => []]);
             }
 
@@ -131,7 +146,8 @@ class ProyectoController extends Controller
 
             return response()->json(['success' => true, 'workers' => $workers]);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'workers' => [], 'message' => $e->getMessage()]);
+            Log::error('Error en getAllWorkers', ['error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'workers' => [], 'message' => 'Error interno']);
         }
     }
 
@@ -292,7 +308,8 @@ class ProyectoController extends Controller
 
             return response()->json(['success' => true, 'message' => 'Trabajador agregado']);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            Log::error('Error en addWorker', ['error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Error interno al agregar trabajador'], 500);
         }
     }
 
@@ -309,7 +326,8 @@ class ProyectoController extends Controller
 
             return response()->json(['success' => true, 'message' => 'Trabajador removido']);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            Log::error('Error en removeWorker', ['error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Error interno al remover trabajador'], 500);
         }
     }
 
@@ -425,7 +443,8 @@ class ProyectoController extends Controller
                 'order_id' => $orderId
             ]);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            Log::error('Error en createMaterialOrder', ['error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Error interno al crear orden'], 500);
         }
     }
 
@@ -467,7 +486,8 @@ class ProyectoController extends Controller
                 'message' => 'Material aprobado y enviado al módulo de Compras'
             ]);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            Log::error('Error en approveMaterialOrder', ['error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Error interno al aprobar material'], 500);
         }
     }
 
@@ -509,7 +529,8 @@ class ProyectoController extends Controller
                 'message' => 'Material rechazado'
             ]);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            Log::error('Error en rejectMaterialOrder', ['error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Error interno al rechazar material'], 500);
         }
     }
 
@@ -580,9 +601,10 @@ class ProyectoController extends Controller
                 'message' => 'Entrega confirmada exitosamente'
             ]);
         } catch (\Exception $e) {
+            Log::error('Error en confirmDelivery', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
+                'message' => 'Error interno al confirmar entrega'
             ], 500);
         }
     }
@@ -614,9 +636,10 @@ class ProyectoController extends Controller
                 'updated' => $updated
             ]);
         } catch (\Exception $e) {
+            Log::error('Error en confirmFileDelivery', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
+                'message' => 'Error interno al confirmar entregas'
             ], 500);
         }
     }
@@ -661,7 +684,8 @@ class ProyectoController extends Controller
 
             return response()->json(['success' => true, 'message' => 'Proyecto creado', 'project_id' => $id]);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            Log::error('Error en store proyecto', ['error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Error interno al crear proyecto'], 500);
         }
     }
 
@@ -700,21 +724,25 @@ class ProyectoController extends Controller
 
             return response()->json(['success' => true, 'message' => 'Proyecto actualizado']);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            Log::error('Error en update proyecto', ['error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Error interno al actualizar proyecto'], 500);
         }
     }
 
     public function destroy($id)
     {
         try {
-            DB::table('project_workers')->where('project_id', $id)->delete();
-            DB::table($this->expensesTable)->where('project_id', $id)->delete();
-            DB::table('purchase_orders')->where('project_id', $id)->delete();
-            DB::table($this->projectsTable)->where('id', $id)->delete();
+            DB::transaction(function () use ($id) {
+                DB::table('project_workers')->where('project_id', $id)->delete();
+                DB::table($this->expensesTable)->where('project_id', $id)->delete();
+                DB::table('purchase_orders')->where('project_id', $id)->delete();
+                DB::table($this->projectsTable)->where('id', $id)->delete();
+            });
 
             return response()->json(['success' => true, 'message' => 'Proyecto eliminado']);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            Log::error('Error en destroy proyecto', ['error' => $e->getMessage(), 'id' => $id]);
+            return response()->json(['success' => false, 'message' => 'Error interno al eliminar proyecto'], 500);
         }
     }
 
@@ -959,7 +987,8 @@ class ProyectoController extends Controller
                 'errors' => $errors
             ]);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => 'Error: ' . $e->getMessage()], 500);
+            Log::error('Error en importBudget', ['error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Error interno al importar presupuesto'], 500);
         }
     }
 
