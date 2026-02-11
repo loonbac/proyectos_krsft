@@ -1025,7 +1025,7 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
                                 <span className="file-name">{group.filename || 'Órdenes Manuales'}</span>
                               </div>
                               <div className="file-header-right">
-                                {userRole === 'manager' && draftOrders.length > 0 && (
+                                {!isSupervisor && draftOrders.length > 0 && (
                                   <div className="file-header-actions" onClick={e => e.stopPropagation()}>
                                     {selectedCount > 0 && (
                                       <button className="btn-bulk-approve outline" onClick={() => approveSelectedInGroup(group)}>
@@ -1037,7 +1037,7 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
                                     </button>
                                   </div>
                                 )}
-                                {group.allPaid && !group.allDelivered && userRole === 'manager' && (
+                                {group.allPaid && !group.allDelivered && isSupervisor && (
                                   <button className="btn-confirm-all" onClick={e => { e.stopPropagation(); confirmFileDelivery(group); }}>
                                     ✓ Confirmar Entrega
                                   </button>
@@ -1055,7 +1055,7 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
                                   <table className="materials-table">
                                     <thead>
                                       <tr>
-                                        {userRole === 'manager' && <th className="col-select">
+                                        {!isSupervisor && <th className="col-select">
                                           <label className="select-checkbox">
                                             <input type="checkbox" disabled />
                                             <span className="checkmark" />
@@ -1070,13 +1070,13 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
                                         <th className="col-mat">MATERIAL</th>
                                         <th className="col-estado">ESTADO</th>
                                         <th className="col-monto">MONTO</th>
-                                        {userRole === 'manager' && <th className="col-actions">ACCIONES</th>}
+                                        {!isSupervisor && <th className="col-actions">ACCIONES</th>}
                                       </tr>
                                     </thead>
                                     <tbody>
                                       {group.orders.map(order => (
                                         <tr key={order.id} className={`row-${getOrderStatusClass(order).replace('status-', '')}`}>
-                                          {userRole === 'manager' && (
+                                          {!isSupervisor && (
                                             <td className="col-select">
                                               <label className="select-checkbox">
                                                 <input type="checkbox" checked={isOrderSelected(group, order.id)} onChange={() => toggleOrderSelection(group, order)} disabled={order.status !== 'draft'} />
@@ -1103,14 +1103,14 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
                                           <td className="col-monto">
                                             {order.amount != null ? `${getCurrencySymbol(selectedProject.currency)} ${formatNumber(order.amount)}` : '-'}
                                           </td>
-                                          {userRole === 'manager' && (
+                                          {!isSupervisor && (
                                             <td className="col-actions">
                                               {order.status === 'draft' ? (
                                                 <div className="action-buttons">
-                                                  <button className="btn-approve" onClick={() => approveMaterial(order.id)} title="Aprobar">
+                                                  <button className="btn-approve" onClick={() => approveMaterial(order.id)} title="Aprobar y enviar a Compras">
                                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12" /></svg>
                                                   </button>
-                                                  <button className="btn-reject" onClick={() => rejectMaterial(order.id)} title="Rechazar">
+                                                  <button className="btn-reject" onClick={() => rejectMaterial(order.id)} title="Rechazar material">
                                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                                                   </button>
                                                 </div>
@@ -1135,8 +1135,8 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
               </div>
             </div>
 
-            {/* Edit Section (managers only) */}
-            {userRole === 'manager' && (
+            {/* Edit Section (non-supervisors: Sub-Gerente, Jefe de Proyectos) */}
+            {!isSupervisor && (
               <div className="edit-section">
                 <h3>Editar Proyecto</h3>
                 <div className="form-row">
@@ -1175,17 +1175,19 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
                 <div className="title-icon">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>
                 </div>
-                <h1>PROYECTOS</h1>
-                <span className={`role-badge ${userRole}`}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-                  {userRole === 'manager' ? 'Jefe' : userRole === 'supervisor' ? 'Supervisor' : 'Trabajador'}
-                </span>
+                <h1>{isSupervisor ? 'MIS PROYECTOS ASIGNADOS' : 'GESTIÓN DE PROYECTOS'}</h1>
+                {isSupervisor && (
+                  <span className="role-badge supervisor">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+                    SUPERVISOR
+                  </span>
+                )}
               </div>
               <div className="header-right">
                 <button className="theme-toggle" onClick={toggleDarkMode}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
                 </button>
-                {userRole === 'manager' && (
+                {!isSupervisor && (
                   <button className="btn-nuevo" onClick={openCreateModal}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
                     Nuevo Proyecto
@@ -1243,9 +1245,17 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
               </div>
             ) : filteredProjects.length === 0 ? (
               <div className="empty-state">
-                <div className="empty-icon">📁</div>
-                <h3>Sin proyectos</h3>
-                <p>No hay proyectos que coincidan con los filtros.</p>
+                <div className="empty-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                </div>
+                <h3>{isSupervisor ? 'No tienes proyectos asignados' : 'No hay proyectos'}</h3>
+                <p>{isSupervisor ? 'Espera a que te asignen un proyecto' : 'No hay proyectos que coincidan con los filtros.'}</p>
+                {!isSupervisor && (
+                  <button className="btn-nuevo" onClick={openCreateModal} style={{ marginTop: '24px' }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                    Nuevo Proyecto
+                  </button>
+                )}
               </div>
             ) : (
               <div className="projects-grid">

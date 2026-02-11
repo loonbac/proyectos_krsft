@@ -2,7 +2,7 @@
     "name": "ProyectosKrsft",
     "slug": "proyectos_krsft",
     "display_name": "PROYECTOS",
-    "version": "6.0.0",
+    "version": "6.0.1",
     "description": "Sistema completo de gestión de proyectos con tracking de presupuesto en tiempo real. v5.10.1: Fix audit issues",
     "icon": "icon.svg",
     "color": "#0AA4A4",
