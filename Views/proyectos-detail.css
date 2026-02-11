@@ -1,0 +1,205 @@
+/* ============================================
+   PROYECTOS - PROJECT DETAIL VIEW
+   ============================================ */
+
+.project-detail {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- Detail Grid ---- */
+.detail-grid {
+    display: grid;
+    grid-template-columns: 350px 1fr;
+    gap: 24px;
+    margin-top: 24px;
+}
+
+@media (max-width: 1024px) {
+    .detail-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ---- Detail Card ---- */
+.detail-card {
+    background: var(--proyectos-bg-light);
+    padding: 16px;
+    border-radius: var(--proyectos-radius-lg);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid var(--proyectos-border);
+}
+
+/* ---- Status Badge ---- */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: var(--proyectos-radius-full);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.status-badge.active {
+    background: var(--proyectos-badge-active-bg);
+    color: var(--proyectos-badge-active-text);
+}
+
+.status-badge.completed {
+    background: var(--proyectos-badge-completed-bg);
+    color: var(--proyectos-badge-completed-text);
+}
+
+.status-badge.cancelled {
+    background: var(--proyectos-badge-cancelled-bg);
+    color: var(--proyectos-badge-cancelled-text);
+}
+
+/* ---- Project Stats Panel ---- */
+.project-stats-panel {
+    display: flex;
+    gap: 32px;
+    background: var(--proyectos-bg-card);
+    border: 1px solid var(--proyectos-border);
+    border-radius: var(--proyectos-radius-lg);
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--proyectos-shadow-sm);
+}
+
+.stats-list {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.stat-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 12px 16px;
+    background: var(--proyectos-bg-light);
+    border-radius: var(--proyectos-radius-md);
+}
+
+.stat-label {
+    font-size: 11px;
+    color: var(--proyectos-text-gray);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    min-width: 150px;
+}
+
+.stat-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--proyectos-text-dark);
+}
+
+.stat-value.primary { color: var(--proyectos-primary); }
+.stat-value.success { color: var(--proyectos-success); }
+.stat-value.warning { color: var(--proyectos-warning); }
+.stat-value.info    { color: #3b82f6; font-weight: 700; }
+.stat-value.muted   { color: var(--proyectos-text-gray); font-weight: 500; font-size: 14px; }
+
+/* Retained row */
+.retained-row {
+    background: rgba(148, 163, 184, 0.1);
+    border-left: 3px solid #94a3b8;
+}
+
+/* Available row */
+.available-row {
+    background: rgba(59, 130, 246, 0.1);
+    border-left: 3px solid #3b82f6;
+}
+
+/* Threshold row */
+.threshold-row {
+    background: rgba(239, 68, 68, 0.1);
+    border-left: 3px solid #ef4444;
+}
+
+.stat-value.threshold {
+    color: #ef4444;
+    font-weight: 700;
+}
+
+.threshold-amount {
+    font-size: 13px;
+    color: var(--proyectos-text-gray);
+    font-weight: 600;
+    margin-left: auto;
+}
+
+/* ---- Pie Chart ---- */
+.expense-chart {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pie-chart {
+    width: 432px;
+    height: 432px;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.08));
+}
+
+@media (max-width: 768px) {
+    .project-stats-panel {
+        flex-direction: column;
+    }
+
+    .expense-chart {
+        width: 140px;
+        margin: 0 auto;
+    }
+}
+
+/* ---- Section Box ---- */
+.section-box {
+    background: var(--proyectos-bg-card);
+    border-radius: var(--proyectos-radius-lg);
+    padding: 24px;
+    margin-bottom: 20px;
+    border: 1px solid var(--proyectos-border);
+}
+
+.section-box h3 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 20px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--proyectos-text-dark);
+}
+
+.section-box h3 svg {
+    width: 22px;
+    height: 22px;
+    color: var(--proyectos-primary);
+    vertical-align: middle;
+}
+
+/* ---- Edit Section ---- */
+.edit-section {
+    margin-top: 30px;
+    padding-top: 30px;
+    border-top: 1px solid var(--proyectos-border);
+}
+
+.edit-section h3 {
+    margin: 0 0 20px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--proyectos-text-dark);
+}

@@ -1,0 +1,163 @@
+/* ============================================
+   PROYECTOS - PROJECT CARDS GRID
+   ============================================ */
+
+.projects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 200px;
+}
+
+.project-card {
+    background: var(--proyectos-bg-card);
+    border-radius: var(--proyectos-radius-lg);
+    padding: 20px;
+    border: 1px solid var(--proyectos-border);
+    box-shadow: var(--proyectos-shadow-sm);
+    cursor: pointer;
+    transition: var(--proyectos-transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.project-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--proyectos-shadow-md);
+    border-color: var(--proyectos-primary);
+}
+
+.project-card h3 {
+    margin: 0 0 8px 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--proyectos-text-dark);
+    padding-right: 40px;
+}
+
+.project-card p {
+    margin: 4px 0;
+    font-size: 13px;
+    color: var(--proyectos-text-gray);
+}
+
+.project-card small {
+    color: var(--proyectos-text-gray);
+    font-size: 12px;
+}
+
+/* ---- Card Amounts ---- */
+.project-amounts {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--proyectos-border);
+}
+
+.amount-item {
+    text-align: center;
+}
+
+.amount-item .label {
+    display: block;
+    font-size: 10px;
+    color: var(--proyectos-text-light);
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.amount-item .value {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--proyectos-text-dark);
+}
+
+.amount-item .value.success {
+    color: var(--proyectos-success);
+}
+
+.amount-item .value.warning {
+    color: var(--proyectos-warning);
+}
+
+/* ---- Currency Badge ---- */
+.currency-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    background: var(--proyectos-primary-light);
+    border-radius: var(--proyectos-radius-full);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--proyectos-primary);
+    margin-top: 8px;
+}
+
+/* ---- Progress Bar ---- */
+.progress-bar {
+    height: 6px;
+    background: var(--proyectos-progress-track);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 12px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--proyectos-progress-fill);
+    border-radius: 3px;
+    transition: width 0.4s ease;
+}
+
+/* ---- Empty & Loading States ---- */
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    background: var(--proyectos-bg-card);
+    border-radius: var(--proyectos-radius-lg);
+    border: 1px solid var(--proyectos-border);
+}
+
+.empty-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.empty-state h3 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--proyectos-text-dark);
+}
+
+.empty-state p {
+    margin: 0;
+    color: var(--proyectos-text-gray);
+}
+
+.loading-state {
+    text-align: center;
+    padding: 60px 20px;
+}
+
+.loading-state .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--proyectos-border);
+    border-top-color: var(--proyectos-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-state p {
+    color: var(--proyectos-text-gray);
+    font-size: 14px;
+}

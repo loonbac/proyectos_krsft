@@ -1,0 +1,320 @@
+/* ============================================
+   PROYECTOS - FILTERS & ACTIONS BAR
+   ============================================ */
+
+/* ---- Stats Grid ---- */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.stat-card {
+    background: var(--proyectos-bg-card);
+    border-radius: var(--proyectos-radius-lg);
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border: 1px solid var(--proyectos-border);
+    box-shadow: var(--proyectos-shadow-sm);
+    transition: var(--proyectos-transition);
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--proyectos-shadow-md);
+}
+
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--proyectos-radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.stat-icon svg {
+    width: 24px;
+    height: 24px;
+    color: white;
+}
+
+.stat-info h3 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--proyectos-text-dark);
+}
+
+.stat-info span {
+    font-size: 12px;
+    color: var(--proyectos-text-gray);
+    font-weight: 500;
+}
+
+/* ---- Actions Bar ---- */
+.actions-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    gap: 12px;
+}
+
+.btn-nuevo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 24px;
+    background: var(--proyectos-primary);
+    border: none;
+    border-radius: var(--proyectos-radius-md);
+    color: var(--proyectos-text-white);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--proyectos-transition);
+    box-shadow: var(--proyectos-shadow-sm);
+}
+
+.btn-nuevo:hover {
+    background: var(--proyectos-primary-dark);
+    transform: translateY(-2px);
+    box-shadow: var(--proyectos-shadow-md);
+}
+
+.btn-nuevo svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* ---- Filter Bar ---- */
+.filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 20px;
+    background: var(--proyectos-bg-card);
+    border-radius: var(--proyectos-radius-lg);
+    padding: 16px;
+    border: 1px solid var(--proyectos-border);
+}
+
+.filter-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: var(--proyectos-radius-full);
+    border: 1px solid var(--proyectos-border);
+    background: var(--proyectos-bg-light);
+    color: var(--proyectos-text-gray);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--proyectos-transition-fast);
+}
+
+.filter-btn:hover {
+    border-color: var(--proyectos-primary);
+    color: var(--proyectos-primary);
+}
+
+.filter-btn.active {
+    background: var(--proyectos-filter-active-bg);
+    color: var(--proyectos-filter-active-text);
+    border-color: var(--proyectos-filter-active-bg);
+}
+
+.filter-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+.filter-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.filter-btn:not(.active) .filter-count {
+    background: var(--proyectos-border);
+    color: var(--proyectos-text-gray);
+}
+
+/* ---- Date Filter ---- */
+.filter-dates {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.filter-dates .date-label {
+    font-size: 12px;
+    color: var(--proyectos-text-gray);
+    font-weight: 600;
+}
+
+.date-input-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.date-input-group .flatpickr-input,
+.date-input-group input[type="text"] {
+    padding: 8px 12px;
+    border: 1px solid var(--proyectos-border);
+    border-radius: var(--proyectos-radius-md);
+    background: var(--proyectos-bg-input);
+    color: var(--proyectos-text-dark);
+    font-size: 13px;
+    width: 130px;
+}
+
+.date-input-group .flatpickr-input:focus,
+.date-input-group input[type="text"]:focus {
+    outline: none;
+    border-color: var(--proyectos-primary);
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+}
+
+.date-display {
+    display: inline-block;
+    font-size: 12px;
+    color: var(--proyectos-text-gray);
+    min-width: 80px;
+}
+
+.btn-date-clear {
+    background: none;
+    border: 1px solid var(--proyectos-border);
+    color: var(--proyectos-text-gray);
+    padding: 6px 12px;
+    border-radius: var(--proyectos-radius-md);
+    cursor: pointer;
+    font-size: 12px;
+    transition: var(--proyectos-transition-fast);
+}
+
+.btn-date-clear:hover {
+    border-color: var(--proyectos-danger);
+    color: var(--proyectos-danger);
+}
+
+/* ---- Flatpickr Theme Override ---- */
+.flatpickr-calendar {
+    background: var(--proyectos-bg-card) !important;
+    border-color: var(--proyectos-border) !important;
+    box-shadow: var(--proyectos-shadow-lg) !important;
+    border-radius: var(--proyectos-radius-lg) !important;
+    font-family: inherit !important;
+}
+
+.flatpickr-months {
+    background: var(--proyectos-bg-light) !important;
+    border-radius: var(--proyectos-radius-lg) var(--proyectos-radius-lg) 0 0 !important;
+}
+
+.flatpickr-months .flatpickr-month {
+    color: var(--proyectos-text-dark) !important;
+    fill: var(--proyectos-text-dark) !important;
+}
+
+.flatpickr-months .flatpickr-prev-month,
+.flatpickr-months .flatpickr-next-month {
+    color: var(--proyectos-text-dark) !important;
+    fill: var(--proyectos-text-dark) !important;
+}
+
+.flatpickr-months .flatpickr-prev-month:hover,
+.flatpickr-months .flatpickr-next-month:hover {
+    color: var(--proyectos-primary) !important;
+    fill: var(--proyectos-primary) !important;
+}
+
+.flatpickr-current-month .flatpickr-monthDropdown-months {
+    background: transparent !important;
+    color: var(--proyectos-text-dark) !important;
+}
+
+.flatpickr-current-month input.cur-year {
+    color: var(--proyectos-text-dark) !important;
+}
+
+.flatpickr-weekdays {
+    background: var(--proyectos-bg-light) !important;
+}
+
+span.flatpickr-weekday {
+    color: var(--proyectos-text-gray) !important;
+    font-weight: 600 !important;
+}
+
+.flatpickr-day {
+    color: var(--proyectos-text-dark) !important;
+    border-radius: var(--proyectos-radius-sm) !important;
+}
+
+.flatpickr-day:hover {
+    background: var(--proyectos-primary-light) !important;
+    border-color: var(--proyectos-primary) !important;
+}
+
+.flatpickr-day.today {
+    border-color: var(--proyectos-primary) !important;
+}
+
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange {
+    background: var(--proyectos-primary) !important;
+    border-color: var(--proyectos-primary) !important;
+    color: white !important;
+}
+
+.flatpickr-day.inRange {
+    background: var(--proyectos-primary-light) !important;
+    border-color: transparent !important;
+    box-shadow: -5px 0 0 var(--proyectos-primary-light), 5px 0 0 var(--proyectos-primary-light) !important;
+}
+
+.flatpickr-day.prevMonthDay,
+.flatpickr-day.nextMonthDay {
+    color: var(--proyectos-text-light) !important;
+}
+
+body.dark-mode .flatpickr-calendar {
+    background: var(--proyectos-bg-card) !important;
+    border-color: var(--proyectos-border) !important;
+}
+
+body.dark-mode .flatpickr-months {
+    background: var(--proyectos-bg-dark) !important;
+}
+
+body.dark-mode .flatpickr-months .flatpickr-month,
+body.dark-mode .flatpickr-months .flatpickr-prev-month,
+body.dark-mode .flatpickr-months .flatpickr-next-month,
+body.dark-mode .flatpickr-current-month .flatpickr-monthDropdown-months,
+body.dark-mode .flatpickr-current-month input.cur-year,
+body.dark-mode .flatpickr-day,
+body.dark-mode span.flatpickr-weekday {
+    color: var(--proyectos-text-dark) !important;
+    fill: var(--proyectos-text-dark) !important;
+}
+
+body.dark-mode .flatpickr-weekdays {
+    background: var(--proyectos-bg-dark) !important;
+}

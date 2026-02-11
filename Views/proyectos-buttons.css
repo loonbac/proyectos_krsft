@@ -1,0 +1,345 @@
+/* ============================================
+   PROYECTOS - BUTTONS
+   ============================================ */
+
+.btn-add {
+    padding: 10px 20px;
+    background: var(--proyectos-success);
+    border: none;
+    border-radius: var(--proyectos-radius-md);
+    color: var(--proyectos-text-white);
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--proyectos-transition-fast);
+}
+
+.btn-add:hover { background: var(--proyectos-success-dark); }
+.btn-add:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Green circular + button */
+.btn-add-icon {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    background: var(--proyectos-success);
+    border: none;
+    border-radius: var(--proyectos-radius-md);
+    color: var(--proyectos-text-white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: var(--proyectos-transition-fast);
+}
+
+.btn-add-icon svg { width: 22px; height: 22px; }
+
+.btn-add-icon:hover {
+    background: var(--proyectos-success-dark);
+    transform: translateY(-2px);
+}
+
+.btn-add-icon:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+/* Submit */
+.btn-submit {
+    padding: 12px 24px;
+    background: var(--proyectos-success);
+    border: none;
+    border-radius: var(--proyectos-radius-md);
+    color: var(--proyectos-text-white);
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--proyectos-transition);
+}
+
+.btn-submit:hover { background: var(--proyectos-success-dark); }
+.btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-submit svg { width: 18px; height: 18px; }
+
+/* Cancel */
+.btn-cancel {
+    padding: 12px 24px;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.45);
+    border-radius: var(--proyectos-radius-md);
+    color: #ef4444;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--proyectos-transition-fast);
+}
+
+.btn-cancel:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: #ef4444;
+}
+
+/* Secondary */
+.btn-secondary {
+    padding: 12px 24px;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.45);
+    border-radius: var(--proyectos-radius-md);
+    color: #ef4444;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--proyectos-transition-fast);
+}
+
+.btn-secondary:hover { background: rgba(239, 68, 68, 0.2); }
+
+body.dark-mode .btn-secondary {
+    background: rgba(239, 68, 68, 0.16);
+    border-color: rgba(239, 68, 68, 0.6);
+    color: #f87171;
+}
+
+/* Edit / Delete */
+.btn-edit {
+    padding: 8px 16px;
+    background: var(--proyectos-btn-edit-bg);
+    border: 1px solid var(--proyectos-btn-edit-text);
+    border-radius: var(--proyectos-radius-sm);
+    color: var(--proyectos-btn-edit-text);
+    cursor: pointer;
+    transition: var(--proyectos-transition-fast);
+}
+
+.btn-edit:hover { background: var(--proyectos-btn-edit-hover); }
+
+.btn-delete {
+    padding: 8px 16px;
+    background: var(--proyectos-btn-delete-bg);
+    border: 1px solid var(--proyectos-btn-delete-text);
+    border-radius: var(--proyectos-radius-sm);
+    color: var(--proyectos-btn-delete-text);
+    cursor: pointer;
+    transition: var(--proyectos-transition-fast);
+}
+
+.btn-delete:hover { background: var(--proyectos-btn-delete-hover); }
+
+/* Remove (circle) */
+.btn-remove {
+    background: var(--proyectos-danger);
+    border: none;
+    color: var(--proyectos-text-white);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 16px;
+    transition: var(--proyectos-transition-fast);
+}
+
+.btn-remove:hover { background: var(--proyectos-danger-dark); }
+
+/* Close (modal) */
+.btn-close {
+    background: none;
+    border: none;
+    color: var(--proyectos-text-gray);
+    font-size: 24px;
+    cursor: pointer;
+    transition: var(--proyectos-transition-fast);
+}
+
+.btn-close:hover { color: var(--proyectos-danger); }
+
+/* Add Material */
+.btn-add-material {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    background: var(--proyectos-primary);
+    border: none;
+    border-radius: var(--proyectos-radius-md);
+    color: white;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.btn-add-material:hover:not(:disabled) {
+    background: var(--proyectos-primary-dark);
+    transform: translateY(-1px);
+}
+
+.btn-add-material:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-add-material svg { width: 18px; height: 18px; }
+
+/* Download Template */
+.btn-download-template {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px;
+    padding: 10px 20px;
+    min-width: 180px;
+    background: #0AA4A4 !important;
+    border: none;
+    border-radius: var(--proyectos-radius-md);
+    color: #ffffff !important;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 6px rgba(10, 164, 164, 0.3);
+    white-space: nowrap;
+    text-decoration: none;
+    line-height: 1;
+    vertical-align: middle;
+}
+
+.btn-download-template:hover {
+    background: #099090 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(10, 164, 164, 0.4);
+}
+
+.btn-download-template:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 4px rgba(10, 164, 164, 0.3);
+}
+
+.btn-download-template svg {
+    width: 18px !important;
+    height: 18px !important;
+    flex-shrink: 0 !important;
+    color: #ffffff !important;
+    stroke: currentColor;
+    fill: none;
+    display: inline-block !important;
+    vertical-align: middle !important;
+}
+
+/* Import Excel */
+.btn-import-excel {
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px;
+    padding: 10px 20px !important;
+    min-width: 180px;
+    height: auto !important;
+    background: #f59e0b !important;
+    border: none !important;
+    border-radius: var(--proyectos-radius-md);
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    font-family: inherit !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 6px rgba(245, 158, 11, 0.3);
+    white-space: nowrap;
+    text-decoration: none;
+    line-height: 1 !important;
+    vertical-align: middle;
+}
+
+.btn-import-excel:hover {
+    background: #dc8b0a !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(245, 158, 11, 0.4);
+}
+
+.btn-import-excel:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 4px rgba(245, 158, 11, 0.3);
+}
+
+.btn-import-excel svg {
+    width: 18px !important;
+    height: 18px !important;
+    flex-shrink: 0 !important;
+    color: #ffffff !important;
+    stroke: currentColor;
+    fill: none;
+    display: inline-block !important;
+    vertical-align: middle !important;
+    order: -1;
+}
+
+.btn-import-excel input[type="file"] {
+    display: none;
+}
+
+/* Bulk approve */
+.btn-bulk-approve {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 999px;
+    background: #10b981;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-bulk-approve.outline {
+    background: #7c3aed;
+    border: none;
+    color: #ffffff;
+    outline: none;
+    box-shadow: none;
+}
+
+.btn-bulk-approve.outline:focus,
+.btn-bulk-approve.outline:focus-visible {
+    outline: none;
+    box-shadow: none;
+}
+
+.btn-bulk-approve:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+
+.btn-bulk-approve:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+}
+
+/* Confirm all */
+.btn-confirm-all {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-confirm-all:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+/* Approve / Reject (table actions) */
+.btn-approve,
+.btn-reject {
+    padding: 6px 8px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-approve svg,
+.btn-reject svg { width: 16px; height: 16px; }
+
+.btn-approve { background: rgba(16, 185, 129, 0.18); color: #10b981; }
+.btn-reject  { background: rgba(239, 68, 68, 0.18); color: #ef4444; }

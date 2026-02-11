@@ -1,0 +1,190 @@
+/* ============================================
+   PROYECTOS - FORMS & INPUTS
+   ============================================ */
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--proyectos-text-gray);
+    text-transform: uppercase;
+}
+
+.input-field,
+.select-field {
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--proyectos-bg-input);
+    border: 1px solid var(--proyectos-border);
+    border-radius: var(--proyectos-radius-md);
+    color: var(--proyectos-text-dark);
+    font-size: 14px;
+    transition: var(--proyectos-transition-fast);
+}
+
+.input-field:focus,
+.select-field:focus {
+    outline: none;
+    border-color: var(--proyectos-primary);
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+/* ---- Currency Switch ---- */
+.currency-switch {
+    display: flex;
+    background: var(--proyectos-bg-light);
+    border-radius: var(--proyectos-radius-md);
+    overflow: hidden;
+}
+
+.currency-option {
+    flex: 1;
+    padding: 12px;
+    text-align: center;
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--proyectos-text-gray);
+    transition: var(--proyectos-transition-fast);
+}
+
+.currency-option.active {
+    background: var(--proyectos-currency-bg);
+    color: var(--proyectos-text-white);
+}
+
+/* ---- Checkbox ---- */
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.checkbox-group input {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--proyectos-primary);
+}
+
+.igv-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    color: var(--proyectos-text-dark);
+}
+
+.igv-input {
+    width: 80px !important;
+}
+
+/* ---- Material Specification Form ---- */
+.material-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.material-form-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.form-group-sm { flex: 0 0 80px; }
+.form-group-md { flex: 1 1 150px; min-width: 120px; }
+.form-group-lg { flex: 2 1 300px; min-width: 200px; }
+
+.material-form label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--proyectos-text-gray);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.material-form .input-field,
+.material-form .select-field {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--proyectos-input-bg);
+    border: 1px solid var(--proyectos-border);
+    border-radius: var(--proyectos-radius-md);
+    color: var(--proyectos-text-dark);
+    font-size: 13px;
+    transition: border-color 0.2s;
+}
+
+.material-form .input-field:focus,
+.material-form .select-field:focus {
+    outline: none;
+    border-color: var(--proyectos-primary);
+}
+
+.material-form-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.actions-left {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.actions-right {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* ---- Add Worker / Material Row ---- */
+.add-worker-row,
+.material-add-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.qty-input {
+    width: 100px !important;
+    text-align: center;
+}
+
+.expense-add-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.order-form {
+    margin-top: 16px;
+}
+
+/* ---- Hint / Error ---- */
+.hint {
+    font-size: 12px;
+    color: var(--proyectos-text-light);
+    margin-top: 8px;
+}
+
+.error {
+    color: var(--proyectos-danger);
+    font-size: 14px;
+    margin: 10px 0;
+}

@@ -1,0 +1,159 @@
+/* ============================================
+   PROYECTOS - CSS VARIABLES / THEME
+   ============================================ */
+
+:root {
+    /* Primary */
+    --proyectos-primary: #f59e0b;
+    --proyectos-primary-dark: #d97706;
+    --proyectos-primary-light: rgba(245, 158, 11, 0.1);
+    --proyectos-primary-color: #f59e0b;
+
+    /* Backgrounds */
+    --proyectos-bg: #f1f5f9;
+    --proyectos-bg-card: #ffffff;
+    --proyectos-bg-light: #f8fafc;
+    --proyectos-bg-dark: #1e293b;
+    --proyectos-bg-input: #ffffff;
+    --proyectos-bg-hover: rgba(0, 0, 0, 0.04);
+    --proyectos-hover-bg: rgba(0, 0, 0, 0.02);
+    --proyectos-input-bg: #ffffff;
+
+    /* Text */
+    --proyectos-text: #1e293b;
+    --proyectos-text-dark: #1e293b;
+    --proyectos-text-gray: #64748b;
+    --proyectos-text-light: #94a3b8;
+    --proyectos-text-muted: #94a3b8;
+    --proyectos-text-white: #ffffff;
+    --proyectos-text-white-muted: #cbd5e1;
+
+    /* Borders & Shadows */
+    --proyectos-border: #e2e8f0;
+    --proyectos-border-light: #f1f5f9;
+    --proyectos-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+    --proyectos-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --proyectos-shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.12);
+
+    /* Badge Colors */
+    --proyectos-badge-pending-bg: rgba(245, 158, 11, 0.12);
+    --proyectos-badge-pending-text: #f59e0b;
+    --proyectos-badge-approved-bg: rgba(16, 185, 129, 0.12);
+    --proyectos-badge-approved-text: #10b981;
+    --proyectos-badge-paid-bg: rgba(59, 130, 246, 0.12);
+    --proyectos-badge-paid-text: #3b82f6;
+    --proyectos-badge-danger-bg: rgba(239, 68, 68, 0.12);
+    --proyectos-badge-danger-text: #ef4444;
+    --proyectos-badge-rejected-bg: rgba(239, 68, 68, 0.12);
+    --proyectos-badge-rejected-text: #ef4444;
+    --proyectos-badge-unquoted-bg: rgba(148, 163, 184, 0.18);
+    --proyectos-badge-unquoted-text: #64748b;
+
+    /* Project status badges */
+    --proyectos-badge-active-bg: rgba(16, 185, 129, 0.15);
+    --proyectos-badge-active-text: #10b981;
+    --proyectos-badge-completed-bg: rgba(59, 130, 246, 0.15);
+    --proyectos-badge-completed-text: #3b82f6;
+    --proyectos-badge-cancelled-bg: rgba(239, 68, 68, 0.15);
+    --proyectos-badge-cancelled-text: #ef4444;
+
+    /* Project lifecycle pills */
+    --proyectos-pill-new-bg: linear-gradient(135deg, #3b82f6, #2563eb);
+    --proyectos-pill-progress-bg: linear-gradient(135deg, #f59e0b, #d97706);
+    --proyectos-pill-review-bg: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    --proyectos-pill-complete-bg: linear-gradient(135deg, #10b981, #059669);
+    --proyectos-pill-finalized-bg: linear-gradient(135deg, #6366f1, #4f46e5);
+
+    /* Buttons */
+    --proyectos-btn-edit-bg: rgba(59, 130, 246, 0.1);
+    --proyectos-btn-edit-text: #3b82f6;
+    --proyectos-btn-edit-hover: rgba(59, 130, 246, 0.2);
+    --proyectos-btn-delete-bg: rgba(239, 68, 68, 0.1);
+    --proyectos-btn-delete-text: #ef4444;
+    --proyectos-btn-delete-hover: rgba(239, 68, 68, 0.2);
+
+    /* Status Colors */
+    --proyectos-success: #10b981;
+    --proyectos-success-dark: #059669;
+    --proyectos-warning: #f59e0b;
+    --proyectos-danger: #ef4444;
+    --proyectos-danger-dark: #dc2626;
+
+    /* Stat icon colors */
+    --proyectos-stat-icon-1: #f59e0b;
+    --proyectos-stat-icon-2: #10b981;
+    --proyectos-stat-icon-3: #3b82f6;
+    --proyectos-stat-icon-4: #8b5cf6;
+    --proyectos-stat-icon-5: #ec4899;
+
+    /* Progress bar */
+    --proyectos-progress-track: #e2e8f0;
+    --proyectos-progress-fill: #10b981;
+
+    /* Filter */
+    --proyectos-filter-active-bg: #f59e0b;
+    --proyectos-filter-active-text: #ffffff;
+
+    /* Modal & Toast */
+    --proyectos-modal-overlay: rgba(0, 0, 0, 0.5);
+    --proyectos-toast-success: #10b981;
+    --proyectos-toast-error: #ef4444;
+
+    /* Currency */
+    --proyectos-currency-bg: #f59e0b;
+
+    /* Transitions & Radius */
+    --proyectos-transition: all 0.25s ease;
+    --proyectos-transition-fast: all 0.15s ease;
+    --proyectos-radius: 8px;
+    --proyectos-radius-sm: 6px;
+    --proyectos-radius-md: 10px;
+    --proyectos-radius-lg: 14px;
+    --proyectos-radius-xl: 18px;
+    --proyectos-radius-full: 999px;
+
+    /* Toggle */
+    --proyectos-toggle-border: #cbd5e1;
+}
+
+/* ============================================
+   DARK MODE OVERRIDES
+   ============================================ */
+body.dark-mode {
+    --proyectos-bg: #0f172a;
+    --proyectos-bg-card: #1e293b;
+    --proyectos-bg-light: #1e293b;
+    --proyectos-bg-dark: #0f172a;
+    --proyectos-bg-input: #334155;
+    --proyectos-bg-hover: rgba(255, 255, 255, 0.06);
+    --proyectos-hover-bg: rgba(255, 255, 255, 0.04);
+    --proyectos-input-bg: #334155;
+
+    --proyectos-text: #e2e8f0;
+    --proyectos-text-dark: #e2e8f0;
+    --proyectos-text-gray: #94a3b8;
+    --proyectos-text-light: #64748b;
+    --proyectos-text-muted: #64748b;
+
+    --proyectos-border: rgba(255, 255, 255, 0.08);
+    --proyectos-border-light: rgba(255, 255, 255, 0.04);
+    --proyectos-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
+    --proyectos-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+    --proyectos-shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.4);
+
+    --proyectos-progress-track: #334155;
+    --proyectos-modal-overlay: rgba(0, 0, 0, 0.7);
+    --proyectos-toggle-border: #475569;
+
+    /* Lifecycle pills in dark mode */
+    --proyectos-pill-new-bg: linear-gradient(135deg, #60a5fa, #3b82f6);
+    --proyectos-pill-progress-bg: linear-gradient(135deg, #fbbf24, #f59e0b);
+    --proyectos-pill-review-bg: linear-gradient(135deg, #a78bfa, #8b5cf6);
+    --proyectos-pill-complete-bg: linear-gradient(135deg, #34d399, #10b981);
+    --proyectos-pill-finalized-bg: linear-gradient(135deg, #818cf8, #6366f1);
+
+    /* Animation */
+    --proyectos-anim-color-1: rgba(245, 158, 11, 0.04);
+    --proyectos-anim-color-2: rgba(16, 185, 129, 0.03);
+    --proyectos-anim-color-3: rgba(59, 130, 246, 0.04);
+}

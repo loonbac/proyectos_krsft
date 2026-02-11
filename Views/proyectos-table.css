@@ -1,0 +1,418 @@
+/* ============================================
+   PROYECTOS - TABLES & FILE GROUPS
+   ============================================ */
+
+/* ---- Orders Table ---- */
+.orders-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.orders-table th,
+.orders-table td {
+    padding: 14px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--proyectos-border);
+}
+
+.orders-table th {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--proyectos-text-light);
+    text-transform: uppercase;
+    background: var(--proyectos-bg-light);
+}
+
+.orders-table td {
+    color: var(--proyectos-text-dark);
+}
+
+/* ---- Order Status Badges ---- */
+.order-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: var(--proyectos-radius-full);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.order-status svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    vertical-align: middle;
+    margin-right: 4px;
+}
+
+.order-status.status-pending  { background: rgba(6, 182, 212, 0.2); color: #06b6d4; }
+.order-status.status-draft    { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+.order-status.status-approved { background: rgba(16, 185, 129, 0.18); color: #10b981; }
+.order-status.status-rejected { background: var(--proyectos-badge-danger-bg); color: var(--proyectos-badge-danger-text); }
+.order-status.status-paid     { background: rgba(16, 185, 129, 0.18); color: #10b981; }
+
+/* ---- Order Type Badge ---- */
+.order-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+}
+
+.order-type-badge svg { width: 16px; height: 16px; }
+
+/* ---- Action Buttons Column ---- */
+.col-actions {
+    padding: 8px;
+    text-align: center;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+}
+
+.no-actions {
+    color: var(--proyectos-text-muted);
+    font-size: 12px;
+}
+
+/* ---- Workers / Materials Lists ---- */
+.workers-list,
+.materials-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.workers-list li,
+.materials-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--proyectos-bg-light);
+    border-radius: var(--proyectos-radius-md);
+    margin-bottom: 8px;
+    color: var(--proyectos-text-dark);
+}
+
+.empty-list {
+    padding: 24px;
+    text-align: center;
+    color: var(--proyectos-text-light);
+    background: var(--proyectos-bg-light);
+    border-radius: var(--proyectos-radius-md);
+}
+
+/* ============================================
+   MATERIALS TABLE (EXCEL-STYLE)
+   ============================================ */
+.orders-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.table-scroll-container {
+    overflow-x: auto;
+    overflow-y: auto;
+    flex: 1;
+    border: 1px solid var(--proyectos-border);
+    border-radius: var(--proyectos-radius-md);
+    background: var(--proyectos-bg-light);
+}
+
+.materials-table {
+    width: 100%;
+    min-width: 1100px;
+    border-collapse: collapse;
+    font-size: 12px;
+    table-layout: auto;
+}
+
+.materials-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.materials-table th {
+    background: #e8eef5;
+    color: #1e293b;
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 12px 10px;
+    text-align: center;
+    border-bottom: 2px solid var(--proyectos-border);
+    white-space: nowrap;
+}
+
+.materials-table td {
+    padding: 10px;
+    border-bottom: 1px solid var(--proyectos-border-light);
+    color: var(--proyectos-text-dark);
+    vertical-align: middle;
+    text-align: center;
+}
+
+.materials-table th.col-actions { text-align: center; }
+
+/* ---- Checkbox ---- */
+.select-checkbox {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.select-checkbox input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.select-checkbox .checkmark {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 2px solid var(--proyectos-border);
+    background: var(--proyectos-bg-card);
+    display: inline-block;
+    position: relative;
+    transition: all 0.2s;
+}
+
+.select-checkbox input:checked + .checkmark {
+    background: #10b981;
+    border-color: #10b981;
+}
+
+.select-checkbox input:checked + .checkmark::after {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 1px;
+    width: 4px;
+    height: 8px;
+    border: solid #ffffff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.select-checkbox input:disabled + .checkmark {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.materials-table tbody tr:hover {
+    background: var(--proyectos-hover-bg);
+}
+
+/* ---- Column widths ---- */
+.col-select { width: 48px; text-align: center; }
+.col-item   { text-align: center; font-weight: 600; }
+.col-cant   { text-align: center; font-weight: 600; }
+.col-und    { text-align: center; }
+.col-desc   { text-align: left; }
+.col-diam   { white-space: nowrap; }
+.col-serie  { white-space: nowrap; }
+.col-mat    { white-space: nowrap; }
+.col-estado { white-space: nowrap; }
+.col-monto  { font-weight: 600; white-space: nowrap; }
+.qty-cell   { text-align: center; font-weight: 600; }
+
+/* Status colors in materials table */
+.materials-table .order-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.materials-table .status-pending  { background: rgba(6, 182, 212, 0.2); color: #06b6d4; }
+.materials-table .status-approved { background: rgba(16, 185, 129, 0.18); color: #10b981; }
+.materials-table .status-paid     { background: rgba(16, 185, 129, 0.18); color: #10b981; }
+.materials-table .status-rejected { background: var(--proyectos-badge-rejected-bg); color: var(--proyectos-badge-rejected-text); }
+
+.materials-table .status-unquoted {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--proyectos-badge-unquoted-bg);
+    color: var(--proyectos-badge-unquoted-text);
+    font-weight: 700;
+    font-size: 11px;
+}
+
+/* Row colors by status */
+.materials-table tr.row-pending  { background: rgba(234, 179, 8, 0.05); }
+.materials-table tr.row-approved { background: rgba(34, 197, 94, 0.05); }
+.materials-table tr.row-paid     { background: rgba(59, 130, 246, 0.05); }
+.materials-table tr.row-rejected { background: rgba(239, 68, 68, 0.05); }
+
+/* Dark mode */
+body.dark-mode .materials-table th {
+    background: #2d3b52;
+    color: #e2e8f0;
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+body.dark-mode .table-scroll-container {
+    background: #0f172a;
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+body.dark-mode .materials-table td {
+    color: var(--proyectos-text-white);
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+    background: rgba(51, 65, 85, 0.3);
+}
+
+body.dark-mode .materials-table tbody tr:hover {
+    background: rgba(51, 65, 85, 0.5);
+}
+
+/* ============================================
+   FILE GROUPS - Collapsible sections
+   ============================================ */
+.file-groups-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.file-group {
+    border: 1px solid var(--proyectos-border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--proyectos-bg-card);
+}
+
+.file-group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--proyectos-bg-light);
+    cursor: pointer;
+    transition: background 0.2s;
+    border-bottom: 1px solid transparent;
+}
+
+.file-group-header:hover { background: var(--proyectos-bg-hover); }
+
+.file-group-header.expanded {
+    border-bottom-color: var(--proyectos-border);
+}
+
+.file-group-header.all-paid {
+    background: rgba(16, 185, 129, 0.1);
+    border-left: 3px solid #10b981;
+}
+
+.file-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.collapse-icon {
+    width: 16px;
+    height: 16px;
+    transition: transform 0.2s;
+    color: var(--proyectos-text-muted);
+}
+
+.file-group-header.expanded .collapse-icon {
+    transform: rotate(90deg);
+}
+
+.file-icon {
+    width: 18px;
+    height: 18px;
+    color: var(--proyectos-primary);
+}
+
+.file-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--proyectos-text);
+}
+
+body.dark-mode .file-name {
+    font-weight: 500;
+    color: var(--proyectos-text-white);
+}
+
+.file-header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.file-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.file-count {
+    font-size: 12px;
+    color: var(--proyectos-text-muted);
+}
+
+.file-status-badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(251, 146, 60, 0.15);
+    color: #fb923c;
+}
+
+.file-status-badge.complete {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+}
+
+.file-status-badge.delivered {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+}
+
+.file-group-content { padding: 0; }
+
+.file-group-content .table-scroll-container {
+    margin: 0;
+    border-radius: 0;
+}
+
+/* Dark mode file groups */
+body.dark-mode .file-group {
+    background: var(--proyectos-bg-dark);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-mode .file-group-header {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+body.dark-mode .file-group-header:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+body.dark-mode .file-group-header.expanded {
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+}
