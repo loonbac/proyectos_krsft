@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 
 $moduleName = basename(dirname(__DIR__));
 $ctrl = "Modulos_ERP\\{$moduleName}\\Controllers\\ProyectoController";
+$pipeCtrl = "Modulos_ERP\\{$moduleName}\\Controllers\\PipelineController";
 
 // Projects
 Route::get('/list', "{$ctrl}@list");
@@ -30,3 +31,37 @@ Route::post('/confirm-file-delivery', "{$ctrl}@confirmFileDelivery");
 // Material import/export
 Route::get('/material-template', "{$ctrl}@downloadMaterialTemplate");
 Route::post('/{id}/import-materials', "{$ctrl}@importMaterials")->where('id', '[0-9]+');
+
+// Finalizar proyecto (liberar materiales apartados → disponible)
+Route::post('/{id}/finalize', "{$ctrl}@finalizeProject")->where('id', '[0-9]+');
+
+// ── Pipeline de Pre-Proyecto ────────────────────────────────────────────
+Route::prefix('pipeline')->group(function () use ($pipeCtrl) {
+    Route::get('/', "{$pipeCtrl}@index");
+    Route::get('/stats', "{$pipeCtrl}@stats");
+    Route::get('/workers', "{$pipeCtrl}@getWorkers");
+    Route::post('/', "{$pipeCtrl}@store");
+    Route::get('/{id}', "{$pipeCtrl}@show")->where('id', '[0-9]+');
+    Route::put('/{id}', "{$pipeCtrl}@update")->where('id', '[0-9]+');
+    Route::delete('/{id}', "{$pipeCtrl}@destroy")->where('id', '[0-9]+');
+
+    // Cambio de etapa
+    Route::post('/{id}/stage', "{$pipeCtrl}@changeStage")->where('id', '[0-9]+');
+
+    // Equipo
+    Route::put('/{id}/team', "{$pipeCtrl}@updateTeam")->where('id', '[0-9]+');
+
+    // Comunicaciones
+    Route::post('/{id}/communications', "{$pipeCtrl}@addCommunication")->where('id', '[0-9]+');
+
+    // Visitas
+    Route::post('/{id}/visits', "{$pipeCtrl}@addVisit")->where('id', '[0-9]+');
+    Route::post('/visits/{visitId}/complete', "{$pipeCtrl}@completeVisit")->where('visitId', '[0-9]+');
+
+    // Presupuestos
+    Route::post('/{id}/budgets', "{$pipeCtrl}@addBudget")->where('id', '[0-9]+');
+    Route::put('/budgets/{budgetId}/status', "{$pipeCtrl}@updateBudgetStatus")->where('budgetId', '[0-9]+');
+
+    // Negociaciones
+    Route::post('/{id}/negotiations', "{$pipeCtrl}@addNegotiation")->where('id', '[0-9]+');
+});

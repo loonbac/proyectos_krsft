@@ -53,8 +53,11 @@ class ProyectoController extends Controller
             return ['role' => 'guest', 'isSupervisor' => false, 'trabajadorId' => null];
         }
 
+        // Detectar admin usando hasRole (compara por slug, no por display name)
+        $isAdmin = $user->isAdmin();
+
         // === SIMULACIÓN DE ROL (solo para admins) ===
-        if ($user->role === 'admin' && request()->has('simulate_role')) {
+        if ($isAdmin && request()->has('simulate_role')) {
             $simulatedRole = request()->input('simulate_role');
             
             if ($simulatedRole === 'supervisor') {
@@ -76,7 +79,7 @@ class ProyectoController extends Controller
         }
 
         // Admin always has full access (sin simulación)
-        if ($user->role === 'admin') {
+        if ($isAdmin) {
             return ['role' => 'admin', 'isSupervisor' => false, 'trabajadorId' => $user->trabajador_id];
         }
 
@@ -114,13 +117,17 @@ class ProyectoController extends Controller
             }
 
             $supervisors = DB::table('trabajadores')
-                ->where('estado', 'LIKE', '%activo%')
-                ->where(function($query) {
-                    $query->where('cargo', 'LIKE', '%supervisor%')
-                          ->orWhere('cargo', 'LIKE', '%Supervisor%');
-                })
-                ->orderBy('nombre_completo')
-                ->get(['id', 'nombre_completo', 'cargo', 'dni', 'email']);
+                ->join('users', 'trabajadores.id', '=', 'users.trabajador_id')
+                ->where('trabajadores.estado', 'LIKE', '%activo%')
+                ->whereRaw('LOWER(trabajadores.cargo) LIKE ?', ['%supervisor%'])
+                ->orderBy('trabajadores.nombre_completo')
+                ->get([
+                    'trabajadores.id',
+                    'trabajadores.nombre_completo as name',
+                    'trabajadores.cargo',
+                    'trabajadores.dni',
+                    'users.email',
+                ]);
 
             return response()->json(['success' => true, 'supervisors' => $supervisors]);
         } catch (\Exception $e) {
@@ -174,9 +181,41 @@ class ProyectoController extends Controller
                 'projects.updated_at',
                 'trabajadores.nombre_completo as supervisor_name',
                 'users.name as creator_name',
-                DB::raw("COALESCE(SUM(CASE WHEN purchase_orders.status = 'approved' THEN COALESCE(purchase_orders.amount_pen, purchase_orders.amount) ELSE 0 END), 0) as spent"),
-                DB::raw("(projects.available_amount - COALESCE(SUM(CASE WHEN purchase_orders.status = 'approved' THEN COALESCE(purchase_orders.amount_pen, purchase_orders.amount) ELSE 0 END), 0)) as remaining"),
-                DB::raw("CASE WHEN projects.available_amount > 0 THEN (COALESCE(SUM(CASE WHEN purchase_orders.status = 'approved' THEN COALESCE(purchase_orders.amount_pen, purchase_orders.amount) ELSE 0 END), 0) / projects.available_amount * 100) ELSE 0 END as usage_percent"),
+                DB::raw("
+                    COALESCE(SUM(CASE WHEN purchase_orders.status = 'approved' THEN
+                        CASE
+                            WHEN projects.currency = 'USD' AND purchase_orders.currency = 'PEN' AND COALESCE(purchase_orders.exchange_rate, 0) > 0
+                                THEN purchase_orders.amount / purchase_orders.exchange_rate
+                            WHEN projects.currency = 'USD' AND purchase_orders.currency = 'USD'
+                                THEN purchase_orders.amount
+                            ELSE COALESCE(purchase_orders.amount_pen, purchase_orders.amount)
+                        END
+                    ELSE 0 END), 0) as spent
+                "),
+                DB::raw("
+                    projects.available_amount - COALESCE(SUM(CASE WHEN purchase_orders.status = 'approved' THEN
+                        CASE
+                            WHEN projects.currency = 'USD' AND purchase_orders.currency = 'PEN' AND COALESCE(purchase_orders.exchange_rate, 0) > 0
+                                THEN purchase_orders.amount / purchase_orders.exchange_rate
+                            WHEN projects.currency = 'USD' AND purchase_orders.currency = 'USD'
+                                THEN purchase_orders.amount
+                            ELSE COALESCE(purchase_orders.amount_pen, purchase_orders.amount)
+                        END
+                    ELSE 0 END), 0) as remaining
+                "),
+                DB::raw("
+                    CASE WHEN projects.available_amount > 0 THEN
+                        COALESCE(SUM(CASE WHEN purchase_orders.status = 'approved' THEN
+                            CASE
+                                WHEN projects.currency = 'USD' AND purchase_orders.currency = 'PEN' AND COALESCE(purchase_orders.exchange_rate, 0) > 0
+                                    THEN purchase_orders.amount / purchase_orders.exchange_rate
+                                WHEN projects.currency = 'USD' AND purchase_orders.currency = 'USD'
+                                    THEN purchase_orders.amount
+                                ELSE COALESCE(purchase_orders.amount_pen, purchase_orders.amount)
+                            END
+                        ELSE 0 END), 0) / projects.available_amount * 100
+                    ELSE 0 END as usage_percent
+                "),
                 DB::raw("SUM(CASE WHEN purchase_orders.status = 'pending' THEN 1 ELSE 0 END) as pending_orders")
             ])
             ->leftJoin('purchase_orders', 'projects.id', '=', 'purchase_orders.project_id')
@@ -254,8 +293,19 @@ class ProyectoController extends Controller
             ->get();
 
         $approvedOrders = $orders->where('status', 'approved');
-        // Use amount_pen if available (for USD converted to PEN), otherwise use amount
-        $spent = $approvedOrders->sum(function ($order) {
+        // Calcular gasto en la moneda del proyecto
+        $projectCurrency = $project->currency ?? 'PEN';
+        $spent = $approvedOrders->sum(function ($order) use ($projectCurrency) {
+            // Si el proyecto es USD y la orden es PEN: convertir PEN a USD
+            if ($projectCurrency === 'USD' && ($order->currency ?? 'PEN') === 'PEN') {
+                $rate = floatval($order->exchange_rate ?? 0);
+                return $rate > 0 ? floatval($order->amount ?? 0) / $rate : 0;
+            }
+            // Si el proyecto es USD y la orden es USD: usar amount directo
+            if ($projectCurrency === 'USD' && ($order->currency ?? 'PEN') === 'USD') {
+                return floatval($order->amount ?? 0);
+            }
+            // Proyecto PEN: usar amount_pen (ya convertido)
             return floatval($order->amount_pen ?? $order->amount ?? 0);
         });
         $remaining = $project->available_amount - $spent;
@@ -412,12 +462,15 @@ class ProyectoController extends Controller
             ];
 
             if ($request->type === 'service') {
-                // Services are auto-approved and go directly
-                $request->validate(['amount' => 'required|numeric|min:0.01']);
-                $orderData['amount'] = floatval($request->amount);
-                $orderData['status'] = 'approved';
-                $orderData['approved_by'] = auth()->id();
-                $orderData['approved_at'] = now();
+                // Services follow same draft→approve→compras flow as materials
+                $orderData['status'] = 'draft';
+                $orderData['supervisor_approved'] = true;
+                $orderData['supervisor_approved_by'] = auth()->id();
+                $orderData['supervisor_approved_at'] = now();
+                $orderData['manager_approved'] = false;
+                // Store service-specific data: time_value as a single-item materials array, location in notes
+                $orderData['materials'] = json_encode([['name' => trim($request->description), 'qty' => intval($request->input('time_value', 1))]]);
+                $orderData['notes'] = $request->input('location', '');
             } else {
                 // Materials created by supervisor start as 'draft'
                 // They need manager approval before going to Compras module
@@ -457,17 +510,37 @@ class ProyectoController extends Controller
         $order = DB::table('purchase_orders')->find($orderId);
 
         if (!$order) {
-            return response()->json(['success' => false, 'message' => 'Orden no encontrada'], 404);
+            return response()->json([
+                'success' => false,
+                'message' => "Orden #{$orderId} no encontrada",
+                'error_code' => 'ORDER_NOT_FOUND'
+            ], 404);
         }
 
         if ($order->status !== 'draft') {
-            return response()->json(['success' => false, 'message' => 'Solo se pueden aprobar órdenes en borrador'], 400);
+            $statusLabels = ['pending' => 'pendiente', 'approved' => 'aprobada', 'rejected' => 'rechazada'];
+            $label = $statusLabels[$order->status] ?? $order->status;
+            return response()->json([
+                'success' => false,
+                'message' => "No se puede aprobar: la orden #{$orderId} ya está {$label}",
+                'error_code' => 'INVALID_STATUS',
+                'current_status' => $order->status
+            ], 400);
         }
 
-        // Check user is manager (Jefe de Proyectos)
+        // Check user is manager (Jefe de Proyectos) or admin
         $userInfo = $this->getUserRoleInfo();
         if ($userInfo['role'] !== 'manager' && $userInfo['role'] !== 'admin') {
-            return response()->json(['success' => false, 'message' => 'No tiene permisos para aprobar materiales'], 403);
+            Log::warning('Intento de aprobación sin permisos', [
+                'user_id' => auth()->id(),
+                'resolved_role' => $userInfo['role'],
+                'order_id' => $orderId
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => "No tiene permisos para aprobar materiales (rol actual: {$userInfo['role']})",
+                'error_code' => 'FORBIDDEN'
+            ], 403);
         }
 
         try {
@@ -486,8 +559,17 @@ class ProyectoController extends Controller
                 'message' => 'Material aprobado y enviado al módulo de Compras'
             ]);
         } catch (\Exception $e) {
-            Log::error('Error en approveMaterialOrder', ['error' => $e->getMessage()]);
-            return response()->json(['success' => false, 'message' => 'Error interno al aprobar material'], 500);
+            Log::error('Error en approveMaterialOrder', [
+                'order_id' => $orderId,
+                'user_id' => auth()->id(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Error interno al aprobar material: ' . $e->getMessage(),
+                'error_code' => 'INTERNAL_ERROR'
+            ], 500);
         }
     }
 
@@ -499,17 +581,32 @@ class ProyectoController extends Controller
         $order = DB::table('purchase_orders')->find($orderId);
 
         if (!$order) {
-            return response()->json(['success' => false, 'message' => 'Orden no encontrada'], 404);
+            return response()->json([
+                'success' => false,
+                'message' => "Orden #{$orderId} no encontrada",
+                'error_code' => 'ORDER_NOT_FOUND'
+            ], 404);
         }
 
         if ($order->status !== 'draft') {
-            return response()->json(['success' => false, 'message' => 'Solo se pueden rechazar órdenes en borrador'], 400);
+            $statusLabels = ['pending' => 'pendiente', 'approved' => 'aprobada', 'rejected' => 'rechazada'];
+            $label = $statusLabels[$order->status] ?? $order->status;
+            return response()->json([
+                'success' => false,
+                'message' => "No se puede rechazar: la orden #{$orderId} ya está {$label}",
+                'error_code' => 'INVALID_STATUS',
+                'current_status' => $order->status
+            ], 400);
         }
 
-        // Check user is manager (Jefe de Proyectos)
+        // Check user is manager (Jefe de Proyectos) or admin
         $userInfo = $this->getUserRoleInfo();
         if ($userInfo['role'] !== 'manager' && $userInfo['role'] !== 'admin') {
-            return response()->json(['success' => false, 'message' => 'No tiene permisos para rechazar materiales'], 403);
+            return response()->json([
+                'success' => false,
+                'message' => "No tiene permisos para rechazar materiales (rol actual: {$userInfo['role']})",
+                'error_code' => 'FORBIDDEN'
+            ], 403);
         }
 
         try {
@@ -529,8 +626,16 @@ class ProyectoController extends Controller
                 'message' => 'Material rechazado'
             ]);
         } catch (\Exception $e) {
-            Log::error('Error en rejectMaterialOrder', ['error' => $e->getMessage()]);
-            return response()->json(['success' => false, 'message' => 'Error interno al rechazar material'], 500);
+            Log::error('Error en rejectMaterialOrder', [
+                'order_id' => $orderId,
+                'user_id' => auth()->id(),
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Error interno al rechazar material: ' . $e->getMessage(),
+                'error_code' => 'INTERNAL_ERROR'
+            ], 500);
         }
     }
 
@@ -746,6 +851,40 @@ class ProyectoController extends Controller
         }
     }
 
+    /**
+     * Finalizar proyecto: libera materiales "Apartado" → "Disponible"
+     * y marca el proyecto como completado.
+     * POST /api/proyectoskrsft/{id}/finalize
+     */
+    public function finalizeProject(Request $request, $id)
+    {
+        $project = DB::table($this->projectsTable)->find($id);
+
+        if (!$project) {
+            return response()->json(['success' => false, 'message' => 'Proyecto no encontrado'], 404);
+        }
+
+        if ($project->status !== 'active') {
+            return response()->json(['success' => false, 'message' => 'Solo se pueden finalizar proyectos activos'], 400);
+        }
+
+        // Verificar permisos (solo manager o admin)
+        $userInfo = $this->getUserRoleInfo();
+        if (!in_array($userInfo['role'], ['manager', 'admin'])) {
+            return response()->json(['success' => false, 'message' => 'No tiene permisos para finalizar proyectos'], 403);
+        }
+
+        try {
+            $crossFlowService = app(\Modulos_ERP\ComprasKrsft\Services\CrossFlowService::class);
+            $result = $crossFlowService->releaseProjectMaterials($id, auth()->id());
+
+            return response()->json($result, $result['success'] ? 200 : 400);
+        } catch (\Exception $e) {
+            Log::error('Error en finalizeProject', ['id' => $id, 'error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Error interno al finalizar proyecto'], 500);
+        }
+    }
+
     public function stats()
     {
         $userInfo = $this->getUserRoleInfo();
@@ -870,20 +1009,35 @@ class ProyectoController extends Controller
                 ->where('project_id', $id)
                 ->where('source_filename', $sourceFilename)
                 ->first();
-            
+
+            // Compute next available sequential name when duplicate detected
+            $proposedFilename = $sourceFilename;
+            if ($existingFile) {
+                $proposedFilename = $this->getNextAvailableFilename($id, $sourceFilename);
+            }
+
+            // Handle rename duplicate FIRST — must run before the check_duplicate
+            // early-return so that when both flags arrive together the rename is
+            // applied and the flow continues to the preview/import stage.
+            if ($existingFile && $request->input('rename_duplicate') === 'true') {
+                // If the frontend sent the proposed name, validate it; otherwise recompute
+                $sourceFilename = $request->input('proposed_filename', $proposedFilename);
+                // Safety: ensure the proposed name is also unique (race condition guard)
+                if (DB::table('purchase_orders')->where('project_id', $id)->where('source_filename', $sourceFilename)->exists()) {
+                    $sourceFilename = $this->getNextAvailableFilename($id, $file->getClientOriginalName());
+                }
+                // Clear $existingFile so the duplicate check below does NOT fire
+                $existingFile = null;
+            }
+
+            // Pure duplicate detection (only when NOT already handling a rename)
             if ($existingFile && $request->input('check_duplicate') === 'true') {
                 return response()->json([
                     'duplicate' => true,
                     'originalFilename' => $sourceFilename,
+                    'proposedFilename' => $proposedFilename,
                     'existingId' => $existingFile->id
                 ]);
-            }
-            
-            // Handle rename duplicate
-            if ($existingFile && $request->input('rename_duplicate') === 'true') {
-                $baseName = pathinfo($sourceFilename, PATHINFO_FILENAME);
-                $extension_file = pathinfo($sourceFilename, PATHINFO_EXTENSION);
-                $sourceFilename = $baseName . ' (2).' . $extension_file;
             }
             
             $rows = [];
@@ -990,6 +1144,36 @@ class ProyectoController extends Controller
             Log::error('Error en importBudget', ['error' => $e->getMessage()]);
             return response()->json(['success' => false, 'message' => 'Error interno al importar presupuesto'], 500);
         }
+    }
+
+    /**
+     * Compute the next available filename for a project when a duplicate is detected.
+     * E.g. "lista.xlsx" → "lista (2).xlsx" → "lista (3).xlsx" etc.
+     */
+    private function getNextAvailableFilename(int $projectId, string $originalFilename): string
+    {
+        $baseName  = pathinfo($originalFilename, PATHINFO_FILENAME);
+        $extension = pathinfo($originalFilename, PATHINFO_EXTENSION);
+
+        // Strip any existing trailing " (N)" to normalise the base for counting
+        $cleanBase = preg_replace('/\s*\(\d+\)$/', '', $baseName);
+
+        // Fetch all source_filenames in this project that share the same base
+        $existing = DB::table('purchase_orders')
+            ->where('project_id', $projectId)
+            ->where('source_filename', 'LIKE', $cleanBase . '%')
+            ->distinct()
+            ->pluck('source_filename')
+            ->toArray();
+
+        // Start at (2) and increment until free
+        $counter = 2;
+        do {
+            $candidate = $cleanBase . ' (' . $counter . ')' . ($extension ? '.' . $extension : '');
+            $counter++;
+        } while (in_array($candidate, $existing, true));
+
+        return $candidate;
     }
 
     /**

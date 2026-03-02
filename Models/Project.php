@@ -57,4 +57,37 @@ class Project extends Model
         if ($usage >= $threshold) return 'warning';
         return 'good';
     }
+
+    /**
+     * Órdenes de compra del proyecto.
+     */
+    public function purchaseOrders()
+    {
+        return $this->hasMany(\Modulos_ERP\ComprasKrsft\Models\PurchaseOrder::class, 'project_id');
+    }
+
+    /**
+     * Materiales de inventario apartados para este proyecto.
+     */
+    public function reservedMaterials()
+    {
+        return $this->hasMany(\Modulos_ERP\InventarioKrsft\Models\Producto::class, 'project_id')
+            ->where('apartado', true);
+    }
+
+    /**
+     * Reservas de inventario activas.
+     */
+    public function inventoryReservations()
+    {
+        return $this->hasMany(\Modulos_ERP\ComprasKrsft\Models\InventoryReservation::class, 'project_id');
+    }
+
+    /**
+     * ¿Se puede finalizar el proyecto?
+     */
+    public function getCanFinalizeAttribute(): bool
+    {
+        return $this->status === 'active';
+    }
 }
