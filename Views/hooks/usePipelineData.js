@@ -1,6 +1,6 @@
 /**
  * @file usePipelineData — Hook de lógica del Pipeline de Pre-Proyecto.
- * Gestiona estado, fetching y CRUD para leads del pipeline.
+ * Gestiona estado, fetching y CRUD para proyectos del pipeline.
  * Acceso restringido a Sub-Gerente, Jefe de Proyectos y Admin.
  */
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -41,7 +41,7 @@ const INITIAL_FORM = {
 
 export { STAGE_ORDER, STAGE_LABELS };
 
-export default function usePipelineData({ showToast, enabled = true }) {
+export default function usePipelineData({ showToast, enabled = true, onProjectCreated }) {
   // ── State ──────────────────────────────────────────────────────────
   const [leads, setLeads] = useState([]);
   const [counts, setCounts] = useState({});
@@ -60,6 +60,11 @@ export default function usePipelineData({ showToast, enabled = true }) {
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [showNegotiationModal, setShowNegotiationModal] = useState(false);
   const [showTeamModal, setShowTeamModal] = useState(false);
+  const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
+
+  // Data
+  const [cecos, setCecos] = useState([]);
+  const [leadForProject, setLeadForProject] = useState(null);
 
   // Forms
   const [createForm, setCreateForm] = useState({ ...INITIAL_FORM });
@@ -121,6 +126,19 @@ export default function usePipelineData({ showToast, enabled = true }) {
     } catch { /* silencio */ }
   }, []);
 
+  const fetchCecos = useCallback(async () => {
+    try {
+      const res = await fetch(`${PIPELINE_API}/cecos/list`, {
+        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+      });
+      const data = await res.json();
+      if (data.success && isMounted.current) {
+        // Usar estructura jerárquica para mostrar en dropdown
+        setCecos(data.hierarchical || []);
+      }
+    } catch { /* silencio */ }
+  }, []);
+
   const fetchLeadDetail = useCallback(async (id) => {
     setLoadingDetail(true);
     try {
@@ -132,7 +150,7 @@ export default function usePipelineData({ showToast, enabled = true }) {
         setLeadDetail(data.lead);
       }
     } catch {
-      showToastRef.current('Error al cargar detalle del lead', 'error');
+      showToastRef.current('Error al cargar detalle del proyecto', 'error');
     } finally {
       if (isMounted.current) setLoadingDetail(false);
     }
@@ -142,9 +160,9 @@ export default function usePipelineData({ showToast, enabled = true }) {
   useEffect(() => {
     if (!enabled) return;
     setLoading(true);
-    Promise.all([fetchLeads(), fetchStats(), fetchWorkers()])
+    Promise.all([fetchLeads(), fetchStats(), fetchWorkers(), fetchCecos()])
       .finally(() => { if (isMounted.current) setLoading(false); });
-  }, [enabled, fetchLeads, fetchStats, fetchWorkers]);
+  }, [enabled, fetchLeads, fetchStats, fetchWorkers, fetchCecos]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -166,7 +184,7 @@ export default function usePipelineData({ showToast, enabled = true }) {
 
   // ── Derived ────────────────────────────────────────────────────────
 
-  /** Leads agrupados por etapa */
+  /** Proyectos agrupados por etapa */
   const leadsByStage = useMemo(() => {
     const grouped = {};
     STAGE_ORDER.forEach((s) => { grouped[s] = []; });
@@ -196,16 +214,16 @@ export default function usePipelineData({ showToast, enabled = true }) {
       });
       const data = await res.json();
       if (data.success) {
-        showToastRef.current('Lead creado correctamente', 'success');
+        showToastRef.current('Proyecto creado correctamente', 'success');
         setShowCreateModal(false);
         setCreateForm({ ...INITIAL_FORM });
         fetchLeads();
         fetchStats();
       } else {
-        showToastRef.current(data.message || 'Error al crear lead', 'error');
+        showToastRef.current(data.message || 'Error al crear proyecto', 'error');
       }
     } catch {
-      showToastRef.current('Error de red al crear lead', 'error');
+      showToastRef.current('Error de red al crear proyecto', 'error');
     } finally {
       if (isMounted.current) setSaving(false);
     }
@@ -219,7 +237,7 @@ export default function usePipelineData({ showToast, enabled = true }) {
       });
       const data = await res.json();
       if (data.success) {
-        showToastRef.current('Lead actualizado', 'success');
+        showToastRef.current('Proyecto actualizado', 'success');
         fetchLeads();
         if (selectedLeadRef.current?.id === id) fetchLeadDetail(id);
       } else {
@@ -235,7 +253,7 @@ export default function usePipelineData({ showToast, enabled = true }) {
       const res = await fetchWithCsrf(`${PIPELINE_API}/${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
-        showToastRef.current('Lead eliminado', 'success');
+        showToastRef.current('Proyecto eliminado', 'success');
         if (selectedLeadRef.current?.id === id) setSelectedLead(null);
         fetchLeads();
         fetchStats();
@@ -250,6 +268,14 @@ export default function usePipelineData({ showToast, enabled = true }) {
   // ── Stage change ───────────────────────────────────────────────────
 
   const changeStage = useCallback(async (id, etapa, motivo = '') => {
+    // Si es cerrado_ganado, abrir modal en lugar de crear automáticamente
+    if (etapa === 'cerrado_ganado') {
+      setLeadForProject(selectedLeadRef.current);
+      setShowCreateProjectModal(true);
+      return;
+    }
+
+    // Para otras etapas, cambio normal
     try {
       const res = await fetchWithCsrf(`${PIPELINE_API}/${id}/stage`, {
         method: 'POST',
@@ -424,12 +450,41 @@ export default function usePipelineData({ showToast, enabled = true }) {
     }
   }, [fetchLeadDetail]);
 
+  // ── Create project from lead ───────────────────────────────────────
+
+  const createProjectFromLeadModal = useCallback(async (leadId, formData) => {
+    try {
+      const res = await fetchWithCsrf(`${PIPELINE_API}/${leadId}/create-project`, {
+        method: 'POST',
+        body: JSON.stringify(formData),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToastRef.current(data.message, 'success');
+        setShowCreateProjectModal(false);
+        setLeadForProject(null);
+        fetchLeads();
+        fetchStats();
+        if (selectedLeadRef.current?.id === leadId) fetchLeadDetail(leadId);
+        // Reload projects list when a project is created from lead
+        if (onProjectCreated) onProjectCreated();
+        return true;
+      } else {
+        showToastRef.current(data.message || 'Error al crear proyecto', 'error');
+        return false;
+      }
+    } catch {
+      showToastRef.current('Error de red', 'error');
+      return false;
+    }
+  }, [fetchLeads, fetchStats, fetchLeadDetail, onProjectCreated]);
+
   // ── Return ─────────────────────────────────────────────────────────
   return {
     // Data
-    leads, counts, pipelineStats, loading, workers,
+    leads, counts, pipelineStats, loading, workers, cecos,
     selectedLead, setSelectedLead,
-    leadDetail, loadingDetail,
+    leadDetail, loadingDetail, leadForProject, setLeadForProject,
     leadsByStage,
     // Modals
     showCreateModal, setShowCreateModal,
@@ -439,6 +494,7 @@ export default function usePipelineData({ showToast, enabled = true }) {
     showBudgetModal, setShowBudgetModal,
     showNegotiationModal, setShowNegotiationModal,
     showTeamModal, setShowTeamModal,
+    showCreateProjectModal, setShowCreateProjectModal,
     // Forms
     createForm, setCreateForm, saving,
     // Actions
@@ -446,7 +502,7 @@ export default function usePipelineData({ showToast, enabled = true }) {
     changeStage, updateTeam,
     addCommunication, addVisit, completeVisit,
     addBudget, updateBudgetStatus,
-    addNegotiation,
+    addNegotiation, createProjectFromLeadModal,
     fetchLeads, fetchStats,
     // Constants
     STAGE_ORDER, STAGE_LABELS,

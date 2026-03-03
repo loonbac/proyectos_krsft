@@ -1,6 +1,6 @@
 /**
  * PipelineModals — Modales del pipeline de pre-proyecto.
- * Incluye: CreateLeadModal, CommunicationModal, VisitModal, BudgetModal,
+ * Incluye: CreateProyectoModal, CommunicationModal, VisitModal, BudgetModal,
  *          NegotiationModal, TeamModal.
  */
 import { useState, useEffect, memo, useCallback } from 'react';
@@ -36,14 +36,14 @@ export const CreateLeadModal = memo(function CreateLeadModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Nuevo Lead — Pipeline"
+      title="Nuevo Proyecto — Pipeline"
       titleIcon={<PlusIcon className="size-5 text-primary" />}
       size="lg"
       footer={
         <>
           <Button variant="danger" onClick={onClose}>Cancelar</Button>
           <Button variant="primary" onClick={onCreate} disabled={saving} loading={saving}>
-            {saving ? 'Creando...' : 'Crear Lead'}
+            {saving ? 'Creando...' : 'Crear Proyecto'}
           </Button>
         </>
       }
@@ -405,6 +405,151 @@ export const TeamModal = memo(function TeamModal({
               </button>
             );
           })}
+        </div>
+      </div>
+    </Modal>
+  );
+});
+// ── CreateProjectFromLeadModal ─────────────────────────────────────────
+
+export const CreateProjectFromLeadModal = memo(function CreateProjectFromLeadModal({
+  open, onClose, lead, cecos, supervisors = [], saving, onCreate,
+}) {
+  const [form, setForm] = useState({
+    abbreviation: '',
+    ceco_id: '',
+    supervisor_id: '',
+  });
+
+  useEffect(() => {
+    if (open) {
+      setForm({ abbreviation: '', ceco_id: '', supervisor_id: '' });
+    }
+  }, [open]);
+
+  const handleCreate = () => {
+    if (!form.abbreviation.trim()) {
+      alert('La abreviatura es requerida');
+      return;
+    }
+    if (!form.ceco_id) {
+      alert('Debes seleccionar un CECO');
+      return;
+    }
+    if (!form.supervisor_id) {
+      alert('Debes seleccionar un supervisor');
+      return;
+    }
+    onCreate(lead.id, form);
+  };
+
+  if (!lead) return null;
+
+  const budget = lead.budgets?.find(b => b.estado === 'aceptado');
+  const totalAmount = budget?.monto_total || lead.presupuesto_estimado;
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Crear Proyecto desde Pre-Proyecto"
+      titleIcon={<CurrencyDollarIcon className="size-5 text-primary" />}
+      size="lg"
+      footer={
+        <>
+          <Button variant="danger" onClick={onClose} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleCreate}
+            disabled={saving || !form.abbreviation.trim() || !form.ceco_id || !form.supervisor_id}
+            loading={saving}
+          >
+            {saving ? 'Creando...' : 'Proyecto a ejecutar'}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {/* Nombre del proyecto - readonly */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Nombre del Proyecto
+          </label>
+          <input
+            type="text"
+            value={lead.nombre_proyecto || ''}
+            disabled
+            className="w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700"
+          />
+        </div>
+
+        {/* Presupuesto - readonly */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Presupuesto que se le otorga
+          </label>
+          <input
+            type="text"
+            value={`${getCurrencySymbol(lead.moneda || 'PEN')} ${totalAmount.toLocaleString('es-PE', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}`}
+            disabled
+            className="w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-900"
+          />
+        </div>
+
+        {/* Abreviatura - editable */}
+        <Input
+          label="Abreviatura del nombre del proyecto"
+          required
+          placeholder=""
+          value={form.abbreviation}
+          onChange={e => setForm({ ...form, abbreviation: e.target.value.replace(/[^A-Za-zÀ-ÿ\s]/g, '') })}
+          maxLength={50}
+        />
+
+        {/* Supervisor del proyecto - select */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Supervisor del Proyecto <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={form.supervisor_id || ''}
+            onChange={e => setForm({ ...form, supervisor_id: parseInt(e.target.value) || '' })}
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary focus:ring-primary"
+          >
+            <option value="">Selecciona un supervisor...</option>
+            {(supervisors || []).map(s => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* CECO - select con jerarquía */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Columna de CECO dependiente <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={form.ceco_id || ''}
+            onChange={e => setForm({ ...form, ceco_id: parseInt(e.target.value) || '' })}
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary focus:ring-primary"
+          >
+            <option value="">Selecciona un CECO...</option>
+            {(cecos || []).map(ceco => (
+              <option
+                key={ceco.id}
+                value={ceco.id}
+              >
+                {ceco.codigo} – {ceco.nombre}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
     </Modal>

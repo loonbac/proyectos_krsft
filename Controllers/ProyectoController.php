@@ -267,7 +267,13 @@ class ProyectoController extends Controller
     {
         $project = DB::table($this->projectsTable)
             ->leftJoin('trabajadores', 'projects.supervisor_id', '=', 'trabajadores.id')
-            ->select('projects.*', 'trabajadores.nombre_completo as supervisor_name')
+            ->leftJoin('cecos', 'projects.ceco_id', '=', 'cecos.id')
+            ->select(
+                'projects.*', 
+                'trabajadores.nombre_completo as supervisor_name',
+                'cecos.codigo as ceco_codigo',
+                'cecos.nombre as ceco_nombre'
+            )
             ->where('projects.id', $id)
             ->first();
 

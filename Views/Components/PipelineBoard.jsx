@@ -1,8 +1,8 @@
 /**
  * PipelineBoard — Vista Kanban del pipeline de pre-proyecto.
- * Muestra leads agrupados por etapa con estadísticas y acciones rápidas.
+ * Muestra proyectos agrupados por etapa con estadísticas y acciones rápidas.
  */
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import clsx from 'clsx';
 import {
   PlusIcon,
@@ -14,6 +14,7 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   ChevronRightIcon,
+  ChevronDownIcon,
   BuildingOfficeIcon,
 } from '@heroicons/react/24/outline';
 import Badge from './ui/Badge';
@@ -24,13 +25,13 @@ import { formatNumber, formatDate, getCurrencySymbol } from '../utils';
 // ── Configuración visual por etapa ──────────────────────────────────────
 
 const STAGE_CONFIG = {
-  ingresado:       { color: 'bg-slate-500',   lightBg: 'bg-slate-50',   border: 'border-slate-200',  badge: 'gray',    icon: PlusIcon },
-  contactado:      { color: 'bg-blue-500',    lightBg: 'bg-blue-50',    border: 'border-blue-200',   badge: 'blue',    icon: PhoneIcon },
-  visitado:        { color: 'bg-purple-500',  lightBg: 'bg-purple-50',  border: 'border-purple-200', badge: 'purple',  icon: MapPinIcon },
-  presupuestado:   { color: 'bg-amber-500',   lightBg: 'bg-amber-50',   border: 'border-amber-200',  badge: 'amber',   icon: CurrencyDollarIcon },
-  negociacion:     { color: 'bg-cyan-500',    lightBg: 'bg-cyan-50',    border: 'border-cyan-200',   badge: 'cyan',    icon: ChatBubbleLeftRightIcon },
-  cerrado_ganado:  { color: 'bg-emerald-500', lightBg: 'bg-emerald-50', border: 'border-emerald-200',badge: 'emerald', icon: CheckCircleIcon },
-  cerrado_perdido: { color: 'bg-red-500',     lightBg: 'bg-red-50',     border: 'border-red-200',    badge: 'red',     icon: XCircleIcon },
+  ingresado: { color: 'bg-slate-500', lightBg: 'bg-slate-50', border: 'border-slate-200', badge: 'gray', icon: PlusIcon },
+  contactado: { color: 'bg-blue-500', lightBg: 'bg-blue-50', border: 'border-blue-200', badge: 'blue', icon: PhoneIcon },
+  visitado: { color: 'bg-purple-500', lightBg: 'bg-purple-50', border: 'border-purple-200', badge: 'purple', icon: MapPinIcon },
+  presupuestado: { color: 'bg-amber-500', lightBg: 'bg-amber-50', border: 'border-amber-200', badge: 'amber', icon: CurrencyDollarIcon },
+  negociacion: { color: 'bg-cyan-500', lightBg: 'bg-cyan-50', border: 'border-cyan-200', badge: 'cyan', icon: ChatBubbleLeftRightIcon },
+  cerrado_ganado: { color: 'bg-emerald-500', lightBg: 'bg-emerald-50', border: 'border-emerald-200', badge: 'emerald', icon: CheckCircleIcon },
+  cerrado_perdido: { color: 'bg-red-500', lightBg: 'bg-red-50', border: 'border-red-200', badge: 'red', icon: XCircleIcon },
 };
 
 const STAGE_LABELS = {
@@ -51,7 +52,7 @@ const PHASES = [
   { label: 'Resultado', stages: ['cerrado_ganado', 'cerrado_perdido'], color: 'text-gray-700', bg: 'bg-gray-50', border: 'border-gray-200' },
 ];
 
-// ── Lead Card ───────────────────────────────────────────────────────────
+// ── Proyecto Card ───────────────────────────────────────────────────────
 
 function LeadCard({ lead, onSelect }) {
   const config = STAGE_CONFIG[lead.etapa] || STAGE_CONFIG.ingresado;
@@ -121,7 +122,7 @@ function StageColumn({ stage, leads, onSelectLead }) {
       </div>
       <div className="flex-1 space-y-2 p-2 overflow-y-auto max-h-[50vh]">
         {leads.length === 0 ? (
-          <p className="py-4 text-center text-xs text-gray-400">Sin leads</p>
+          <p className="py-4 text-center text-xs text-gray-400">Sin proyectos</p>
         ) : (
           leads.map((lead) => (
             <LeadCard key={lead.id} lead={lead} onSelect={onSelectLead} />
@@ -138,14 +139,14 @@ function PipelineStats({ stats }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <StatsCard
-        title="Leads Activos"
+        title="Proyectos Activos"
         value={stats.active_leads ?? 0}
         icon={<UserGroupIcon className="size-8" />}
         iconBg="bg-blue-100"
         iconColor="text-blue-600"
       />
       <StatsCard
-        title="Total Leads"
+        title="Total Proyectos"
         value={stats.total_leads ?? 0}
         icon={<PlusIcon className="size-8" />}
         iconBg="bg-gray-100"
@@ -182,6 +183,15 @@ function PipelineStats({ stats }) {
  * }} props
  */
 function PipelineBoard({ leadsByStage, counts, pipelineStats, loading, onSelectLead, onNewLead }) {
+  // All phases collapsed by default
+  const [collapsed, setCollapsed] = useState(
+    Object.fromEntries(PHASES.map((p) => [p.label, true])),
+  );
+
+  const togglePhase = (label) => {
+    setCollapsed((prev) => ({ ...prev, [label]: !prev[label] }));
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
@@ -189,7 +199,7 @@ function PipelineBoard({ leadsByStage, counts, pipelineStats, loading, onSelectL
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
         </svg>
-        <p className="mt-4 text-sm text-gray-500">Cargando pipeline...</p>
+        <p className="mt-4 text-sm text-gray-500">Cargando proyectos...</p>
       </div>
     );
   }
@@ -200,11 +210,11 @@ function PipelineBoard({ leadsByStage, counts, pipelineStats, loading, onSelectL
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-gray-900">Pipeline de Pre-Proyecto</h2>
-          <p className="text-sm text-gray-500">Gestión de leads y oportunidades antes del inicio formal del proyecto</p>
+          <p className="text-sm text-gray-500">Gestión de proyectos en evaluación antes del inicio formal</p>
         </div>
-        <Button variant="primary" size="sm" onClick={onNewLead} className="gap-1.5">
-          <PlusIcon className="size-4" />
-          Nuevo Lead
+        <Button variant="primary" size="md" onClick={onNewLead} className="gap-2 text-sm">
+          <PlusIcon className="size-5" />
+          INICIAR PROYECTO
         </Button>
       </div>
 
@@ -212,30 +222,73 @@ function PipelineBoard({ leadsByStage, counts, pipelineStats, loading, onSelectL
       <PipelineStats stats={pipelineStats} />
 
       {/* Board by Phases */}
-      {PHASES.map((phase) => (
-        <div key={phase.label} className="space-y-2">
-          <div className={clsx('flex items-center gap-2 rounded-md px-3 py-1.5', phase.bg, phase.border, 'border')}>
-            <span className={clsx('text-xs font-bold uppercase tracking-wider', phase.color)}>{phase.label}</span>
+      {PHASES.map((phase) => {
+        const isCollapsed = !!collapsed[phase.label];
+        const totalLeads = phase.stages.reduce(
+          (sum, stage) => sum + (leadsByStage[stage]?.length ?? 0),
+          0,
+        );
+
+        return (
+          <div key={phase.label} className="space-y-2">
+            {/* Phase header — clickable toggle */}
+            <button
+              type="button"
+              onClick={() => togglePhase(phase.label)}
+              className={clsx(
+                'flex w-full items-center justify-between rounded-md px-3 py-1.5 border transition-all duration-150',
+                phase.bg,
+                phase.border,
+                'hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-offset-1',
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <ChevronDownIcon
+                  className={clsx(
+                    'size-4 transition-transform duration-200',
+                    phase.color,
+                    isCollapsed ? '-rotate-90' : 'rotate-0',
+                  )}
+                />
+                <span className={clsx('text-xs font-bold uppercase tracking-wider', phase.color)}>
+                  {phase.label}
+                </span>
+              </div>
+              {isCollapsed && totalLeads > 0 && (
+                <span className={clsx('text-xs font-semibold rounded-full px-2 py-0.5 bg-white/60', phase.color)}>
+                  {totalLeads} proyecto{totalLeads !== 1 ? 's' : ''}
+                </span>
+              )}
+            </button>
+
+            {/* Phase content — collapsible */}
+            {!isCollapsed && (
+              <div
+                className={clsx(
+                  'grid gap-3',
+                  phase.stages.length === 1
+                    ? 'grid-cols-1'
+                    : phase.stages.length === 2
+                      ? 'grid-cols-1 sm:grid-cols-2'
+                      : 'grid-cols-1 sm:grid-cols-3',
+                )}
+              >
+                {phase.stages.map((stage) => (
+                  <StageColumn
+                    key={stage}
+                    stage={stage}
+                    leads={leadsByStage[stage] || []}
+                    onSelectLead={onSelectLead}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-          <div className={clsx(
-            'grid gap-3',
-            phase.stages.length === 1 ? 'grid-cols-1' :
-            phase.stages.length === 2 ? 'grid-cols-1 sm:grid-cols-2' :
-            'grid-cols-1 sm:grid-cols-3'
-          )}>
-            {phase.stages.map((stage) => (
-              <StageColumn
-                key={stage}
-                stage={stage}
-                leads={leadsByStage[stage] || []}
-                onSelectLead={onSelectLead}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
 export default memo(PipelineBoard);
+

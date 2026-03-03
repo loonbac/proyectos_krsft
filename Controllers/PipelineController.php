@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Modulos_ERP\CecosKrsft\Services\CecoHierarchyService;
 
 /**
  * PipelineController — Gestión del pipeline de pre-proyecto.
@@ -385,6 +386,107 @@ class PipelineController extends Controller
     }
 
     /**
+     * Crear proyecto desde lead (llamado desde modal con abreviatura y CECO)
+     */
+    public function createProjectFromLeadModal(Request $request, $id)
+    {
+        if (!$this->checkPipelineAccess()) return $this->denyAccess();
+
+        $lead = DB::table($this->pipelineTable)->find($id);
+        if (!$lead) return response()->json(['success' => false, 'message' => 'Lead no encontrado'], 404);
+
+        if ($lead->etapa === 'cerrado_ganado') {
+            return response()->json(['success' => false, 'message' => 'Este lead ya ha sido convertido a proyecto'], 422);
+        }
+
+        // Validar que tenga presupuesto aceptado
+        $acceptedBudget = DB::table($this->budgetsTable)
+            ->where('pipeline_id', $lead->id)
+            ->where('estado', 'aceptado')
+            ->orderByDesc('version')
+            ->first();
+
+        if (!$acceptedBudget) {
+            return response()->json(['success' => false, 'message' => 'Debe tener un presupuesto aceptado para crear el proyecto'], 422);
+        }
+
+        $request->validate([
+            'abbreviation'  => 'required|string|max:50',
+            'ceco_id'       => 'required|integer|exists:cecos,id',
+            'supervisor_id' => 'required|integer|exists:trabajadores,id',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            // Obtener el CECO padre seleccionado
+            $parentCeco = DB::table('cecos')->find($request->ceco_id);
+            if (!$parentCeco || $parentCeco->nivel != 0 || $parentCeco->parent_id !== null) {
+                throw new \Exception('El CECO seleccionado debe ser un CECO padre válido');
+            }
+
+            // Crear el proyecto con el supervisor seleccionado
+            $projectId = $this->createProjectFromLead($lead, $request->input('supervisor_id'));
+
+            // Crear CECO automático usando la abreviatura del proyecto como nombre
+            /** @var CecoHierarchyService $cecoHierarchyService */
+            $cecoHierarchyService = app(CecoHierarchyService::class);
+            $cecoResult = $cecoHierarchyService->createWithSubcuentas([
+                'nombre' => $request->abbreviation, // Usar abreviatura como nombre
+                'razon_social' => $lead->cliente_empresa ?? null,
+                'descripcion' => $lead->descripcion ?? null,
+                'tipo_cliente' => $parentCeco->codigo, // Usar código del CECO padre
+                'estado' => true,
+            ], auth()->id());
+
+            $createdCecoId = $cecoResult['cliente']->id;
+            $createdCecoCode = $cecoResult['codigo_generado'] ?? null;
+
+            // Actualizar proyecto con abreviatura y ceco_id
+            DB::table('projects')
+                ->where('id', $projectId)
+                ->update([
+                    'abbreviation' => $request->abbreviation,
+                    'ceco_id'      => $createdCecoId,
+                    'updated_at'   => now(),
+                ]);
+
+            // Actualizar lead a cerrado_ganado
+            DB::table($this->pipelineTable)
+                ->where('id', $id)
+                ->update([
+                    'etapa'      => 'cerrado_ganado',
+                    'project_id' => $projectId,
+                    'updated_at' => now(),
+                ]);
+
+            // Registrar cambio en historial
+            DB::table($this->historyTable)->insert([
+                'pipeline_id'    => $id,
+                'etapa_anterior' => $lead->etapa,
+                'etapa_nueva'    => 'cerrado_ganado',
+                'motivo'         => "Convertido a proyecto #{$projectId}: {$request->abbreviation}" . ($createdCecoCode ? " | CECO {$createdCecoCode}" : ''),
+                'cambiado_por'   => auth()->id(),
+                'created_at'     => now(),
+                'updated_at'     => now(),
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success'    => true,
+                'message'    => 'Proyecto creado exitosamente con CECO automático',
+                'project_id' => $projectId,
+                'ceco_id'    => $createdCecoId,
+                'ceco_code'  => $createdCecoCode,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error creando proyecto desde lead', ['error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Error al crear el proyecto'], 500);
+        }
+    }
+
+    /**
      * Validar que la transición sea permitida.
      */
     protected function validateTransition($lead, string $from, string $to): ?string
@@ -454,7 +556,7 @@ class PipelineController extends Controller
      * Crear proyecto automáticamente desde un lead ganado.
      * Usa el presupuesto aceptado como base del monto del proyecto.
      */
-    protected function createProjectFromLead(object $lead): int
+    protected function createProjectFromLead(object $lead, ?int $supervisorId = null): int
     {
         $retentionRate = 0.12;
         $availableRate = 0.88;
@@ -474,10 +576,13 @@ class PipelineController extends Controller
         $retainedAmount = $totalAmount * $retentionRate;
         $availableAmount = $totalAmount * $availableRate;
 
-        // Obtener el primer miembro del equipo como supervisor
-        $firstTeamMember = DB::table($this->teamTable)
-            ->where('pipeline_id', $lead->id)
-            ->first();
+        // Si no se pasa supervisor, usar el primer miembro del equipo
+        if (!$supervisorId) {
+            $firstTeamMember = DB::table($this->teamTable)
+                ->where('pipeline_id', $lead->id)
+                ->first();
+            $supervisorId = $firstTeamMember ? $firstTeamMember->trabajador_id : null;
+        }
 
         $projectId = DB::table('projects')->insertGetId([
             'name'               => $lead->nombre_proyecto,
@@ -489,7 +594,7 @@ class PipelineController extends Controller
             'spending_threshold' => 75,
             'igv_enabled'        => $igvEnabled,
             'igv_rate'           => $igvRate,
-            'supervisor_id'      => $firstTeamMember ? $firstTeamMember->trabajador_id : null,
+            'supervisor_id'      => $supervisorId,
             'user_id'            => auth()->id(),
             'status'             => 'active',
             'created_at'         => now(),
@@ -739,6 +844,72 @@ class PipelineController extends Controller
             ->get();
 
         return response()->json(['success' => true, 'workers' => $workers]);
+    }
+
+    /**
+     * Obtener CECOs disponibles para asignación a proyectos (con estructura jerárquica)
+     */
+    public function getCecos()
+    {
+        try {
+            if (!DB::getSchemaBuilder()->hasTable('cecos')) {
+                return response()->json([
+                    'success' => true, 
+                    'cecos' => [], 
+                    'hierarchical' => []
+                ]);
+            }
+
+            // Obtener todos los CECOs padres (nivel 0, sin parent_id, sin tipo_subcuenta)
+            $cecos = DB::table('cecos')
+                ->select('id', 'codigo', 'nombre', 'razon_social')
+                ->where('nivel', 0)
+                ->whereNull('parent_id')
+                ->whereNull('tipo_subcuenta')
+                ->orderBy('codigo')
+                ->get()
+                ->map(function($ceco) {
+                    return [
+                        'id' => $ceco->id,
+                        'codigo' => $ceco->codigo,
+                        'nombre' => $ceco->nombre,
+                        'razon_social' => $ceco->razon_social,
+                        'nivel' => 0,
+                    ];
+                })
+                ->toArray();
+
+            return response()->json([
+                'success' => true, 
+                'cecos' => array_values($cecos),
+                'hierarchical' => array_values($cecos),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error en getCecos', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false, 
+                'cecos' => [], 
+                'hierarchical' => [], 
+                'message' => 'Error interno'
+            ]);
+        }
+    }
+
+    /**
+     * Construir árbol de CECOs recursivamente
+     */
+    private function buildCecoTree($ceco, $allCecos, $level = 0)
+    {
+        $children = $allCecos->filter(fn($c) => $c->parent_id === $ceco->id)->values();
+        
+        return [
+            'id' => $ceco->id,
+            'codigo' => $ceco->codigo,
+            'nombre' => $ceco->nombre,
+            'razon_social' => $ceco->razon_social,
+            'nivel' => $level,
+            'children' => $children->map(fn($child) => $this->buildCecoTree($child, $allCecos, $level + 1))->toArray(),
+        ];
     }
 
     // ── Estadísticas del pipeline ───────────────────────────────────────

@@ -5,7 +5,7 @@ import { useDrawingArea } from '@mui/x-charts/hooks';
 import { styled } from '@mui/material/styles';
 import {
   formatNumber, getCurrencySymbol, getProjectStateClass,
-  getProjectStateLabel, canFinalizeProject,
+  getProjectStateLabel, canFinalizeProject, getProjectColor,
 } from '../utils';
 
 const StyledText = styled('text')(() => ({
@@ -49,13 +49,21 @@ function StatsPanel({
   const cur = getCurrencySymbol(project.currency);
   const isCompleted = getProjectStateClass(project) === 'completed';
   const total = parseFloat(project.total_amount || 0);
+  const projectColor = getProjectColor(project.id);
 
   const rows = [
-    { label: 'Monto Adjudicado', value: formatNumber(project.total_amount), color: 'text-amber-600' },
-    { label: 'Retenido', value: formatNumber(project.retained_amount), color: 'text-gray-400' },
-    { label: 'Real Disponible', value: formatNumber(parseFloat(project.total_amount || 0) - parseFloat(project.retained_amount || 0)), color: 'text-emerald-600' },
-    { label: 'Gastado', value: formatNumber(projectSummary.spent), color: 'text-amber-500' },
-    { label: 'Disponible Actual', value: formatNumber(projectSummary.remaining || project.available_amount), color: 'text-blue-600' },
+    { label: 'Monto Adjudicado', value: formatNumber(project.total_amount), color: 'text-amber-600', isCurrency: true },
+    { label: 'Retenido', value: formatNumber(project.retained_amount), color: 'text-gray-400', isCurrency: true },
+    { label: 'Real Disponible', value: formatNumber(parseFloat(project.total_amount || 0) - parseFloat(project.retained_amount || 0)), color: 'text-emerald-600', isCurrency: true },
+    { label: 'Gastado', value: formatNumber(projectSummary.spent), color: 'text-amber-500', isCurrency: true },
+    { label: 'Disponible Actual', value: formatNumber(projectSummary.remaining || project.available_amount), color: 'text-blue-600', isCurrency: true },
+    ...(project.ceco_codigo ? [{ 
+      label: 'CECOs', 
+      value: `${project.abbreviation || project.ceco_nombre} – ${project.ceco_codigo}`, 
+      isCurrency: false,
+      isPill: true,
+      pillColor: projectColor
+    }] : []),
   ];
 
   const pieData = useMemo(() => {
@@ -104,7 +112,20 @@ function StatsPanel({
           {rows.map((row, i) => (
             <div key={i} className="flex items-center justify-between border-b border-gray-50 pb-2 last:border-0">
               <span className="text-sm text-gray-500">{row.label}</span>
-              <span className={`text-sm font-semibold ${row.color}`}>{cur} {row.value}</span>
+              {row.isPill ? (
+                <span 
+                  className="inline-flex items-center rounded-full px-4 py-1.5 text-xs font-semibold text-white"
+                  style={{ 
+                    backgroundColor: row.pillColor
+                  }}
+                >
+                  {row.value}
+                </span>
+              ) : (
+                <span className={`text-sm font-semibold ${row.color}`}>
+                  {row.isCurrency !== false ? cur + ' ' : ''}{row.value}
+                </span>
+              )}
             </div>
           ))}
 

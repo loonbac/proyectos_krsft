@@ -60,7 +60,11 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
 
   // Pipeline hook — siempre se invoca (regla de hooks), enabled controla fetching
   const showToastFn = useCallback((msg, type) => d.setToast({ show: true, message: msg, type }), [d.setToast]);
-  const pipe = usePipelineData({ showToast: showToastFn, enabled: canSeePipeline });
+  const pipe = usePipelineData({
+    showToast: showToastFn,
+    enabled: canSeePipeline,
+    onProjectCreated: d.loadProjects
+  });
 
   // Navigation: 'pipeline' | 'projects' | 'project-detail' | 'lead-detail'
   const [activeTab, setActiveTab] = useState(isSupervisor ? 'projects' : 'pipeline');
@@ -76,7 +80,7 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
 
   // ── Render view ──
   const renderView = () => {
-    // ─── Lead Detail ───
+    // ─── Detalle de Pre-Proyecto ───
     if (activeTab === 'lead-detail' && canSeePipeline) {
       return (
         <PipelineDetail
@@ -92,6 +96,12 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
           onOpenBudgetModal={() => pipe.setShowBudgetModal(true)}
           onUpdateBudgetStatus={pipe.updateBudgetStatus}
           onOpenNegotiationModal={() => pipe.setShowNegotiationModal(true)}
+          cecos={pipe.cecos}
+          supervisors={d.supervisors}
+          showCreateProjectModal={pipe.showCreateProjectModal}
+          setShowCreateProjectModal={pipe.setShowCreateProjectModal}
+          onCreateProjectFromLead={pipe.createProjectFromLeadModal}
+          savingProject={pipe.saving}
         />
       );
     }
@@ -223,7 +233,7 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
             <p className="mt-2 text-sm text-gray-500">
               {isSupervisor
                 ? 'Espera a que te asignen un proyecto'
-                : 'Los proyectos se crean automáticamente cuando un lead del pipeline se cierra como ganado.'}
+                : 'Los proyectos se crean automáticamente cuando un pre-proyecto del pipeline se cierra como ganado.'}
             </p>
           </div>
         ) : (
@@ -276,11 +286,10 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
                 role="tab"
                 aria-selected={activeTab === 'pipeline'}
                 onClick={goToPipeline}
-                className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-                  activeTab === 'pipeline'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-gray-600 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === 'pipeline'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-gray-600 hover:text-gray-700 hover:border-gray-300'
+                  }`}
               >
                 <FunnelIcon className="size-4" />
                 Pre-Proyectos
@@ -294,11 +303,10 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
                 role="tab"
                 aria-selected={activeTab === 'projects'}
                 onClick={goToProjects}
-                className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-                  activeTab === 'projects'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-gray-600 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === 'projects'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-gray-600 hover:text-gray-700 hover:border-gray-300'
+                  }`}
               >
                 <RocketLaunchIcon className="size-4" />
                 Proyectos Iniciados

@@ -40,6 +40,7 @@ Route::prefix('pipeline')->group(function () use ($pipeCtrl) {
     Route::get('/', "{$pipeCtrl}@index");
     Route::get('/stats', "{$pipeCtrl}@stats");
     Route::get('/workers', "{$pipeCtrl}@getWorkers");
+    Route::get('/cecos/list', "{$pipeCtrl}@getCecos");
     Route::post('/', "{$pipeCtrl}@store");
     Route::get('/{id}', "{$pipeCtrl}@show")->where('id', '[0-9]+');
     Route::put('/{id}', "{$pipeCtrl}@update")->where('id', '[0-9]+');
@@ -47,6 +48,9 @@ Route::prefix('pipeline')->group(function () use ($pipeCtrl) {
 
     // Cambio de etapa
     Route::post('/{id}/stage', "{$pipeCtrl}@changeStage")->where('id', '[0-9]+');
+
+    // Crear proyecto desde lead (con modal: abreviatura + CECO)
+    Route::post('/{id}/create-project', "{$pipeCtrl}@createProjectFromLeadModal")->where('id', '[0-9]+');
 
     // Equipo
     Route::put('/{id}/team', "{$pipeCtrl}@updateTeam")->where('id', '[0-9]+');

@@ -26,6 +26,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
+import { CreateProjectFromLeadModal } from './modals/PipelineModals';
 import { formatNumber, formatDate, getCurrencySymbol } from '../utils';
 
 // ── Stage config ────────────────────────────────────────────────────────
@@ -135,6 +136,12 @@ function Section({ title, icon: Icon, badge, children, actions }) {
  *   onOpenBudgetModal: Function,
  *   onUpdateBudgetStatus: Function,
  *   onOpenNegotiationModal: Function,
+ *   cecos: Array,
+ *   supervisors: Array,
+ *   showCreateProjectModal: boolean,
+ *   setShowCreateProjectModal: Function,
+ *   onCreateProjectFromLead: Function,
+ *   savingProject: boolean,
  * }} props
  */
 function PipelineDetail({
@@ -150,6 +157,12 @@ function PipelineDetail({
   onOpenBudgetModal,
   onUpdateBudgetStatus,
   onOpenNegotiationModal,
+  cecos = [],
+  supervisors = [],
+  showCreateProjectModal = false,
+  setShowCreateProjectModal = () => { },
+  onCreateProjectFromLead = () => { },
+  savingProject = false,
 }) {
   const [showHistory, setShowHistory] = useState(false);
   const isClosed = lead?.etapa === 'cerrado_ganado' || lead?.etapa === 'cerrado_perdido';
@@ -537,6 +550,17 @@ function PipelineDetail({
           )}
         </div>
       )}
+
+      {/* ── Create Project Modal ── */}
+      <CreateProjectFromLeadModal
+        open={showCreateProjectModal}
+        onClose={() => setShowCreateProjectModal(false)}
+        lead={lead}
+        cecos={cecos}
+        supervisors={supervisors}
+        saving={savingProject}
+        onCreate={onCreateProjectFromLead}
+      />
     </div>
   );
 }
