@@ -2,8 +2,11 @@
  * PipelineDetail — Vista detallada de un lead del pipeline.
  * Muestra todas las secciones de gestión por etapa con herramientas para cada fase.
  */
-import { memo, useState, Fragment } from 'react';
+import { memo, useState } from 'react';
 import clsx from 'clsx';
+import { ProgressIndicator, ProgressStep } from '@carbon/react';
+import '@carbon/styles/css/styles.css';
+import './PipelineDetailProgress.css';
 import {
   ArrowLeftIcon,
   UserGroupIcon,
@@ -22,7 +25,6 @@ import {
   EnvelopeIcon,
   CalendarDaysIcon,
   DocumentTextIcon,
-  ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
@@ -62,42 +64,65 @@ const BUDGET_STATUS_LABEL = { borrador: 'Borrador', enviado: 'Enviado', aceptado
 const NEG_TYPE_LABEL = { observacion: 'Observación', contraoferta: 'Contraoferta', acuerdo: 'Acuerdo', rechazo: 'Rechazo', otro: 'Otro' };
 const NEG_TYPE_BADGE = { observacion: 'gray', contraoferta: 'amber', acuerdo: 'emerald', rechazo: 'red', otro: 'blue' };
 
+const STAGE_PROGRESS_META = {
+  ingresado: {
+    icon: PlusIcon,
+    iconClass: 'text-slate-600',
+  },
+  contactado: {
+    icon: PhoneIcon,
+    iconClass: 'text-blue-600',
+  },
+  visitado: {
+    icon: MapPinIcon,
+    iconClass: 'text-purple-600',
+  },
+  presupuestado: {
+    icon: CurrencyDollarIcon,
+    iconClass: 'text-amber-600',
+  },
+  negociacion: {
+    icon: ChatBubbleLeftRightIcon,
+    iconClass: 'text-cyan-600',
+  },
+  cerrado_ganado: {
+    icon: CheckCircleIcon,
+    iconClass: 'text-emerald-600',
+  },
+};
+
 // ── Stage Progress Bar ──────────────────────────────────────────────────
 
 function StageProgressBar({ currentStage }) {
   const mainStages = STAGE_ORDER.filter(s => s !== 'cerrado_perdido');
-  const currentIdx = mainStages.indexOf(currentStage);
   const isLost = currentStage === 'cerrado_perdido';
+  const currentIdx = isLost ? 0 : Math.max(mainStages.indexOf(currentStage), 0);
 
   return (
-    <div className="flex items-center gap-1">
-      {mainStages.map((stage, idx) => {
-        const isActive = stage === currentStage;
-        const isPast = !isLost && idx < currentIdx;
-        const isFuture = !isLost && idx > currentIdx;
+    <div className="w-full rounded-xl border border-primary-100 bg-white px-4 py-4 shadow-sm">
+      <ProgressIndicator currentIndex={currentIdx} spaceEqually className="pipeline-progress-indicator">
+        {mainStages.map((stage, idx) => {
+          const meta = STAGE_PROGRESS_META[stage];
+          const Icon = meta.icon;
 
-        return (
-          <Fragment key={stage}>
-            <div
-              className={clsx(
-                'flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors',
-                isActive && !isLost && 'bg-primary text-white',
-                isLost && isActive && 'bg-red-500 text-white',
-                isPast && 'bg-emerald-100 text-emerald-700',
-                isFuture && 'bg-gray-100 text-gray-400',
-                !isActive && !isPast && !isFuture && 'bg-gray-100 text-gray-400',
+          return (
+            <ProgressStep
+              key={stage}
+              complete={!isLost && idx < currentIdx}
+              current={!isLost && idx === currentIdx}
+              invalid={isLost && idx === mainStages.length - 1}
+              label={(
+                <span className="pipeline-step-label">
+                  <Icon className={clsx('pipeline-step-icon size-3.5', meta.iconClass)} />
+                  <span className="pipeline-step-label-text">{STAGE_LABELS[stage]}</span>
+                </span>
               )}
-              title={STAGE_LABELS[stage]}
-            >
-              {isPast && <CheckCircleIcon className="size-3" />}
-              {STAGE_LABELS[stage]}
-            </div>
-            {idx < mainStages.length - 1 && (
-              <ChevronRightIcon className={clsx('size-3', isPast ? 'text-emerald-400' : 'text-gray-300')} />
-            )}
-          </Fragment>
-        );
-      })}
+              secondaryLabel={isLost && idx === mainStages.length - 1 ? STAGE_LABELS.cerrado_perdido : undefined}
+              description={`Etapa ${idx + 1}: ${STAGE_LABELS[stage]}`}
+            />
+          );
+        })}
+      </ProgressIndicator>
     </div>
   );
 }
@@ -180,8 +205,7 @@ function PipelineDetail({
   }
 
   // Determine next stage for quick advance
-  const currentIdx = STAGE_ORDER.indexOf(lead.etapa);
-  const nextStage = currentIdx < 4 ? STAGE_ORDER[currentIdx + 1] : null;
+  const canClose = lead.etapa === 'negociacion' || lead.etapa === 'presupuestado';
 
   return (
     <div className="space-y-5">
@@ -203,6 +227,18 @@ function PipelineDetail({
           <Badge variant={STAGE_BADGE[lead.etapa]} className="text-sm px-3 py-1">
             {STAGE_LABELS[lead.etapa]}
           </Badge>
+          {canClose && (
+            <>
+              <Button variant="success" size="sm" onClick={() => onChangeStage(lead.id, 'cerrado_ganado')} className="gap-1">
+                <CheckCircleIcon className="size-3.5" />
+                Cerrar Ganado
+              </Button>
+              <Button variant="danger" size="sm" onClick={() => onChangeStage(lead.id, 'cerrado_perdido')} className="gap-1">
+                <XCircleIcon className="size-3.5" />
+                Cerrar Perdido
+              </Button>
+            </>
+          )}
           {!isClosed && (
             <button
               onClick={() => onDelete(lead.id)}
@@ -219,31 +255,6 @@ function PipelineDetail({
       <div className="overflow-x-auto pb-1">
         <StageProgressBar currentStage={lead.etapa} />
       </div>
-
-      {/* ── Quick Actions ── */}
-      {!isClosed && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-4 py-3">
-          <span className="text-xs font-medium text-primary-700 mr-2">Acciones rápidas:</span>
-          {nextStage && (
-            <Button variant="primary" size="sm" onClick={() => onChangeStage(lead.id, nextStage)} className="gap-1">
-              <ArrowPathIcon className="size-3.5" />
-              Avanzar a {STAGE_LABELS[nextStage]}
-            </Button>
-          )}
-          {(lead.etapa === 'negociacion' || lead.etapa === 'presupuestado') && (
-            <>
-              <Button variant="success" size="sm" onClick={() => onChangeStage(lead.id, 'cerrado_ganado')} className="gap-1">
-                <CheckCircleIcon className="size-3.5" />
-                Cerrar Ganado
-              </Button>
-              <Button variant="danger" size="sm" onClick={() => onChangeStage(lead.id, 'cerrado_perdido')} className="gap-1">
-                <XCircleIcon className="size-3.5" />
-                Cerrar Perdido
-              </Button>
-            </>
-          )}
-        </div>
-      )}
 
       {/* ── Info general ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

@@ -8,11 +8,17 @@ import {
   PlusIcon,
   PhoneIcon,
   MapPinIcon,
+  ClockIcon,
   CurrencyDollarIcon,
   ChatBubbleLeftRightIcon,
   UserGroupIcon,
   CheckIcon,
 } from '@heroicons/react/24/outline';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
+import dayjs from 'dayjs';
+import 'dayjs/locale/es';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
@@ -172,21 +178,24 @@ export const CommunicationModal = memo(function CommunicationModal({
 export const VisitModal = memo(function VisitModal({
   open, onClose, onSubmit, leadId, workers,
 }) {
-  const [form, setForm] = useState({
-    fecha_programada: '', direccion: '', observaciones: '', asignado_a: '',
-  });
+  const [datetime, setDatetime] = useState(null);
+  const [fields, setFields] = useState({ direccion: '', observaciones: '', asignado_a: '' });
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = useCallback(async () => {
-    if (!form.fecha_programada) return;
+    if (!datetime?.isValid()) return;
     setSaving(true);
-    const ok = await onSubmit(leadId, form);
+    const ok = await onSubmit(leadId, {
+      fecha_programada: datetime.format('YYYY-MM-DDTHH:mm'),
+      ...fields,
+    });
     setSaving(false);
     if (ok) {
-      setForm({ fecha_programada: '', direccion: '', observaciones: '', asignado_a: '' });
+      setDatetime(null);
+      setFields({ direccion: '', observaciones: '', asignado_a: '' });
       onClose();
     }
-  }, [form, leadId, onSubmit, onClose]);
+  }, [datetime, fields, leadId, onSubmit, onClose]);
 
   return (
     <Modal
@@ -197,20 +206,50 @@ export const VisitModal = memo(function VisitModal({
       footer={
         <>
           <Button variant="danger" onClick={onClose}>Cancelar</Button>
-          <Button variant="primary" onClick={handleSubmit} disabled={saving || !form.fecha_programada} loading={saving}>Programar</Button>
+          <Button variant="primary" onClick={handleSubmit} disabled={saving || !datetime?.isValid()} loading={saving}>Programar</Button>
         </>
       }
     >
       <div className="space-y-4">
-        <Input label="Fecha y hora programada" required type="datetime-local" value={form.fecha_programada} onChange={e => setForm({ ...form, fecha_programada: e.target.value })} />
-        <Input label="Dirección" value={form.direccion} onChange={e => setForm({ ...form, direccion: e.target.value })} placeholder="Dirección de la visita" />
-        <Select label="Asignar a" value={form.asignado_a} onChange={e => setForm({ ...form, asignado_a: e.target.value })}
-          options={workers.map(w => ({ value: w.id, label: `${w.nombre_completo} — ${w.cargo}` }))}
+        <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
+          <DateTimePicker
+            label="Fecha y hora programada"
+            value={datetime}
+            onChange={(newValue) => setDatetime(newValue)}
+            views={['year', 'month', 'day', 'hours', 'minutes']}
+            slotProps={{
+              textField: {
+                fullWidth: true,
+                size: 'small',
+                required: true,
+              },
+            }}
+            sx={{
+              width: '100%',
+              '& .MuiOutlinedInput-root': {
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#0AA4A4' },
+              },
+              '& .MuiInputLabel-root.Mui-focused': { color: '#0AA4A4' },
+              '& .MuiPickersDay-root.Mui-selected': {
+                backgroundColor: '#0AA4A4',
+                '&:hover': { backgroundColor: '#08C6B6' },
+              },
+              '& .MuiClock-pin, & .MuiClockPointer-root': { backgroundColor: '#0AA4A4' },
+              '& .MuiClockPointer-thumb': { borderColor: '#0AA4A4' },
+              '& .MuiMultiSectionDigitalClockSection-item.Mui-selected': {
+                backgroundColor: '#0AA4A4',
+              },
+            }}
+          />
+        </LocalizationProvider>
+        <Input label="Dirección" value={fields.direccion} onChange={e => setFields(f => ({ ...f, direccion: e.target.value }))} placeholder="Dirección de la visita" />
+        <Select label="Asignar a" value={fields.asignado_a} onChange={e => setFields(f => ({ ...f, asignado_a: e.target.value }))}
+          options={workers.map(w => ({ value: w.trabajador_id ?? w.id, label: `${w.nombre_completo} — ${w.cargo}` }))}
           placeholder="Seleccionar responsable..."
         />
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
-          <textarea rows={2} value={form.observaciones} onChange={e => setForm({ ...form, observaciones: e.target.value })} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary focus:ring-primary" placeholder="Notas sobre la visita..." />
+          <textarea rows={2} value={fields.observaciones} onChange={e => setFields(f => ({ ...f, observaciones: e.target.value }))} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary focus:ring-primary" placeholder="Notas sobre la visita..." />
         </div>
       </div>
     </Modal>

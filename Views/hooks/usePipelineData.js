@@ -326,7 +326,8 @@ export default function usePipelineData({ showToast, enabled = true, onProjectCr
       });
       const data = await res.json();
       if (data.success) {
-        showToastRef.current('Comunicación registrada', 'success');
+        showToastRef.current(data.message || 'Comunicación registrada', 'success');
+        if (data.stage_changed) { fetchLeads(); fetchStats(); }
         if (selectedLeadRef.current?.id === id) fetchLeadDetail(id);
         return true;
       } else {
@@ -337,7 +338,7 @@ export default function usePipelineData({ showToast, enabled = true, onProjectCr
       showToastRef.current('Error de red', 'error');
       return false;
     }
-  }, [fetchLeadDetail]);
+  }, [fetchLeadDetail, fetchLeads, fetchStats]);
 
   // ── Visits ─────────────────────────────────────────────────────────
 
@@ -370,7 +371,8 @@ export default function usePipelineData({ showToast, enabled = true, onProjectCr
       });
       const data = await res.json();
       if (data.success) {
-        showToastRef.current('Visita completada', 'success');
+        showToastRef.current(data.message || 'Visita completada', 'success');
+        if (data.stage_changed) { fetchLeads(); fetchStats(); }
         if (selectedLeadRef.current) fetchLeadDetail(selectedLeadRef.current.id);
         return true;
       } else {
@@ -381,7 +383,7 @@ export default function usePipelineData({ showToast, enabled = true, onProjectCr
       showToastRef.current('Error de red', 'error');
       return false;
     }
-  }, [fetchLeadDetail]);
+  }, [fetchLeadDetail, fetchLeads, fetchStats]);
 
   // ── Budgets ────────────────────────────────────────────────────────
 
@@ -414,7 +416,8 @@ export default function usePipelineData({ showToast, enabled = true, onProjectCr
       });
       const data = await res.json();
       if (data.success) {
-        showToastRef.current('Estado de presupuesto actualizado', 'success');
+        showToastRef.current(data.message || 'Estado de presupuesto actualizado', 'success');
+        if (data.stage_changed) { fetchLeads(); fetchStats(); }
         if (selectedLeadRef.current) fetchLeadDetail(selectedLeadRef.current.id);
         return true;
       } else {
@@ -425,7 +428,7 @@ export default function usePipelineData({ showToast, enabled = true, onProjectCr
       showToastRef.current('Error de red', 'error');
       return false;
     }
-  }, [fetchLeadDetail]);
+  }, [fetchLeadDetail, fetchLeads, fetchStats]);
 
   // ── Negotiations ───────────────────────────────────────────────────
 
@@ -437,7 +440,8 @@ export default function usePipelineData({ showToast, enabled = true, onProjectCr
       });
       const data = await res.json();
       if (data.success) {
-        showToastRef.current('Registro de negociación agregado', 'success');
+        showToastRef.current(data.message || 'Registro de negociación agregado', 'success');
+        if (data.stage_changed) { fetchLeads(); fetchStats(); }
         if (selectedLeadRef.current?.id === id) fetchLeadDetail(id);
         return true;
       } else {
@@ -448,7 +452,7 @@ export default function usePipelineData({ showToast, enabled = true, onProjectCr
       showToastRef.current('Error de red', 'error');
       return false;
     }
-  }, [fetchLeadDetail]);
+  }, [fetchLeadDetail, fetchLeads, fetchStats]);
 
   // ── Create project from lead ───────────────────────────────────────
 

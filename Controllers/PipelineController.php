@@ -618,6 +618,41 @@ class PipelineController extends Controller
         return $projectId;
     }
 
+    // ── Auto-advance helper ──────────────────────────────────────────────
+
+    /**
+     * Intentar avance automático de etapa basado en acciones.
+     * Solo avanza si el lead está en la etapa esperada (expectedStage).
+     */
+    protected function tryAutoAdvance(int $pipelineId, string $expectedStage, string $targetStage): ?array
+    {
+        $lead = DB::table($this->pipelineTable)->find($pipelineId);
+        if (!$lead || $lead->etapa !== $expectedStage) {
+            return null;
+        }
+
+        DB::table($this->pipelineTable)->where('id', $pipelineId)->update([
+            'etapa'      => $targetStage,
+            'updated_at' => now(),
+        ]);
+
+        DB::table($this->historyTable)->insert([
+            'pipeline_id'    => $pipelineId,
+            'etapa_anterior' => $expectedStage,
+            'etapa_nueva'    => $targetStage,
+            'motivo'         => 'Avance automático: ' . self::STAGE_LABELS[$expectedStage] . ' → ' . self::STAGE_LABELS[$targetStage],
+            'cambiado_por'   => auth()->id(),
+            'created_at'     => now(),
+            'updated_at'     => now(),
+        ]);
+
+        return [
+            'from'  => $expectedStage,
+            'to'    => $targetStage,
+            'label' => self::STAGE_LABELS[$targetStage],
+        ];
+    }
+
     // ── Equipo ──────────────────────────────────────────────────────────
 
     public function updateTeam(Request $request, $id)
@@ -676,7 +711,22 @@ class PipelineController extends Controller
             'updated_at'         => now(),
         ]);
 
-        return response()->json(['success' => true, 'message' => 'Comunicación registrada']);
+        // Auto-avance: comunicación exitosa → ingresado a contactado
+        $stageChanged = null;
+        if ($request->boolean('contacto_exitoso')) {
+            $stageChanged = $this->tryAutoAdvance((int) $id, 'ingresado', 'contactado');
+        }
+
+        $msg = 'Comunicación registrada';
+        if ($stageChanged) {
+            $msg .= '. Etapa avanzada automáticamente a ' . $stageChanged['label'];
+        }
+
+        return response()->json([
+            'success'       => true,
+            'message'       => $msg,
+            'stage_changed' => $stageChanged,
+        ]);
     }
 
     // ── Visitas ─────────────────────────────────────────────────────────
@@ -727,7 +777,19 @@ class PipelineController extends Controller
             'updated_at'      => now(),
         ]);
 
-        return response()->json(['success' => true, 'message' => 'Visita completada']);
+        // Auto-avance: visita completada → contactado a visitado
+        $stageChanged = $this->tryAutoAdvance((int) $visit->pipeline_id, 'contactado', 'visitado');
+
+        $msg = 'Visita completada';
+        if ($stageChanged) {
+            $msg .= '. Etapa avanzada automáticamente a ' . $stageChanged['label'];
+        }
+
+        return response()->json([
+            'success'       => true,
+            'message'       => $msg,
+            'stage_changed' => $stageChanged,
+        ]);
     }
 
     // ── Presupuestos ────────────────────────────────────────────────────
@@ -796,7 +858,22 @@ class PipelineController extends Controller
 
         DB::table($this->budgetsTable)->where('id', $budgetId)->update($updates);
 
-        return response()->json(['success' => true, 'message' => 'Estado de presupuesto actualizado']);
+        // Auto-avance: presupuesto enviado → visitado a presupuestado
+        $stageChanged = null;
+        if ($request->estado === 'enviado') {
+            $stageChanged = $this->tryAutoAdvance((int) $budget->pipeline_id, 'visitado', 'presupuestado');
+        }
+
+        $msg = 'Estado de presupuesto actualizado';
+        if ($stageChanged) {
+            $msg .= '. Etapa avanzada automáticamente a ' . $stageChanged['label'];
+        }
+
+        return response()->json([
+            'success'       => true,
+            'message'       => $msg,
+            'stage_changed' => $stageChanged,
+        ]);
     }
 
     // ── Negociaciones ───────────────────────────────────────────────────
@@ -824,7 +901,19 @@ class PipelineController extends Controller
             'updated_at'      => now(),
         ]);
 
-        return response()->json(['success' => true, 'message' => 'Registro de negociación agregado']);
+        // Auto-avance: negociación registrada → presupuestado a negociación
+        $stageChanged = $this->tryAutoAdvance((int) $id, 'presupuestado', 'negociacion');
+
+        $msg = 'Registro de negociación agregado';
+        if ($stageChanged) {
+            $msg .= '. Etapa avanzada automáticamente a ' . $stageChanged['label'];
+        }
+
+        return response()->json([
+            'success'       => true,
+            'message'       => $msg,
+            'stage_changed' => $stageChanged,
+        ]);
     }
 
     // ── Workers listing (para selección de equipo) ──────────────────────

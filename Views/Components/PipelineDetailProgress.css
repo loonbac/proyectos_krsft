@@ -1,0 +1,119 @@
+/* ── Pipeline Progress Indicator — Carbon overrides ───────────────────── */
+
+/* Container: full width */
+.pipeline-progress-indicator.cds--progress {
+  inline-size: 100%;
+}
+
+/* Steps: equal distribution */
+.pipeline-progress-indicator .cds--progress-step {
+  flex: 1 1 0;
+  min-inline-size: 0;
+}
+
+/* Step button: transparent, no shadow */
+.pipeline-progress-indicator .cds--progress-step-button {
+  display: inline-flex;
+  align-items: flex-start;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: #0aa4a4;
+}
+
+/* Hide Carbon's native SVG indicator (checkmark / circle / warning) */
+.pipeline-progress-indicator .cds--progress-step-button > svg {
+  display: none !important;
+}
+
+/* Remove Carbon pseudo-element circles */
+.pipeline-progress-indicator .cds--progress-step-button::before,
+.pipeline-progress-indicator .cds--progress-step-button::after {
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+/* ── Label layout ────────────────────────────────────────────────────── */
+
+.pipeline-progress-indicator .cds--progress-label {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 0.35rem;
+  overflow: visible !important;
+  max-inline-size: none !important;
+  margin: 0.5rem 0 0 0;
+  margin-inline-start: 0 !important;
+  padding-inline-start: 0 !important;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.1;
+  color: #374151;
+  white-space: nowrap;
+}
+
+.pipeline-step-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.pipeline-step-label-text {
+  white-space: nowrap;
+}
+
+/* ── Custom heroicon overrides ───────────────────────────────────────── */
+/* Carbon's ".cds--progress-step svg" applies fill, border-radius, fixed
+   sizing, and margins to ALL descendant SVGs. We must undo every one of
+   those properties on our custom icons so they render as outline strokes. */
+
+.pipeline-progress-indicator .cds--progress-step .pipeline-step-icon {
+  display: inline-block !important;
+  flex-shrink: 0;
+  fill: none !important;
+  border-radius: 0 !important;
+  position: static !important;
+  z-index: auto !important;
+  block-size: 0.875rem !important;   /* size-3.5 = 14px */
+  inline-size: 0.875rem !important;
+  margin-block-start: 0 !important;
+  margin-inline-end: 0 !important;
+  stroke-width: 1.5;
+}
+
+/* Ensure inner paths never get filled either */
+.pipeline-progress-indicator .cds--progress-step .pipeline-step-icon path,
+.pipeline-progress-indicator .cds--progress-step .pipeline-step-icon circle {
+  fill: none !important;
+}
+
+/* ── Progress lines ──────────────────────────────────────────────────── */
+
+.pipeline-progress-indicator .cds--progress-line {
+  background-color: #dbe3ea;
+}
+
+.pipeline-progress-indicator .cds--progress-step--complete .cds--progress-line,
+.pipeline-progress-indicator .cds--progress-step--current .cds--progress-line {
+  background-color: #0aa4a4;
+}
+
+/* ── State-specific label colours ────────────────────────────────────── */
+
+.pipeline-progress-indicator .cds--progress-step--current .cds--progress-label {
+  color: #0a7f7f;
+}
+
+.pipeline-progress-indicator .cds--progress-step--incomplete .cds--progress-step-button {
+  background-color: transparent !important;
+}
+
+.pipeline-progress-indicator .cds--progress-step--invalid .cds--progress-label,
+.pipeline-progress-indicator .cds--progress-step--invalid .cds--progress-step-button {
+  color: #dc2626;
+}
+
+/* Invalid state — also tint our custom icon red */
+.pipeline-progress-indicator .cds--progress-step--invalid .pipeline-step-icon {
+  color: #dc2626 !important;
+}
