@@ -22,7 +22,7 @@
 }
 
 /* Hide Carbon's native SVG indicator (checkmark / circle / warning) */
-.pipeline-progress-indicator .cds--progress-step-button > svg {
+.pipeline-progress-indicator .cds--progress-step-button>svg {
   display: none !important;
 }
 
@@ -44,7 +44,7 @@
   margin: 0.5rem 0 0 0;
   margin-inline-start: 0 !important;
   padding-inline-start: 0 !important;
-  font-size: 0.72rem;
+  font-size: 0.95rem;
   font-weight: 600;
   line-height: 1.1;
   color: #374151;
@@ -74,11 +74,13 @@
   border-radius: 0 !important;
   position: static !important;
   z-index: auto !important;
-  block-size: 0.875rem !important;   /* size-3.5 = 14px */
-  inline-size: 0.875rem !important;
+  block-size: 1.15rem !important;
+  /* match new larger font-size */
+  inline-size: 1.15rem !important;
   margin-block-start: 0 !important;
   margin-inline-end: 0 !important;
-  stroke-width: 1.5;
+  stroke-width: 1.7;
+  /* a bit thicker stroke for larger icons */
 }
 
 /* Ensure inner paths never get filled either */
@@ -91,11 +93,18 @@
 
 .pipeline-progress-indicator .cds--progress-line {
   background-color: #dbe3ea;
+  block-size: 3px !important;
+  /* Make the background line thicker */
+  transform: translateY(1px);
+  /* Adjust vertical alignment if needed */
 }
 
 .pipeline-progress-indicator .cds--progress-step--complete .cds--progress-line,
 .pipeline-progress-indicator .cds--progress-step--current .cds--progress-line {
   background-color: #0aa4a4;
+  block-size: 3px !important;
+  /* Make the active line thicker */
+  transform: translateY(1px);
 }
 
 /* ── State-specific label colours ────────────────────────────────────── */

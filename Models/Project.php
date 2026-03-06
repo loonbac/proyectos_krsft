@@ -3,6 +3,7 @@
 namespace Modulos_ERP\ProyectosKrsft\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Project extends Model
 {
@@ -30,6 +31,14 @@ class Project extends Model
     public function expenses()
     {
         return $this->hasMany(ProjectExpense::class, 'project_id');
+    }
+
+    /**
+     * Relación con el CECO (Centro de Costo) del proyecto
+     */
+    public function ceco(): BelongsTo
+    {
+        return $this->belongsTo(\Modulos_ERP\CecosKrsft\Models\Ceco::class, 'ceco_id');
     }
 
     public function getSpentAttribute()

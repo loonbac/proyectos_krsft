@@ -35,6 +35,12 @@ Route::post('/{id}/import-materials', "{$ctrl}@importMaterials")->where('id', '[
 // Finalizar proyecto (liberar materiales apartados → disponible)
 Route::post('/{id}/finalize', "{$ctrl}@finalizeProject")->where('id', '[0-9]+');
 
+// Completar proyecto con gestión de sobras de materiales
+Route::get('/{id}/completion-materials', "{$ctrl}@getCompletionMaterials")->where('id', '[0-9]+');
+Route::get('/{id}/completion-request', "{$ctrl}@getCompletionRequest")->where('id', '[0-9]+');
+Route::post('/{id}/request-completion', "{$ctrl}@requestCompletion")->where('id', '[0-9]+');
+Route::post('/{id}/approve-completion', "{$ctrl}@approveCompletion")->where('id', '[0-9]+');
+
 // ── Pipeline de Pre-Proyecto ────────────────────────────────────────────
 Route::prefix('pipeline')->group(function () use ($pipeCtrl) {
     Route::get('/', "{$pipeCtrl}@index");
@@ -68,4 +74,9 @@ Route::prefix('pipeline')->group(function () use ($pipeCtrl) {
 
     // Negociaciones
     Route::post('/{id}/negotiations', "{$pipeCtrl}@addNegotiation")->where('id', '[0-9]+');
+
+    // Archivos adjuntos
+    Route::post('/{id}/files', "{$pipeCtrl}@uploadFiles")->where('id', '[0-9]+');
+    Route::get('/files/{fileId}/download', "{$pipeCtrl}@downloadFile")->where('fileId', '[0-9]+');
+    Route::delete('/files/{fileId}', "{$pipeCtrl}@deleteFile")->where('fileId', '[0-9]+');
 });

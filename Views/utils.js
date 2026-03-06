@@ -16,8 +16,8 @@ export const PROJECT_COLORS = [
 ];
 
 export const DEFAULT_MATERIAL_FORM = {
-  item_number: null, qty: 1, unit: '', description: '',
-  diameter: '', series: '', material_type: '',
+  qty: 1, material_type: '', description: '',
+  diameter: '', series: '', notes: '',
 };
 
 export const DEFAULT_SERVICE_FORM = {
@@ -108,11 +108,19 @@ export const getStatusText = (s) =>
 export const getStatusBadgeVariant = (s) =>
   ({ good: 'emerald', warning: 'amber', critical: 'red' }[s] || 'gray');
 
-export const getProjectStateClass = (p) =>
-  ((p?.status || '').toLowerCase() === 'completed' ? 'completed' : 'in-progress');
+export const getProjectStateClass = (p) => {
+  const s = (p?.status || '').toLowerCase();
+  if (s === 'completed') return 'completed';
+  if (s === 'pendiente_recuento') return 'pending-recount';
+  return 'in-progress';
+};
 
-export const getProjectStateLabel = (p) =>
-  (getProjectStateClass(p) === 'completed' ? 'FINALIZADO' : 'EN PROGRESO');
+export const getProjectStateLabel = (p) => {
+  const cls = getProjectStateClass(p);
+  if (cls === 'completed') return 'FINALIZADO';
+  if (cls === 'pending-recount') return 'RECUENTO PENDIENTE';
+  return 'EN PROGRESO';
+};
 
 export const getProjectDaysAlive = (p) => {
   if (!p?.created_at) return 0;
@@ -121,7 +129,7 @@ export const getProjectDaysAlive = (p) => {
   return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000));
 };
 
-export const canFinalizeProject = (p) => getProjectStateClass(p) !== 'completed';
+export const canFinalizeProject = (p) => getProjectStateClass(p) === 'in-progress';
 
 /* ============================================
    ORDER HELPERS
@@ -151,6 +159,14 @@ export const getOrderStatusLabel = (o) => {
   if (o.status === 'approved' && o.payment_confirmed) return 'Aprobado';
   if (o.status === 'approved') return 'Aprobado';
   return 'En Espera';
+};
+
+/** Monto efectivo de una orden (incluye IGV si aplica) en su moneda original */
+export const getOrderEffectiveAmount = (o) => {
+  const base = parseFloat(o.amount || 0);
+  if (!o.igv_enabled) return base;
+  const rate = parseFloat(o.igv_rate ?? 18);
+  return base + base * (rate / 100);
 };
 
 export const getOrderQuantity = (o) => {

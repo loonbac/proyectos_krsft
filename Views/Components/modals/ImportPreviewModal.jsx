@@ -37,10 +37,10 @@ function ImportPreviewModal({
             </div>
             <div className="mt-1 flex flex-wrap gap-2 text-xs text-gray-500">
               <span>Cant: {it.quantity}</span>
-              <span>Und: {it.unit}</span>
-              {it.diameter && <span>Diám: {it.diameter}</span>}
-              {it.series && <span>Serie: {it.series}</span>}
-              {it.material_type && <span>Mat: {it.material_type}</span>}
+              {it.material_type && <span>Tipo Mat: {it.material_type}</span>}
+              {it.diameter && <span>Medida: {it.diameter}</span>}
+              {it.series && <span>Conexión: {it.series}</span>}
+              {it.notes && <span>Obs: {it.notes}</span>}
             </div>
           </div>
         ))}

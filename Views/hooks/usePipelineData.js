@@ -32,9 +32,9 @@ const INITIAL_FORM = {
   cliente_telefono: '',
   cliente_email: '',
   cliente_empresa: '',
+  cargo_cliente: '',
+  tipo_negocio: '',
   descripcion: '',
-  presupuesto_estimado: 0,
-  moneda: 'PEN',
   ubicacion: '',
   team_ids: [],
 };
@@ -483,6 +483,65 @@ export default function usePipelineData({ showToast, enabled = true, onProjectCr
     }
   }, [fetchLeads, fetchStats, fetchLeadDetail, onProjectCreated]);
 
+  // ── Files (archivos adjuntos al lead) ──────────────────────────────
+
+  const uploadFiles = useCallback(async (id, files, category = 'general') => {
+    const formData = new FormData();
+    files.forEach((file) => formData.append('files[]', file));
+    formData.append('category', category);
+
+    try {
+      const res = await fetch(`${PIPELINE_API}/${id}/files`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'X-CSRF-TOKEN': getCsrfToken(),
+        },
+        body: formData,
+      });
+      const data = await res.json();
+      
+      // Manejar respuesta exitosa
+      if (res.ok && data.success) {
+        showToastRef.current(data.message, 'success');
+        if (selectedLeadRef.current?.id === id) fetchLeadDetail(id);
+        return true;
+      }
+      
+      // Manejar error de validación (422) u otros errores
+      const errorMsg = data.message || (res.status === 422 ? 'Error de validación' : 'Error al subir archivos');
+      showToastRef.current(errorMsg, 'error');
+      console.error('Error al subir archivos:', { status: res.status, data });
+      return false;
+    } catch (err) {
+      showToastRef.current('Error de red al subir archivos', 'error');
+      console.error('Error de red:', err);
+      return false;
+    }
+  }, [fetchLeadDetail]);
+
+  const deleteFile = useCallback(async (fileId) => {
+    try {
+      const res = await fetchWithCsrf(`${PIPELINE_API}/files/${fileId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        showToastRef.current('Archivo eliminado', 'success');
+        if (selectedLeadRef.current) fetchLeadDetail(selectedLeadRef.current.id);
+        return true;
+      } else {
+        showToastRef.current(data.message || 'Error al eliminar archivo', 'error');
+        return false;
+      }
+    } catch {
+      showToastRef.current('Error de red', 'error');
+      return false;
+    }
+  }, [fetchLeadDetail]);
+
+  const getFileDownloadUrl = useCallback((fileId) => {
+    return `${PIPELINE_API}/files/${fileId}/download`;
+  }, []);
+
   // ── Return ─────────────────────────────────────────────────────────
   return {
     // Data
@@ -507,6 +566,7 @@ export default function usePipelineData({ showToast, enabled = true, onProjectCr
     addCommunication, addVisit, completeVisit,
     addBudget, updateBudgetStatus,
     addNegotiation, createProjectFromLeadModal,
+    uploadFiles, deleteFile, getFileDownloadUrl,
     fetchLeads, fetchStats,
     // Constants
     STAGE_ORDER, STAGE_LABELS,

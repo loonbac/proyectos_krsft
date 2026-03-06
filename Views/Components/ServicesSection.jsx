@@ -17,6 +17,7 @@ function ServicesSection({
     serviceOrders,
     selectedServices,
     isSupervisor,
+    readOnly,
     onApproveAll,
     onApproveSelected,
     onApproveService,
@@ -64,7 +65,7 @@ function ServicesSection({
 
                             <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                                 {/* Bulk approve buttons (manager/admin only) */}
-                                {!isSupervisor && draftServices.length > 0 && (
+                                {!isSupervisor && !readOnly && draftServices.length > 0 && (
                                     <>
                                         {selectedCount > 0 && (
                                             <Button variant="success" size="sm" onClick={onApproveSelected}>
@@ -89,7 +90,7 @@ function ServicesSection({
                                 <table className="w-full divide-y divide-gray-200 text-sm">
                                     <thead className="bg-gray-50">
                                         <tr>
-                                            {!isSupervisor && (
+                                            {!isSupervisor && !readOnly && (
                                                 <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 w-10">
                                                     <input type="checkbox" disabled className="rounded border-gray-300" />
                                                 </th>
@@ -99,7 +100,7 @@ function ServicesSection({
                                             <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 whitespace-nowrap">TIEMPO</th>
                                             <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 whitespace-nowrap">LUGAR</th>
                                             <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 whitespace-nowrap">ESTADO</th>
-                                            {!isSupervisor && (
+                                            {!isSupervisor && !readOnly && (
                                                 <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 whitespace-nowrap">ACCIONES</th>
                                             )}
                                         </tr>
@@ -117,10 +118,10 @@ function ServicesSection({
                                             return (
                                                 <tr
                                                     key={order.id}
-                                                    className={`transition-colors ${isDraft && !isSupervisor ? 'cursor-pointer' : ''} ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
-                                                    onClick={() => isDraft && !isSupervisor && toggleServiceSelection(order)}
+                                                    className={`transition-colors ${isDraft && !isSupervisor && !readOnly ? 'cursor-pointer' : ''} ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                                                    onClick={() => isDraft && !isSupervisor && !readOnly && toggleServiceSelection(order)}
                                                 >
-                                                    {!isSupervisor && (
+                                                    {!isSupervisor && !readOnly && (
                                                         <td className="px-3 py-2 text-center">
                                                             <input
                                                                 type="checkbox"
@@ -144,7 +145,7 @@ function ServicesSection({
                                                             {getOrderStatusLabel(order)}
                                                         </Badge>
                                                     </td>
-                                                    {!isSupervisor && (
+                                                    {!isSupervisor && !readOnly && (
                                                         <td className="px-3 py-2 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                                                             {isDraft ? (
                                                                 <div className="flex justify-center gap-2">

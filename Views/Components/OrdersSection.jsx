@@ -10,6 +10,7 @@ import Button from './ui/Button';
 import {
   formatNumber, getCurrencySymbol,
   getOrderBadgeVariant, getOrderStatusLabel, getOrderQuantity,
+  getOrderEffectiveAmount,
 } from '../utils';
 
 /**
@@ -20,6 +21,7 @@ function OrdersSection({
   expandedFiles,
   selectedProject,
   isSupervisor,
+  readOnly,
   onToggleFile,
   onApproveAll,
   onApproveSelected,
@@ -55,9 +57,8 @@ function OrdersSection({
                 <div
                   role="button"
                   tabIndex={0}
-                  className={`flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm transition-colors cursor-pointer ${
-                    isExpanded ? 'bg-gray-50' : 'bg-white hover:bg-gray-50'
-                  }`}
+                  className={`flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm transition-colors cursor-pointer ${isExpanded ? 'bg-gray-50' : 'bg-white hover:bg-gray-50'
+                    }`}
                   onClick={() => onToggleFile(group.filename)}
                   onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleFile(group.filename); } }}
                 >
@@ -67,7 +68,7 @@ function OrdersSection({
                     <span className="truncate font-medium text-gray-700">{group.filename || 'Órdenes Manuales'}</span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
-                    {!isSupervisor && draftOrders.length > 0 && (
+                    {!isSupervisor && !readOnly && draftOrders.length > 0 && (
                       <>
                         {selectedCount > 0 && (
                           <Button variant="success" size="sm" onClick={() => onApproveSelected(group)}>
@@ -79,7 +80,7 @@ function OrdersSection({
                         </Button>
                       </>
                     )}
-                    {group.allPaid && !group.allDelivered && isSupervisor && (
+                    {group.allPaid && !group.allDelivered && isSupervisor && !readOnly && (
                       <Button variant="primary" size="sm" onClick={() => onConfirmFileDelivery(group)}>
                         Confirmar Entrega
                       </Button>
@@ -97,32 +98,30 @@ function OrdersSection({
                     <table className="w-full divide-y divide-gray-200 text-sm">
                       <thead className="bg-gray-50">
                         <tr>
-                          {!isSupervisor && <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 w-12"><input type="checkbox" disabled className="rounded border-gray-300" /></th>}
+                          {!isSupervisor && <th className="px-3 py-2 text-center  text-xs font-medium uppercase text-gray-500 w-12"><input type="checkbox" disabled className="rounded border-gray-300" /></th>}
                           <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 whitespace-nowrap">ITEM</th>
-                          <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 whitespace-nowrap">CANT.</th>
-                          <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 whitespace-nowrap">UND</th>
-                          <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">DESCRIPCIÓN</th>
-                          <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 whitespace-nowrap">DIÁMETRO</th>
-                          <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 whitespace-nowrap">SERIE</th>
-                          <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 whitespace-nowrap">MATERIAL</th>
+                          <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 whitespace-nowrap">CANTIDAD</th>
+                          <th className="px-3 py-2 text-left  text-xs font-medium uppercase text-gray-500 whitespace-nowrap">TIPO DE MATERIAL</th>
+                          <th className="px-3 py-2 text-left  text-xs font-medium uppercase text-gray-500 whitespace-nowrap">ESPECIFICACION TECNICA</th>
+                          <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 whitespace-nowrap">MEDIDA</th>
+                          <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 whitespace-nowrap">TIPO DE CONEXIÓN</th>
+                          <th className="px-3 py-2 text-left  text-xs font-medium uppercase text-gray-500 whitespace-nowrap">OBSERVACIONES</th>
                           <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 whitespace-nowrap">ESTADO</th>
-                          <th className="px-3 py-2 text-right text-xs font-medium uppercase text-gray-500 whitespace-nowrap">MONTO</th>
-                          {!isSupervisor && <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 whitespace-nowrap">ACCIONES</th>}
+                          <th className="px-3 py-2 text-right  text-xs font-medium uppercase text-gray-500 whitespace-nowrap">MONTO</th>
+                          {!isSupervisor && !readOnly && <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 whitespace-nowrap">ACCIONES</th>}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {group.orders.map(order => {
                           const isSelected = isOrderSelected(group, order.id);
                           const isDraft = order.status === 'draft';
-                          
+
                           return (
-                            <tr 
-                              key={order.id} 
-                              className={`transition-colors ${
-                                isDraft ? 'cursor-pointer' : ''
-                              } ${
-                                isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
-                              }`}
+                            <tr
+                              key={order.id}
+                              className={`transition-colors ${isDraft ? 'cursor-pointer' : ''
+                                } ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
+                                }`}
                               onClick={() => isDraft && !isSupervisor && toggleOrderSelection(group, order)}
                             >
                               {!isSupervisor && (
@@ -130,7 +129,7 @@ function OrdersSection({
                                   <input
                                     type="checkbox"
                                     checked={isSelected}
-                                    onChange={() => {}}
+                                    onChange={() => { }}
                                     disabled={!isDraft}
                                     className="rounded border-gray-300 pointer-events-none"
                                   />
@@ -138,11 +137,11 @@ function OrdersSection({
                               )}
                               <td className="px-3 py-2 text-center text-gray-700 whitespace-nowrap">{order.item_number || '-'}</td>
                               <td className="px-3 py-2 text-center text-gray-700 whitespace-nowrap">{getOrderQuantity(order)}</td>
-                              <td className="px-3 py-2 text-center text-gray-700 whitespace-nowrap">{order.unit || 'UND'}</td>
-                              <td className="px-3 py-2 text-left text-gray-700">{order.description}</td>
+                              <td className="px-3 py-2 text-left  text-gray-700 whitespace-nowrap">{order.material_type || '-'}</td>
+                              <td className="px-3 py-2 text-left  text-gray-700 whitespace-nowrap">{order.description || '-'}</td>
                               <td className="px-3 py-2 text-center text-gray-700 whitespace-nowrap">{order.diameter || '-'}</td>
                               <td className="px-3 py-2 text-center text-gray-700 whitespace-nowrap">{order.series || '-'}</td>
-                              <td className="px-3 py-2 text-center text-gray-700 whitespace-nowrap">{order.material_type || '-'}</td>
+                              <td className="px-3 py-2 text-left  text-gray-700 whitespace-nowrap">{order.notes || '-'}</td>
                               <td className="px-3 py-2 text-center text-gray-700 whitespace-nowrap">
                                 {order.amount === null && order.status === 'pending' ? (
                                   <Badge variant="gray">Por cotizar</Badge>
@@ -150,21 +149,21 @@ function OrdersSection({
                                   <Badge variant={getOrderBadgeVariant(order)}>{getOrderStatusLabel(order)}</Badge>
                                 )}
                               </td>
-                              <td className="px-3 py-2 text-right text-gray-700 whitespace-nowrap font-medium">{order.amount != null ? `${getCurrencySymbol(selectedProject.currency)} ${formatNumber(order.amount)}` : '-'}</td>
-                              {!isSupervisor && (
+                              <td className="px-3 py-2 text-right text-gray-700 whitespace-nowrap font-medium">{order.amount != null ? `${getCurrencySymbol(selectedProject.currency)} ${formatNumber(getOrderEffectiveAmount(order))}` : '-'}</td>
+                              {!isSupervisor && !readOnly && (
                                 <td className="px-3 py-2 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                                   {isDraft ? (
                                     <div className="flex justify-center gap-2">
-                                      <button 
-                                        onClick={() => onApproveMaterial(order.id)} 
-                                        title="Aprobar" 
+                                      <button
+                                        onClick={() => onApproveMaterial(order.id)}
+                                        title="Aprobar"
                                         className="inline-flex items-center justify-center rounded-md bg-emerald-500 px-7 py-1 text-white transition-colors hover:bg-emerald-600 shadow-sm"
                                       >
                                         <CheckIcon className="size-4" />
                                       </button>
-                                      <button 
-                                        onClick={() => onRejectMaterial(order.id)} 
-                                        title="Rechazar" 
+                                      <button
+                                        onClick={() => onRejectMaterial(order.id)}
+                                        title="Rechazar"
                                         className="inline-flex items-center justify-center rounded-md bg-red-500 px-7 py-1 text-white transition-colors hover:bg-red-600 shadow-sm"
                                       >
                                         <XMarkIcon className="size-4" />

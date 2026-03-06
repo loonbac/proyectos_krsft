@@ -184,22 +184,18 @@ class ProyectoController extends Controller
                 DB::raw("
                     COALESCE(SUM(CASE WHEN purchase_orders.status = 'approved' THEN
                         CASE
-                            WHEN projects.currency = 'USD' AND purchase_orders.currency = 'PEN' AND COALESCE(purchase_orders.exchange_rate, 0) > 0
-                                THEN purchase_orders.amount / purchase_orders.exchange_rate
-                            WHEN projects.currency = 'USD' AND purchase_orders.currency = 'USD'
-                                THEN purchase_orders.amount
-                            ELSE COALESCE(purchase_orders.amount_pen, purchase_orders.amount)
+                            WHEN projects.currency = 'USD' AND COALESCE(purchase_orders.exchange_rate, 0) > 0
+                                THEN COALESCE(purchase_orders.total_with_igv, purchase_orders.amount_pen, purchase_orders.amount) / purchase_orders.exchange_rate
+                            ELSE COALESCE(purchase_orders.total_with_igv, purchase_orders.amount_pen, purchase_orders.amount)
                         END
                     ELSE 0 END), 0) as spent
                 "),
                 DB::raw("
                     projects.available_amount - COALESCE(SUM(CASE WHEN purchase_orders.status = 'approved' THEN
                         CASE
-                            WHEN projects.currency = 'USD' AND purchase_orders.currency = 'PEN' AND COALESCE(purchase_orders.exchange_rate, 0) > 0
-                                THEN purchase_orders.amount / purchase_orders.exchange_rate
-                            WHEN projects.currency = 'USD' AND purchase_orders.currency = 'USD'
-                                THEN purchase_orders.amount
-                            ELSE COALESCE(purchase_orders.amount_pen, purchase_orders.amount)
+                            WHEN projects.currency = 'USD' AND COALESCE(purchase_orders.exchange_rate, 0) > 0
+                                THEN COALESCE(purchase_orders.total_with_igv, purchase_orders.amount_pen, purchase_orders.amount) / purchase_orders.exchange_rate
+                            ELSE COALESCE(purchase_orders.total_with_igv, purchase_orders.amount_pen, purchase_orders.amount)
                         END
                     ELSE 0 END), 0) as remaining
                 "),
@@ -207,11 +203,9 @@ class ProyectoController extends Controller
                     CASE WHEN projects.available_amount > 0 THEN
                         COALESCE(SUM(CASE WHEN purchase_orders.status = 'approved' THEN
                             CASE
-                                WHEN projects.currency = 'USD' AND purchase_orders.currency = 'PEN' AND COALESCE(purchase_orders.exchange_rate, 0) > 0
-                                    THEN purchase_orders.amount / purchase_orders.exchange_rate
-                                WHEN projects.currency = 'USD' AND purchase_orders.currency = 'USD'
-                                    THEN purchase_orders.amount
-                                ELSE COALESCE(purchase_orders.amount_pen, purchase_orders.amount)
+                                WHEN projects.currency = 'USD' AND COALESCE(purchase_orders.exchange_rate, 0) > 0
+                                    THEN COALESCE(purchase_orders.total_with_igv, purchase_orders.amount_pen, purchase_orders.amount) / purchase_orders.exchange_rate
+                                ELSE COALESCE(purchase_orders.total_with_igv, purchase_orders.amount_pen, purchase_orders.amount)
                             END
                         ELSE 0 END), 0) / projects.available_amount * 100
                     ELSE 0 END as usage_percent
@@ -288,6 +282,22 @@ class ProyectoController extends Controller
             ->get()
             ->map(function ($order) {
                 $order->materials = $order->materials ? json_decode($order->materials, true) : [];
+
+                // Para órdenes de inventario: usar costo real de la reserva
+                if ($order->source_type === 'inventory' && floatval($order->amount ?? 0) == 0) {
+                    $reservation = DB::table('inventory_reservations')
+                        ->where('purchase_order_id', $order->id)
+                        ->where('status', 'active')
+                        ->first();
+
+                    if ($reservation) {
+                        $order->amount = floatval($reservation->total_cost);
+                        $order->amount_pen = $reservation->currency === 'USD' && $order->exchange_rate > 0
+                            ? round($reservation->total_cost * $order->exchange_rate, 2)
+                            : floatval($reservation->total_cost);
+                    }
+                }
+
                 return $order;
             });
 
@@ -299,20 +309,17 @@ class ProyectoController extends Controller
             ->get();
 
         $approvedOrders = $orders->where('status', 'approved');
-        // Calcular gasto en la moneda del proyecto
+        // Calcular gasto en la moneda del proyecto (incluye IGV cuando aplica)
         $projectCurrency = $project->currency ?? 'PEN';
         $spent = $approvedOrders->sum(function ($order) use ($projectCurrency) {
-            // Si el proyecto es USD y la orden es PEN: convertir PEN a USD
-            if ($projectCurrency === 'USD' && ($order->currency ?? 'PEN') === 'PEN') {
+            // total_with_igv siempre está en PEN e incluye IGV
+            $totalPen = floatval($order->total_with_igv ?? $order->amount_pen ?? $order->amount ?? 0);
+
+            if ($projectCurrency === 'USD') {
                 $rate = floatval($order->exchange_rate ?? 0);
-                return $rate > 0 ? floatval($order->amount ?? 0) / $rate : 0;
+                return $rate > 0 ? $totalPen / $rate : 0;
             }
-            // Si el proyecto es USD y la orden es USD: usar amount directo
-            if ($projectCurrency === 'USD' && ($order->currency ?? 'PEN') === 'USD') {
-                return floatval($order->amount ?? 0);
-            }
-            // Proyecto PEN: usar amount_pen (ya convertido)
-            return floatval($order->amount_pen ?? $order->amount ?? 0);
+            return $totalPen;
         });
         $remaining = $project->available_amount - $spent;
         $usagePercent = $project->available_amount > 0 
@@ -425,6 +432,10 @@ class ProyectoController extends Controller
 
         if (!$project) {
             return response()->json(['success' => false, 'message' => 'Proyecto no encontrado'], 404);
+        }
+
+        if ($project->status !== 'active') {
+            return response()->json(['success' => false, 'message' => 'No se pueden crear órdenes en un proyecto que no está activo'], 400);
         }
 
         $request->validate([
@@ -844,13 +855,63 @@ class ProyectoController extends Controller
     {
         try {
             DB::transaction(function () use ($id) {
+                // Obtener el proyecto para acceder a su CECO
+                $project = DB::table($this->projectsTable)->find($id);
+
+                // Eliminar preproyectos (project_pipeline) asociados - esto eliminará también todas sus relaciones en cascada
+                // (communications, visits, budgets, etc. gracias a cascadeOnDelete)
+                DB::table('project_pipeline')->where('project_id', $id)->delete();
+
+                // Eliminar el CECO asociado si existe (incluyendo CECOs hijos)
+                if ($project && $project->ceco_id) {
+                    // Función recursiva para eliminar CECOs y sus hijos
+                    $this->deleteCecoAndChildren($project->ceco_id);
+                }
+
+                // ── Liberar reservas de inventario del proyecto ───
+                if (DB::getSchemaBuilder()->hasTable('inventory_reservations')) {
+                    $activeReservations = DB::table('inventory_reservations')
+                        ->where('project_id', $id)
+                        ->where('status', 'active')
+                        ->get();
+
+                    foreach ($activeReservations as $res) {
+                        // Devolver stock reservado al inventario
+                        DB::table('inventario_productos')
+                            ->where('id', $res->inventory_item_id)
+                            ->update([
+                                'cantidad_reservada' => DB::raw("GREATEST(cantidad_reservada - {$res->quantity_reserved}, 0)"),
+                                'updated_at'         => now(),
+                            ]);
+                    }
+
+                    // Eliminar todas las reservas del proyecto
+                    DB::table('inventory_reservations')
+                        ->where('project_id', $id)
+                        ->delete();
+                }
+
+                // ── Liberar items de inventario creados para el proyecto ───
+                if (DB::getSchemaBuilder()->hasTable('inventario_productos')) {
+                    DB::table('inventario_productos')
+                        ->where('project_id', $id)
+                        ->update([
+                            'project_id'      => null,
+                            'nombre_proyecto'  => null,
+                            'apartado'         => false,
+                            'updated_at'       => now(),
+                        ]);
+                }
+
+                // Eliminar datos relacionados del proyecto
                 DB::table('project_workers')->where('project_id', $id)->delete();
                 DB::table($this->expensesTable)->where('project_id', $id)->delete();
                 DB::table('purchase_orders')->where('project_id', $id)->delete();
+                DB::table('project_completion_requests')->where('project_id', $id)->delete();
                 DB::table($this->projectsTable)->where('id', $id)->delete();
             });
 
-            return response()->json(['success' => true, 'message' => 'Proyecto eliminado']);
+            return response()->json(['success' => true, 'message' => 'Proyecto, preproyectos y datos asociados eliminados correctamente']);
         } catch (\Exception $e) {
             Log::error('Error en destroy proyecto', ['error' => $e->getMessage(), 'id' => $id]);
             return response()->json(['success' => false, 'message' => 'Error interno al eliminar proyecto'], 500);
@@ -858,8 +919,25 @@ class ProyectoController extends Controller
     }
 
     /**
-     * Finalizar proyecto: libera materiales "Apartado" → "Disponible"
-     * y marca el proyecto como completado.
+     * Elimina un CECO y todos sus hijos recursivamente
+     */
+    private function deleteCecoAndChildren($cecoId)
+    {
+        // Obtener todos los CECOs hijos
+        $children = DB::table('cecos')->where('parent_id', $cecoId)->pluck('id');
+        
+        // Eliminar recursivamente los hijos
+        foreach ($children as $childId) {
+            $this->deleteCecoAndChildren($childId);
+        }
+        
+        // Eliminar el CECO actual
+        DB::table('cecos')->where('id', $cecoId)->delete();
+    }
+
+    /**
+     * Finalizar proyecto: cambia el estado a 'pendiente_recuento'
+     * para que el supervisor haga el recuento de sobrantes.
      * POST /api/proyectoskrsft/{id}/finalize
      */
     public function finalizeProject(Request $request, $id)
@@ -881,10 +959,30 @@ class ProyectoController extends Controller
         }
 
         try {
-            $crossFlowService = app(\Modulos_ERP\ComprasKrsft\Services\CrossFlowService::class);
-            $result = $crossFlowService->releaseProjectMaterials($id, auth()->id());
+            DB::table($this->projectsTable)
+                ->where('id', $id)
+                ->update([
+                    'status'     => 'pendiente_recuento',
+                    'updated_at' => now(),
+                ]);
 
-            return response()->json($result, $result['success'] ? 200 : 400);
+            // Auditoría
+            try {
+                app(\App\Services\AuditService::class)->logModelChange(
+                    'project.finalized_pending_recount',
+                    'Project',
+                    (int) $id,
+                    ['status' => 'active'],
+                    ['status' => 'pendiente_recuento', 'finalized_by' => auth()->id()]
+                );
+            } catch (\Exception $e) {
+                Log::warning('Error registrando auditoría de finalización', ['error' => $e->getMessage()]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Proyecto finalizado. El supervisor procederá con el recuento de sobrantes.',
+            ]);
         } catch (\Exception $e) {
             Log::error('Error en finalizeProject', ['id' => $id, 'error' => $e->getMessage()]);
             return response()->json(['success' => false, 'message' => 'Error interno al finalizar proyecto'], 500);
@@ -932,19 +1030,12 @@ class ProyectoController extends Controller
     {
         $modulePath = dirname(__DIR__);
         
-        // Check for xlsx first (more common), then xls
-        $xlsxPath = $modulePath . '/Assets/Templates/Plantilla_Materiales_v3.xlsx';
-        $xlsPath = $modulePath . '/Assets/Templates/plantilla_materiales.xls';
-        
+        // Serve the official EJE materials template (XLSX)
+        $xlsxPath = $modulePath . '/Assets/Templates/FORMATO DE REQUERIMIENTOS MATERIALES O EQUIPOS - EXCEL.xlsx';
+
         if (file_exists($xlsxPath)) {
-            return response()->download($xlsxPath, 'Plantilla_Materiales.xlsx', [
+            return response()->download($xlsxPath, 'Plantilla_Materiales_EJE.xlsx', [
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            ]);
-        }
-        
-        if (file_exists($xlsPath)) {
-            return response()->download($xlsPath, 'plantilla_materiales.xls', [
-                'Content-Type' => 'application/vnd.ms-excel',
             ]);
         }
         
@@ -998,6 +1089,10 @@ class ProyectoController extends Controller
 
         if (!$project) {
             return response()->json(['success' => false, 'message' => 'Proyecto no encontrado'], 404);
+        }
+
+        if ($project->status !== 'active') {
+            return response()->json(['success' => false, 'message' => 'No se pueden importar materiales en un proyecto que no está activo'], 400);
         }
 
         $request->validate([
@@ -1063,17 +1158,24 @@ class ProyectoController extends Controller
             // If check_duplicate=true and no confirmed_import=true, return preview
             if ($request->input('check_duplicate') === 'true' && $request->input('confirmed_import') !== 'true') {
                 // Return preview data
+            // Columns: A(0)=ITEM(skip/auto), B(1)=CANTIDAD, C(2)=TIPO DE MATERIAL,
+            //           D(3)=ESPECIFICACION TECNICA, E(4)=MEDIDA, F(5)=TIPO DE CONEXIÓN, G(6)=OBSERVACIONES
                 $previewItems = [];
                 foreach ($rows as $index => $columns) {
-                    if (count($columns) < 3) continue;
-                    
+                    // Need at least TIPO DE MATERIAL (C, index 2) or ESPECIFICACION TECNICA (D, index 3)
+                    $materialType = trim($columns[2] ?? '');
+                    $spec = trim($columns[3] ?? '');
+                    // A row is valid if either TIPO DE MATERIAL or ESPECIFICACION TECNICA is filled
+                    if (empty($materialType) && empty($spec)) continue;
+
                     $previewItems[] = [
-                        'quantity' => intval($columns[0] ?? 1),
-                        'unit' => trim($columns[1] ?? 'UND'),
-                        'description' => trim($columns[2] ?? ''),
-                        'diameter' => trim($columns[3] ?? ''),
-                        'series' => trim($columns[4] ?? ''),
-                        'material_type' => trim($columns[5] ?? '')
+                        'quantity'      => intval($columns[1] ?? 1),
+                        'material_type' => $materialType,
+                        // Keep spec separate — do NOT fall back to materialType to avoid duplication
+                        'description'   => $spec,
+                        'diameter'      => trim($columns[4] ?? ''),
+                        'series'        => trim($columns[5] ?? ''),
+                        'notes'         => trim($columns[6] ?? '')
                     ];
                 }
 
@@ -1086,52 +1188,51 @@ class ProyectoController extends Controller
             $imported = 0;
             $errors = [];
 
-            // New simplified format (no ID column): CANT(0), UND(1), DESCRIPCION(2), DIAMETRO(3), SERIE(4), MATERIAL(5)
-            // IDs are always auto-generated
+            // Column layout (new EJE template, data from row 9):
+            // A(0)=ITEM (ignored – auto-assigned), B(1)=CANTIDAD, C(2)=TIPO DE MATERIAL,
+            // D(3)=ESPECIFICACION TECNICA, E(4)=MEDIDA, F(5)=TIPO DE CONEXIÓN, G(6)=OBSERVACIONES
             foreach ($rows as $index => $columns) {
-                // Skip if not enough columns
-                if (count($columns) < 3) {
-                    $errors[] = "Fila " . ($index + 2) . ": formato inválido";
+                $qty          = intval($columns[1] ?? 1);
+                $materialType = trim($columns[2] ?? '');
+                $description  = trim($columns[3] ?? '');
+                $diameter     = trim($columns[4] ?? '');
+                $series       = trim($columns[5] ?? '');
+                $notes        = trim($columns[6] ?? '');
+
+                // A row is valid if TIPO DE MATERIAL (C) or ESPECIFICACION TECNICA (D) has content
+                if (empty($materialType) && empty($description)) {
+                    // Completely empty data row – skip silently
                     continue;
                 }
 
-                $qty = intval($columns[0] ?? 1);
-                $unit = trim($columns[1] ?? 'UND');
-                $description = trim($columns[2] ?? '');
-                $diameter = trim($columns[3] ?? '');
-                $series = trim($columns[4] ?? '');
-                $materialType = trim($columns[5] ?? '');
-
-                if (empty($description)) {
-                    $errors[] = "Fila " . ($index + 2) . ": descripción vacía";
-                    continue;
-                }
+                // If ESPECIFICACION TECNICA is empty, keep it empty — do NOT duplicate TIPO DE MATERIAL
+                // (frontend will show '-' for empty fields)
 
                 // Always auto-generate item number
                 $itemNumber = $this->getNextItemNumber($id);
 
-                // Create order with source filename
                 $orderData = [
-                    'project_id' => $id,
-                    'item_number' => $itemNumber,
-                    'type' => 'material',
-                    'description' => $description,
-                    'materials' => json_encode([['name' => $description, 'qty' => $qty]]),
-                    'unit' => $unit,
-                    'diameter' => $diameter ?: null,
-                    'series' => $series ?: null,
-                    'material_type' => $materialType ?: null,
-                    'source_filename' => $sourceFilename,
-                    'imported_at' => now(),
-                    'currency' => $project->currency ?? 'PEN',
-                    'status' => 'draft',
-                    'supervisor_approved' => true,
+                    'project_id'             => $id,
+                    'item_number'            => $itemNumber,
+                    'type'                   => 'material',
+                    'description'            => $description,
+                    'materials'              => json_encode([['name' => $description, 'qty' => $qty]]),
+                    'unit'                   => 'und',
+                    'diameter'               => $diameter ?: null,
+                    'series'                 => $series   ?: null,
+                    'material_type'          => $materialType ?: null,
+                    'notes'                  => $notes    ?: null,
+                    'source_filename'        => $sourceFilename,
+                    'imported_at'            => now(),
+                    'currency'               => $project->currency ?? 'PEN',
+                    'status'                 => 'draft',
+                    'supervisor_approved'    => true,
                     'supervisor_approved_by' => auth()->id(),
                     'supervisor_approved_at' => now(),
-                    'manager_approved' => false,
-                    'created_by' => auth()->id(),
-                    'created_at' => now(),
-                    'updated_at' => now(),
+                    'manager_approved'       => false,
+                    'created_by'             => auth()->id(),
+                    'created_at'             => now(),
+                    'updated_at'             => now(),
                 ];
 
                 DB::table('purchase_orders')->insert($orderData);
@@ -1193,8 +1294,8 @@ class ProyectoController extends Controller
         preg_match_all('/<Row>(.*?)<\/Row>/s', $content, $rowMatches);
         
         if (!empty($rowMatches[1])) {
-            // Skip first row (header)
-            $dataRows = array_slice($rowMatches[1], 1);
+            // Skip first 9 rows (header area); data starts at row 10
+            $dataRows = array_slice($rowMatches[1], 9);
             
             foreach ($dataRows as $rowXml) {
                 // Extract cell data
@@ -1221,8 +1322,8 @@ class ProyectoController extends Controller
         
         $lines = preg_split('/\r\n|\r|\n/', $content);
         
-        // Skip header row (index 0)
-        for ($i = 1; $i < count($lines); $i++) {
+        // Skip header rows (rows 1-9); data starts at row 10
+        for ($i = 9; $i < count($lines); $i++) {
             $line = trim($lines[$i]);
             if (empty($line)) continue;
             
@@ -1282,8 +1383,8 @@ class ProyectoController extends Controller
                 $rowNum = intval($rowMatch[1]);
                 $rowXml = $rowMatch[2];
                 
-                // Skip header row (row 1)
-                if ($rowNum === 1) {
+                // Skip header rows (rows 1-9); data starts at row 10
+                if ($rowNum <= 9) {
                     continue;
                 }
                 
@@ -1291,12 +1392,18 @@ class ProyectoController extends Controller
                 $currentRow = array_fill(0, 10, '');
                 
                 // Extract each cell - match cells with or without values
-                preg_match_all('/<c\s+r="([A-Z]+)\d+"([^>]*)(?:>(.*?)<\/c>|\/>)/su', $rowXml, $cellMatches, PREG_SET_ORDER);
+                // Use a flexible regex that doesn't assume attribute order
+                preg_match_all('/<c\s([^>]*?)(?:>(.*?)<\/c>|\/>)/su', $rowXml, $cellMatches, PREG_SET_ORDER);
                 
                 foreach ($cellMatches as $cellMatch) {
-                    $colLetter = $cellMatch[1];
-                    $attrs = $cellMatch[2] ?? '';
-                    $cellContent = $cellMatch[3] ?? '';
+                    $allAttrs = $cellMatch[1] ?? '';
+                    $cellContent = $cellMatch[2] ?? '';
+                    
+                    // Extract column letter from r="XX" attribute (anywhere in attrs)
+                    if (!preg_match('/r="([A-Z]+)\d+"/', $allAttrs, $refMatch)) {
+                        continue; // skip cells without a reference
+                    }
+                    $colLetter = $refMatch[1];
                     
                     // Convert column letter to index (A=0, B=1, etc.)
                     $colIndex = 0;
@@ -1309,7 +1416,7 @@ class ProyectoController extends Controller
                     if ($colIndex < 0 || $colIndex > 9) continue;
                     
                     // Check if it's a shared string (t="s")
-                    $isSharedString = preg_match('/t="s"/i', $attrs);
+                    $isSharedString = preg_match('/t="s"/i', $allAttrs);
                     
                     // Get the value from <v>...</v>
                     $cellValue = '';
@@ -1317,8 +1424,13 @@ class ProyectoController extends Controller
                         $cellValue = $valueMatch[1];
                     }
                     
+                    // Skip cells without an actual <v> value (empty styled cells)
+                    if ($cellValue === '') {
+                        continue;
+                    }
+                    
                     // Apply shared string lookup if needed
-                    if ($isSharedString && $cellValue !== '' && isset($sharedStrings[(int)$cellValue])) {
+                    if ($isSharedString && isset($sharedStrings[(int)$cellValue])) {
                         $currentRow[$colIndex] = $sharedStrings[(int)$cellValue];
                     } else {
                         $currentRow[$colIndex] = $cellValue;
@@ -1341,5 +1453,757 @@ class ProyectoController extends Controller
         }
         
         return $rows;
+    }
+
+    // ====================================================================
+    //  COMPLETAR PROYECTO CON GESTIÓN DE SOBRAS DE MATERIALES
+    // ====================================================================
+
+    /**
+     * Obtener materiales vinculados al proyecto para el modal de finalización.
+     * GET /api/proyectoskrsft/{id}/completion-materials
+     */
+    public function getCompletionMaterials(Request $request, $id)
+    {
+        $project = DB::table($this->projectsTable)->find($id);
+        if (!$project) {
+            return response()->json(['success' => false, 'message' => 'Proyecto no encontrado'], 404);
+        }
+
+        $userInfo = $this->getUserRoleInfo();
+        if ($userInfo['isSupervisor'] && $project->supervisor_id != $userInfo['trabajadorId']) {
+            return response()->json(['success' => false, 'message' => 'No tiene acceso a este proyecto'], 403);
+        }
+
+        // 1. Materiales comprados directamente para el proyecto (apartados)
+        $rawMaterials = DB::table('inventario_productos')
+            ->where('project_id', $id)
+            ->where(function ($q) {
+                $q->where('apartado', true)
+                  ->orWhere('estado_flujo', 'apartado');
+            })
+            ->select('id', 'nombre', 'descripcion', 'cantidad', 'cantidad_reservada', 'unidad',
+                     'diameter', 'series', 'material_type', 'categoria',
+                     'precio', 'precio_unitario', 'moneda', 'batch_id')
+            ->orderBy('id')
+            ->get();
+
+        // Enriquecimiento posicional por lote
+        $batchIds = $rawMaterials->pluck('batch_id')->filter()->unique()->values()->toArray();
+        $poByBatch = [];
+        if (!empty($batchIds)) {
+            $poByBatch = DB::table('purchase_orders')
+                ->whereIn('batch_id', $batchIds)
+                ->where('project_id', $id)
+                ->select('id', 'batch_id', 'material_type', 'description')
+                ->orderBy('id')
+                ->get()
+                ->groupBy('batch_id')
+                ->map(fn($rows) => $rows->values());
+        }
+
+        $batchCounters = [];
+
+        $materials = $rawMaterials->map(function ($m) use ($poByBatch, &$batchCounters) {
+            $materialType = $m->material_type;
+            $nombre       = $m->nombre;
+            $descripcion  = $m->descripcion;
+
+            if ((!$materialType || !$nombre || !$descripcion) && !empty($m->batch_id)) {
+                $pos = $poByBatch[$m->batch_id] ?? collect();
+                $idx = $batchCounters[$m->batch_id] ?? 0;
+                $batchCounters[$m->batch_id] = $idx + 1;
+                $po = $pos[$idx] ?? null;
+                if ($po) {
+                    if (!$materialType && !empty($po->material_type)) {
+                        $materialType = $po->material_type;
+                    }
+                    if ((!$nombre || $nombre === 'Material sin tipo') && !empty($po->material_type)) {
+                        $nombre = $po->material_type;
+                    }
+                    if (!$descripcion && !empty($po->description)) {
+                        $descripcion = $po->description;
+                    }
+                }
+            }
+
+            return (object) [
+                'producto_id'       => $m->id,
+                'nombre'            => $nombre,
+                'descripcion'       => $descripcion,
+                'cantidad_original' => (int) $m->cantidad,
+                'cantidad_reservada'=> (int) ($m->cantidad_reservada ?? 0),
+                'unidad'            => $m->unidad,
+                'diameter'          => $m->diameter,
+                'series'            => $m->series,
+                'material_type'     => $materialType,
+                'categoria'         => $m->categoria,
+                'precio'            => (float) $m->precio,
+                'precio_unitario'   => (float) ($m->precio_unitario ?: ($m->cantidad > 0 ? $m->precio / $m->cantidad : 0)),
+                'moneda'            => $m->moneda,
+                'source'            => 'project',
+            ];
+        });
+
+        // 2. Materiales tomados de inventario general (reservas activas)
+        $reservations = DB::table('inventory_reservations')
+            ->where('inventory_reservations.project_id', $id)
+            ->where('inventory_reservations.status', 'active')
+            ->join('inventario_productos', 'inventario_productos.id', '=', 'inventory_reservations.inventory_item_id')
+            ->select(
+                'inventario_productos.id',
+                'inventario_productos.nombre',
+                'inventario_productos.descripcion',
+                'inventario_productos.unidad',
+                'inventario_productos.diameter',
+                'inventario_productos.series',
+                'inventario_productos.material_type',
+                'inventario_productos.categoria',
+                'inventario_productos.precio_unitario',
+                'inventario_productos.moneda',
+                'inventory_reservations.id as reservation_id',
+                'inventory_reservations.quantity_reserved',
+                'inventory_reservations.unit_price_at_reservation',
+                'inventory_reservations.purchase_order_id'
+            )
+            ->orderBy('inventory_reservations.id')
+            ->get();
+
+        foreach ($reservations as $r) {
+            // Enriquecer nombre/descripcion desde purchase_order si falta
+            $materialType = $r->material_type;
+            $nombre       = $r->nombre;
+            $descripcion  = $r->descripcion;
+            if ($r->purchase_order_id) {
+                $po = DB::table('purchase_orders')->find($r->purchase_order_id);
+                if ($po) {
+                    if (!$materialType && !empty($po->material_type)) $materialType = $po->material_type;
+                    if ((!$nombre || $nombre === 'Material sin tipo') && !empty($po->material_type)) $nombre = $po->material_type;
+                    if (!$descripcion && !empty($po->description)) $descripcion = $po->description;
+                }
+            }
+
+            $materials->push((object) [
+                'producto_id'       => $r->id,
+                'nombre'            => $nombre,
+                'descripcion'       => $descripcion,
+                'cantidad_original' => (int) $r->quantity_reserved,
+                'cantidad_reservada'=> (int) $r->quantity_reserved,
+                'unidad'            => $r->unidad,
+                'diameter'          => $r->diameter,
+                'series'            => $r->series,
+                'material_type'     => $materialType,
+                'categoria'         => $r->categoria,
+                'precio'            => (float) ($r->unit_price_at_reservation * $r->quantity_reserved),
+                'precio_unitario'   => (float) $r->unit_price_at_reservation,
+                'moneda'            => $r->moneda,
+                'source'            => 'inventory',
+                'reservation_id'    => $r->reservation_id,
+            ]);
+        }
+
+        return response()->json([
+            'success'   => true,
+            'materials' => $materials->values(),
+        ]);
+    }
+
+    /**
+     * Obtener la solicitud de finalización activa para un proyecto.
+     * GET /api/proyectoskrsft/{id}/completion-request
+     */
+    public function getCompletionRequest(Request $request, $id)
+    {
+        $project = DB::table($this->projectsTable)->find($id);
+        if (!$project) {
+            return response()->json(['success' => false, 'message' => 'Proyecto no encontrado'], 404);
+        }
+
+        $req = DB::table('project_completion_requests')
+            ->where('project_id', $id)
+            ->whereIn('status', ['pending', 'rejected'])
+            ->orderByDesc('created_at')
+            ->first();
+
+        if (!$req) {
+            return response()->json(['success' => true, 'request' => null]);
+        }
+
+        $requestedBy = DB::table('users')->find($req->requested_by);
+
+        // Enriquecer materials_data con datos de purchase_orders (pueden faltar si se guardó antes del fix)
+        $materialsData = json_decode($req->materials_data, true) ?: [];
+
+        // Pre-cargar items de inventario y POs agrupadas por batch_id (matching posicional)
+        $productoIds = array_column($materialsData, 'producto_id');
+        $items = DB::table('inventario_productos')->whereIn('id', $productoIds)->get()->keyBy('id');
+
+        $batchIds = $items->pluck('batch_id')->filter()->unique()->values()->toArray();
+        $poByBatch = [];
+        if (!empty($batchIds)) {
+            $poByBatch = DB::table('purchase_orders')
+                ->whereIn('batch_id', $batchIds)
+                ->where('project_id', $id)
+                ->select('id', 'batch_id', 'material_type', 'description')
+                ->orderBy('id')
+                ->get()
+                ->groupBy('batch_id')
+                ->map(fn($rows) => $rows->values());
+        }
+
+        $batchCounters = [];
+
+        foreach ($materialsData as &$mat) {
+            $item = $items[$mat['producto_id']] ?? null;
+
+            // === Siempre hacer matching posicional por lote ===
+            // El dato almacenado puede estar desactualizado (bug antiguo con ->first()).
+            // Siempre re-enriquecemos desde la BD para garantizar datos correctos.
+            $po = null;
+            if ($item && !empty($item->batch_id)) {
+                $pos = $poByBatch[$item->batch_id] ?? collect();
+                $idx = $batchCounters[$item->batch_id] ?? 0;
+                $batchCounters[$item->batch_id] = $idx + 1;
+                $po = $pos[$idx] ?? null;
+            }
+
+            // Siempre re-derivar material_type, nombre y descripcion desde la BD,
+            // ignorando los valores almacenados (pueden estar corruptos por el bug antiguo de ->first()).
+            // Se construye desde cero: item > PO posicional. Si ambas fuentes están vacías,
+            // el campo queda vacío (borrando el valor incorrecto guardado).
+            $derivedType  = '';
+            $derivedNombre = '';
+            $derivedDesc   = '';
+
+            // Fuente 1: inventario_productos
+            // nombre = Tipo de Material, descripcion = Especificación Técnica
+            if ($item) {
+                if (!empty($item->material_type)) $derivedType = $item->material_type;
+                elseif (!empty($item->nombre) && $item->nombre !== 'Material sin tipo') $derivedType = $item->nombre;
+                if (!empty($item->descripcion))   $derivedDesc   = $item->descripcion;
+                if (!empty($item->descripcion)) {
+                    $derivedNombre = $item->descripcion;
+                } elseif (!empty($item->nombre) && $item->nombre !== 'Material sin tipo') {
+                    $derivedNombre = $item->nombre;
+                }
+            }
+
+            // Fuente 2: purchase_order posicional (tiene prioridad sobre el item para material_type,
+            // y rellena nombre/desc solo si el item no los tenía).
+            if ($po) {
+                if (!empty($po->material_type)) $derivedType = $po->material_type;
+                if (empty($derivedNombre) && !empty($po->description)) $derivedNombre = $po->description;
+                if (empty($derivedDesc)   && !empty($po->description)) $derivedDesc   = $po->description;
+            }
+
+            // Asignar siempre (pisa valores almacenados, incluyendo los incorrectos)
+            if ($derivedType  !== '') $mat['material_type'] = $derivedType;
+            $mat['nombre']    = $derivedNombre;   // vacío si ninguna fuente lo tiene
+            if ($derivedDesc  !== '') $mat['descripcion'] = $derivedDesc;
+
+            // Prioridad 3: si sigue faltando, intentar con la reserva (materiales de inventario general)
+            if (empty($mat['material_type']) || empty($mat['nombre'])) {
+                $source = $mat['source'] ?? 'project';
+                $reservationId = $mat['reservation_id'] ?? null;
+                $fallbackPo = null;
+
+                if ($source === 'inventory' && $reservationId) {
+                    $reservation = DB::table('inventory_reservations')->find($reservationId);
+                    if ($reservation && $reservation->purchase_order_id) {
+                        $fallbackPo = DB::table('purchase_orders')->find($reservation->purchase_order_id);
+                    }
+                }
+                if (!$fallbackPo && $item) {
+                    $fallbackPo = DB::table('purchase_orders')
+                        ->where('inventory_item_id', $item->id)
+                        ->where('project_id', $id)
+                        ->first();
+                }
+                if ($fallbackPo) {
+                    if (empty($mat['material_type']) && !empty($fallbackPo->material_type)) {
+                        $mat['material_type'] = $fallbackPo->material_type;
+                    }
+                    if (empty($mat['nombre']) && !empty($fallbackPo->description)) {
+                        $mat['nombre'] = $fallbackPo->description;
+                    }
+                    if (empty($mat['descripcion']) && !empty($fallbackPo->description)) {
+                        $mat['descripcion'] = $fallbackPo->description;
+                    }
+                }
+            }
+        }
+        unset($mat);
+
+        return response()->json([
+            'success' => true,
+            'request' => [
+                'id'               => $req->id,
+                'status'           => $req->status,
+                'materials_data'   => $materialsData,
+                'rejection_notes'  => $req->rejection_notes,
+                'requested_by_name'=> $requestedBy ? $requestedBy->name : 'Usuario',
+                'created_at'       => $req->created_at,
+            ],
+        ]);
+    }
+
+    /**
+     * Supervisor envía el recuento de sobrantes para un proyecto finalizado.
+     * POST /api/proyectoskrsft/{id}/request-completion
+     */
+    public function requestCompletion(Request $request, $id)
+    {
+        $project = DB::table($this->projectsTable)->find($id);
+        if (!$project) {
+            return response()->json(['success' => false, 'message' => 'Proyecto no encontrado'], 404);
+        }
+        if ($project->status !== 'pendiente_recuento') {
+            return response()->json(['success' => false, 'message' => 'El proyecto debe estar en estado "Recuento Pendiente" para enviar sobrantes'], 400);
+        }
+
+        $userInfo = $this->getUserRoleInfo();
+        if (!$userInfo['isSupervisor'] || $project->supervisor_id != $userInfo['trabajadorId']) {
+            return response()->json(['success' => false, 'message' => 'Solo el supervisor asignado puede enviar el recuento de sobrantes'], 403);
+        }
+
+        // Verificar que no exista solicitud pendiente
+        $existing = DB::table('project_completion_requests')
+            ->where('project_id', $id)
+            ->where('status', 'pending')
+            ->exists();
+        if ($existing) {
+            return response()->json(['success' => false, 'message' => 'Ya existe un recuento pendiente de aprobación'], 400);
+        }
+
+        $request->validate([
+            'materials'               => 'required|array',
+            'materials.*.producto_id' => 'required|integer',
+            'materials.*.cantidad_sobrante' => 'required|integer|min:0',
+        ]);
+
+        $materialsInput = $request->input('materials');
+        $materialsData = [];
+
+        foreach ($materialsInput as $mat) {
+            $item = DB::table('inventario_productos')->find($mat['producto_id']);
+            if (!$item) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Material #{$mat['producto_id']} no encontrado",
+                ], 422);
+            }
+
+            $source = $mat['source'] ?? 'project';
+            $reservationId = $mat['reservation_id'] ?? null;
+            $reservation = null;
+
+            // Validar pertenencia según source
+            if ($source === 'inventory') {
+                // Material de inventario: validar que exista reserva activa para este proyecto
+                $reservation = DB::table('inventory_reservations')
+                    ->where('inventory_item_id', $item->id)
+                    ->where('project_id', $id)
+                    ->where('status', 'active')
+                    ->when($reservationId, fn($q) => $q->where('id', $reservationId))
+                    ->first();
+                if (!$reservation) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Material \"{$item->nombre}\" no tiene reserva activa en este proyecto",
+                    ], 422);
+                }
+                $cantidadOriginal = (int) $reservation->quantity_reserved;
+                $reservationId = $reservation->id;
+            } else {
+                // Material del proyecto: validar project_id
+                if ($item->project_id != $id) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Material #{$mat['producto_id']} no pertenece a este proyecto",
+                    ], 422);
+                }
+                $cantidadOriginal = (int) $item->cantidad;
+            }
+
+            $cantidadSobrante = (int) $mat['cantidad_sobrante'];
+
+            if ($cantidadSobrante > $cantidadOriginal) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "La cantidad sobrante de \"{$item->nombre}\" ({$cantidadSobrante}) no puede exceder la cantidad original ({$cantidadOriginal})",
+                ], 422);
+            }
+
+            // ── Enriquecer nombre y material_type desde purchase_orders ──
+            $materialType = $item->material_type;
+            $descripcion  = $item->descripcion;
+            $nombre       = $item->nombre;
+
+            $enrichPo = null;
+            if ($source === 'inventory' && $reservation && $reservation->purchase_order_id) {
+                $enrichPo = DB::table('purchase_orders')->find($reservation->purchase_order_id);
+            }
+            if (!$enrichPo && !empty($item->purchase_order_id)) {
+                $enrichPo = DB::table('purchase_orders')->find($item->purchase_order_id);
+            }
+            if (!$enrichPo) {
+                $enrichPo = DB::table('purchase_orders')
+                    ->where('inventory_item_id', $item->id)
+                    ->where('project_id', $id)
+                    ->first();
+            }
+            if (!$enrichPo && !empty($item->batch_id)) {
+                $enrichPo = DB::table('purchase_orders')
+                    ->where('batch_id', $item->batch_id)
+                    ->where('project_id', $id)
+                    ->first();
+            }
+            if ($enrichPo) {
+                if (empty($materialType) && !empty($enrichPo->material_type)) {
+                    $materialType = $enrichPo->material_type;
+                }
+                if ((empty($nombre) || $nombre === 'Material sin tipo') && !empty($enrichPo->material_type)) {
+                    $nombre = $enrichPo->material_type;
+                }
+                if (empty($descripcion) && !empty($enrichPo->description)) {
+                    $descripcion = $enrichPo->description;
+                }
+            }
+
+            $materialsData[] = [
+                'producto_id'       => $item->id,
+                'nombre'            => $nombre,
+                'material_type'     => $materialType,
+                'descripcion'       => $descripcion,
+                'diameter'          => $item->diameter,
+                'series'            => $item->series,
+                'unidad'            => $item->unidad,
+                'cantidad_original' => $cantidadOriginal,
+                'cantidad_usada'    => $cantidadOriginal - $cantidadSobrante,
+                'cantidad_sobra'    => $cantidadSobrante,
+                'source'            => $source,
+                'reservation_id'    => $reservationId,
+            ];
+        }
+
+        DB::table('project_completion_requests')->insert([
+            'project_id'     => $id,
+            'requested_by'   => auth()->id(),
+            'status'         => 'pending',
+            'materials_data' => json_encode($materialsData),
+            'created_at'     => now(),
+            'updated_at'     => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Recuento de sobrantes enviado. Esperando aprobación del jefe de proyectos.',
+        ]);
+    }
+
+    /**
+     * Manager/Admin aprueba o rechaza la solicitud de finalización con sobras.
+     * POST /api/proyectoskrsft/{id}/approve-completion
+     */
+    public function approveCompletion(Request $request, $id)
+    {
+        $project = DB::table($this->projectsTable)->find($id);
+        if (!$project) {
+            return response()->json(['success' => false, 'message' => 'Proyecto no encontrado'], 404);
+        }
+
+        $userInfo = $this->getUserRoleInfo();
+        if (!in_array($userInfo['role'], ['manager', 'admin'])) {
+            return response()->json(['success' => false, 'message' => 'No tiene permisos para aprobar finalizaciones'], 403);
+        }
+
+        $request->validate([
+            'request_id'       => 'required|integer',
+            'action'           => 'required|in:approve,reject',
+            'rejection_notes'  => 'required_if:action,reject|nullable|string|max:1000',
+        ]);
+
+        $completionReq = DB::table('project_completion_requests')->find($request->input('request_id'));
+        if (!$completionReq || $completionReq->project_id != $id || $completionReq->status !== 'pending') {
+            return response()->json(['success' => false, 'message' => 'Solicitud no válida o ya procesada'], 400);
+        }
+
+        $action = $request->input('action');
+
+        if ($action === 'reject') {
+            DB::table('project_completion_requests')
+                ->where('id', $completionReq->id)
+                ->update([
+                    'status'          => 'rejected',
+                    'approved_by'     => auth()->id(),
+                    'rejection_notes' => $request->input('rejection_notes'),
+                    'updated_at'      => now(),
+                ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Solicitud rechazada. El supervisor podrá enviar una nueva solicitud.',
+            ]);
+        }
+
+        // === APROBAR: ejecutar split de sobras e inventario ===
+        return DB::transaction(function () use ($completionReq, $id, $project) {
+            $materialsData  = json_decode($completionReq->materials_data, true);
+            $materialsConSobras = 0;
+            $totalSobra     = 0;
+            $newItemIds     = [];
+            $auditDetails   = [];
+            $processedReservationIds = [];
+
+            foreach ($materialsData as $mat) {
+                $item = DB::table('inventario_productos')->find($mat['producto_id']);
+                if (!$item) continue;
+
+                $cantidadSobra   = (int) $mat['cantidad_sobra'];
+                $cantidadOriginal = (int) $mat['cantidad_original'];
+                $source          = $mat['source'] ?? 'project';
+
+                // ── Materiales de INVENTARIO (vía reserva) ───
+                if ($source === 'inventory') {
+                    $reservationId = $mat['reservation_id'] ?? null;
+                    $cantidadConsumida = $cantidadOriginal - $cantidadSobra;
+
+                    // Reducir cantidad (lo consumido se fue) y liberar reserva
+                    // NOTA: precio/amount se recalculan en un UPDATE separado porque
+                    // MySQL evalúa SET de izquierda a derecha, y si precio referencia
+                    // cantidad en el mismo UPDATE, usa el valor ya reducido (doble resta).
+                    DB::table('inventario_productos')
+                        ->where('id', $item->id)
+                        ->update([
+                            'cantidad'           => DB::raw("GREATEST(cantidad - {$cantidadConsumida}, 0)"),
+                            'cantidad_reservada' => DB::raw("GREATEST(cantidad_reservada - {$cantidadOriginal}, 0)"),
+                            'updated_at'         => now(),
+                        ]);
+
+                    // Recalcular totales basados en la cantidad ya actualizada
+                    DB::table('inventario_productos')
+                        ->where('id', $item->id)
+                        ->update([
+                            'precio' => DB::raw("ROUND(precio_unitario * cantidad, 2)"),
+                            'amount' => DB::raw("ROUND(precio_unitario * cantidad, 2)"),
+                        ]);
+
+                    // Actualizar amount_pen proporcionalmente
+                    $freshItem = DB::table('inventario_productos')->find($item->id);
+                    if ($freshItem->moneda === 'USD' && $freshItem->amount_pen && $freshItem->amount > 0) {
+                        $ratio = $freshItem->amount_pen / $freshItem->amount;
+                        DB::table('inventario_productos')
+                            ->where('id', $item->id)
+                            ->update([
+                                'amount_pen' => DB::raw("ROUND(amount * {$ratio}, 2)"),
+                            ]);
+                    }
+
+                    // Limpiar enlace inventory_item_id de las órdenes de compra
+                    // para que el proyecto ya no aparezca en "Uso por Proyecto" del inventario
+                    DB::table('purchase_orders')
+                        ->where('inventory_item_id', $item->id)
+                        ->where('project_id', $id)
+                        ->update([
+                            'inventory_item_id' => null,
+                            'updated_at'        => now(),
+                        ]);
+
+                    // Marcar reserva como consumida
+                    if ($reservationId) {
+                        $processedReservationIds[] = $reservationId;
+                        DB::table('inventory_reservations')
+                            ->where('id', $reservationId)
+                            ->update([
+                                'status'      => 'consumed',
+                                'released_by' => auth()->id(),
+                                'released_at' => now(),
+                                'notes'       => $cantidadSobra > 0
+                                    ? "Consumido: {$cantidadConsumida}, sobra devuelta: {$cantidadSobra}"
+                                    : "Consumido completamente: {$cantidadOriginal}",
+                                'updated_at'  => now(),
+                            ]);
+                    }
+
+                    if ($cantidadSobra > 0) {
+                        $materialsConSobras++;
+                        $totalSobra += $cantidadSobra;
+                    }
+
+                    $auditDetails[] = [
+                        'producto_id'       => $mat['producto_id'],
+                        'nombre'            => $mat['nombre'],
+                        'source'            => 'inventory',
+                        'reservation_id'    => $reservationId,
+                        'cantidad_original' => $cantidadOriginal,
+                        'cantidad_usada'    => $cantidadConsumida,
+                        'cantidad_sobra'    => $cantidadSobra,
+                    ];
+                    continue;
+                }
+
+                // ── Materiales del PROYECTO (comprados para el proyecto) ───
+                if ($cantidadSobra > 0) {
+                    $cantidadUsada = (int) $mat['cantidad_usada'];
+                    $unitPrice = $item->precio_unitario ?: ($item->cantidad > 0 ? $item->precio / $item->cantidad : 0);
+
+                    // Eliminar el original (consumido en el proyecto)
+                    DB::table('inventario_productos')
+                        ->where('id', $item->id)
+                        ->delete();
+
+                    // Crear nuevo item con la sobra (disponible, sin proyecto)
+                    $newSku = 'INV-' . md5($item->sku . '-sobra-' . $id . '-' . microtime(true));
+                    $newAmount    = round($unitPrice * $cantidadSobra, 2);
+                    $newAmountPen = ($item->moneda === 'USD' && $item->amount_pen && $item->amount)
+                        ? round(($item->amount_pen / max($item->amount, 1)) * $newAmount, 2)
+                        : $newAmount;
+                    $newId = DB::table('inventario_productos')->insertGetId([
+                        'nombre'           => $item->material_type ?: $item->nombre,
+                        'descripcion'      => $item->descripcion,
+                        'sku'              => $newSku,
+                        'cantidad'         => $cantidadSobra,
+                        'cantidad_reservada'=> 0,
+                        'precio'           => round($unitPrice * $cantidadSobra, 2),
+                        'precio_unitario'  => round($unitPrice, 2),
+                        'categoria'        => $item->categoria,
+                        'unidad'           => $item->unidad,
+                        'moneda'           => $item->moneda,
+                        'estado'           => 'activo',
+                        'estado_flujo'     => 'disponible',
+                        'ubicacion'        => null,
+                        'estado_ubicacion' => 'pendiente',
+                        'project_id'       => null,
+                        'nombre_proyecto'  => null,
+                        'apartado'         => false,
+                        'batch_id'         => $item->batch_id,
+                        'diameter'         => $item->diameter,
+                        'series'           => $item->series,
+                        'material_type'    => $item->material_type,
+                        'amount'           => $newAmount,
+                        'amount_pen'       => $newAmountPen,
+                        'created_at'       => now(),
+                        'updated_at'       => now(),
+                    ]);
+
+                    $newItemIds[]  = $newId;
+                    $materialsConSobras++;
+                    $totalSobra += $cantidadSobra;
+
+                    $auditDetails[] = [
+                        'producto_id'       => $mat['producto_id'],
+                        'nombre'            => $mat['nombre'],
+                        'source'            => 'project',
+                        'cantidad_original' => $cantidadOriginal,
+                        'cantidad_usada'    => $cantidadUsada,
+                        'cantidad_sobra'    => $cantidadSobra,
+                        'nuevo_item_id'     => $newId,
+                    ];
+                } else {
+                    // Sin sobra: todo fue consumido, eliminar del inventario
+                    DB::table('inventario_productos')
+                        ->where('id', $item->id)
+                        ->delete();
+
+                    $auditDetails[] = [
+                        'producto_id'       => $mat['producto_id'],
+                        'nombre'            => $mat['nombre'],
+                        'source'            => 'project',
+                        'cantidad_original' => $cantidadOriginal,
+                        'cantidad_usada'    => $cantidadOriginal,
+                        'cantidad_sobra'    => 0,
+                    ];
+                }
+            }
+
+            // Liberar reservas activas restantes (no procesadas individualmente)
+            $remainingReservations = DB::table('inventory_reservations')
+                ->where('project_id', $id)
+                ->where('status', 'active')
+                ->whereNotIn('id', $processedReservationIds)
+                ->get();
+
+            foreach ($remainingReservations as $res) {
+                DB::table('inventario_productos')
+                    ->where('id', $res->inventory_item_id)
+                    ->update([
+                        'cantidad_reservada' => DB::raw("GREATEST(cantidad_reservada - {$res->quantity_reserved}, 0)"),
+                        'updated_at'         => now(),
+                    ]);
+            }
+
+            if ($remainingReservations->isNotEmpty()) {
+                DB::table('inventory_reservations')
+                    ->whereIn('id', $remainingReservations->pluck('id'))
+                    ->update([
+                        'status'      => 'released',
+                        'released_by' => auth()->id(),
+                        'released_at' => now(),
+                        'notes'       => 'Liberado al completar proyecto con gestión de sobras',
+                        'updated_at'  => now(),
+                    ]);
+            }
+
+            // Actualizar warehouse_status de purchase_orders
+            DB::table('purchase_orders')
+                ->where('project_id', $id)
+                ->where('warehouse_status', 'apartado')
+                ->update([
+                    'warehouse_status' => 'disponible',
+                    'updated_at'       => now(),
+                ]);
+
+            // Marcar proyecto como completado
+            DB::table($this->projectsTable)
+                ->where('id', $id)
+                ->update([
+                    'status'     => 'completed',
+                    'updated_at' => now(),
+                ]);
+
+            // Actualizar solicitud
+            DB::table('project_completion_requests')
+                ->where('id', $completionReq->id)
+                ->update([
+                    'status'       => 'approved',
+                    'approved_by'  => auth()->id(),
+                    'completed_at' => now(),
+                    'updated_at'   => now(),
+                ]);
+
+            // Auditoría
+            try {
+                app(\App\Services\AuditService::class)->logModelChange(
+                    'project.completed_with_sobras',
+                    'Project',
+                    (int) $id,
+                    ['project_name' => $project->name, 'status' => 'active'],
+                    [
+                        'status'               => 'completed',
+                        'materials_con_sobras'  => $materialsConSobras,
+                        'total_sobra_devuelta'  => $totalSobra,
+                        'nuevos_items_ids'      => $newItemIds,
+                        'detalle_materiales'    => $auditDetails,
+                        'approved_by'           => auth()->id(),
+                    ]
+                );
+            } catch (\Exception $e) {
+                Log::warning('Error registrando auditoría de sobras', ['error' => $e->getMessage()]);
+            }
+
+            $releasedCount = count($materialsData);
+            $message = "Proyecto finalizado. {$releasedCount} materiales procesados.";
+            if ($materialsConSobras > 0) {
+                $message .= " {$materialsConSobras} con sobras devueltas al inventario ({$totalSobra} unidades).";
+            }
+
+            return response()->json([
+                'success'              => true,
+                'message'              => $message,
+                'released_count'       => $releasedCount,
+                'materials_con_sobras' => $materialsConSobras,
+                'total_sobra_devuelta' => $totalSobra,
+            ]);
+        });
     }
 }

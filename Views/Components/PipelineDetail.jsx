@@ -28,6 +28,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
+import LeadFilesSection from './LeadFilesSection';
 import { CreateProjectFromLeadModal } from './modals/PipelineModals';
 import { formatNumber, formatDate, getCurrencySymbol } from '../utils';
 
@@ -161,6 +162,9 @@ function Section({ title, icon: Icon, badge, children, actions }) {
  *   onOpenBudgetModal: Function,
  *   onUpdateBudgetStatus: Function,
  *   onOpenNegotiationModal: Function,
+ *   onUploadFiles: Function,
+ *   onDeleteFile: Function,
+ *   getFileDownloadUrl: Function,
  *   cecos: Array,
  *   supervisors: Array,
  *   showCreateProjectModal: boolean,
@@ -182,6 +186,9 @@ function PipelineDetail({
   onOpenBudgetModal,
   onUpdateBudgetStatus,
   onOpenNegotiationModal,
+  onUploadFiles,
+  onDeleteFile,
+  getFileDownloadUrl,
   cecos = [],
   supervisors = [],
   showCreateProjectModal = false,
@@ -191,6 +198,14 @@ function PipelineDetail({
 }) {
   const [showHistory, setShowHistory] = useState(false);
   const isClosed = lead?.etapa === 'cerrado_ganado' || lead?.etapa === 'cerrado_perdido';
+
+  // ── Lógica progresiva por etapas ──
+  // Cada sección se desbloquea cuando se alcanza su etapa y permanece disponible en etapas posteriores.
+  const stageIdx = STAGE_ORDER.indexOf(lead?.etapa ?? 'ingresado');
+  const canRegisterCommunication = !isClosed && stageIdx >= STAGE_ORDER.indexOf('ingresado');
+  const canScheduleVisit = !isClosed && stageIdx >= STAGE_ORDER.indexOf('contactado');
+  const canCreateBudget = !isClosed && stageIdx >= STAGE_ORDER.indexOf('visitado');
+  const canRegisterNegotiation = !isClosed && stageIdx >= STAGE_ORDER.indexOf('presupuestado');
 
   if (loadingDetail || !lead) {
     return (
@@ -309,12 +324,21 @@ function PipelineDetail({
         </Section>
       </div>
 
+      {/* ── Archivos Adjuntos ── */}
+      <LeadFilesSection
+        files={lead.files || []}
+        isClosed={isClosed}
+        onUpload={(files, category) => onUploadFiles(lead.id, files, category)}
+        onDelete={onDeleteFile}
+        getDownloadUrl={getFileDownloadUrl}
+      />
+
       {/* ── Comunicaciones ── */}
       <Section
         title="Registro de Comunicaciones"
         icon={PhoneIcon}
         badge={<Badge variant="blue" className="text-[10px]">{(lead.communications || []).length}</Badge>}
-        actions={!isClosed && (
+        actions={canRegisterCommunication && (
           <Button variant="primary" size="sm" onClick={onOpenCommunicationModal} className="gap-1 text-xs">
             <PlusIcon className="size-3" />
             Registrar
@@ -363,7 +387,7 @@ function PipelineDetail({
         title="Programación de Visitas"
         icon={MapPinIcon}
         badge={<Badge variant="purple" className="text-[10px]">{(lead.visits || []).length}</Badge>}
-        actions={!isClosed && (
+        actions={canScheduleVisit && (
           <Button variant="primary" size="sm" onClick={onOpenVisitModal} className="gap-1 text-xs">
             <PlusIcon className="size-3" />
             Programar
@@ -409,7 +433,7 @@ function PipelineDetail({
         title="Presupuestos"
         icon={CurrencyDollarIcon}
         badge={<Badge variant="amber" className="text-[10px]">{(lead.budgets || []).length}</Badge>}
-        actions={!isClosed && (
+        actions={canCreateBudget && (
           <Button variant="primary" size="sm" onClick={onOpenBudgetModal} className="gap-1 text-xs">
             <PlusIcon className="size-3" />
             Crear Presupuesto
@@ -471,7 +495,7 @@ function PipelineDetail({
         title="Seguimiento de Negociación"
         icon={ChatBubbleLeftRightIcon}
         badge={<Badge variant="cyan" className="text-[10px]">{(lead.negotiations || []).length}</Badge>}
-        actions={!isClosed && (
+        actions={canRegisterNegotiation && (
           <Button variant="primary" size="sm" onClick={onOpenNegotiationModal} className="gap-1 text-xs">
             <PlusIcon className="size-3" />
             Registrar

@@ -1,15 +1,15 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   FolderIcon,
   ChartBarIcon,
   CurrencyDollarIcon,
   CreditCardIcon,
   DocumentTextIcon,
-  PlusIcon,
   FunnelIcon,
   RocketLaunchIcon,
   ArrowLeftIcon,
   UserIcon,
+  PlusIcon,
 } from '@heroicons/react/24/outline';
 
 import useProyectosData from './hooks/useProyectosData';
@@ -47,6 +47,10 @@ import ConfirmModal from './Components/modals/ConfirmModal';
 import ImportPreviewModal from './Components/modals/ImportPreviewModal';
 import DuplicateFileModal from './Components/modals/DuplicateFileModal';
 import ConfigModal from './Components/modals/ConfigModal';
+import RejectModal from './Components/modals/RejectModal';
+import CompletionApprovalModal from './Components/modals/CompletionApprovalModal';
+import RecuentoSobrantesPanel from './Components/RecuentoSobrantesPanel';
+import AdminRecuentoPanel from './Components/AdminRecuentoPanel';
 
 /* ============================================
    ORCHESTRATOR — Proyectos Module
@@ -69,14 +73,30 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
   // Navigation: 'pipeline' | 'projects' | 'project-detail' | 'lead-detail'
   const [activeTab, setActiveTab] = useState(isSupervisor ? 'projects' : 'pipeline');
   const [showConfigModal, setShowConfigModal] = useState(false);
+  const [loadingProjectDetail, setLoadingProjectDetail] = useState(false);
 
   // ── Tab switching helpers ──
   const goToPipeline = () => { setActiveTab('pipeline'); pipe.setSelectedLead(null); };
   const goToProjects = () => { setActiveTab('projects'); d.setSelectedProject(null); };
-  const selectProject = (p) => { d.selectProject(p); setActiveTab('project-detail'); };
+  const selectProject = async (p) => {
+    setLoadingProjectDetail(true);
+    setActiveTab('project-detail');
+    await d.selectProject(p);
+    setLoadingProjectDetail(false);
+  };
   const backFromDetail = () => { d.setSelectedProject(null); setActiveTab('projects'); };
   const selectLead = (lead) => { pipe.setSelectedLead(lead); setActiveTab('lead-detail'); };
   const backFromLead = () => { pipe.setSelectedLead(null); setActiveTab('pipeline'); };
+
+  // ── Auto-navigation: regresar a lista cuando se elimina un proyecto/lead ──
+  useEffect(() => {
+    if (activeTab === 'project-detail' && !d.selectedProject && !loadingProjectDetail) {
+      setActiveTab('projects');
+    }
+    if (activeTab === 'lead-detail' && !pipe.selectedLead) {
+      setActiveTab('pipeline');
+    }
+  }, [activeTab, d.selectedProject, pipe.selectedLead, loadingProjectDetail]);
 
   // ── Render view ──
   const renderView = () => {
@@ -96,6 +116,9 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
           onOpenBudgetModal={() => pipe.setShowBudgetModal(true)}
           onUpdateBudgetStatus={pipe.updateBudgetStatus}
           onOpenNegotiationModal={() => pipe.setShowNegotiationModal(true)}
+          onUploadFiles={pipe.uploadFiles}
+          onDeleteFile={pipe.deleteFile}
+          getFileDownloadUrl={pipe.getFileDownloadUrl}
           cecos={pipe.cecos}
           supervisors={d.supervisors}
           showCreateProjectModal={pipe.showCreateProjectModal}
@@ -107,7 +130,22 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
     }
 
     // ─── Project Detail ───
-    if (activeTab === 'project-detail' && d.selectedProject) {
+    if (activeTab === 'project-detail') {
+      if (!d.selectedProject) {
+        return (
+          <div className="flex flex-col items-center justify-center py-24">
+            <svg className="size-10 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            <p className="mt-4 text-sm text-gray-500">Cargando proyecto...</p>
+          </div>
+        );
+      }
+      const isProjectReadOnly = isSupervisor && (d.selectedProject.status === 'pendiente_recuento' || d.selectedProject.status === 'completed');
+      const showRecuento = isSupervisor && d.selectedProject.status === 'pendiente_recuento';
+      const showAdminApproval = !isSupervisor && d.selectedProject.status === 'pendiente_recuento' && d.completionRequest?.status === 'pending';
+
       return (
         <div className="space-y-6">
           <DetailHeader
@@ -123,8 +161,27 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
             spentColor={d.spentColor}
             onStateClick={d.handleProjectStateClick}
             ordersGroupedByFile={d.ordersGroupedByFile}
+            completionRequest={d.completionRequest}
+            isSupervisor={isSupervisor}
           />
-          {isSupervisor && (
+          {showRecuento && (
+            <RecuentoSobrantesPanel
+              materials={d.completionMaterials}
+              completionRequest={d.completionRequest}
+              onSubmit={(mats) => d.requestCompletion(d.selectedProject?.id, mats)}
+              loading={d.completionLoading}
+            />
+          )}
+          {showAdminApproval && (
+            <AdminRecuentoPanel
+              completionRequest={d.completionRequest}
+              onApprove={(reqId) => d.approveCompletion(d.selectedProject?.id, reqId)}
+              onReject={(reqId, notes) => d.rejectCompletion(d.selectedProject?.id, reqId, notes)}
+              loading={d.completionLoading}
+              projectName={d.selectedProject?.name || ''}
+            />
+          )}
+          {isSupervisor && !isProjectReadOnly && (
             <MaterialForm
               materialForm={d.materialForm}
               onFormChange={d.setMaterialForm}
@@ -141,6 +198,7 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
             expandedFiles={d.expandedFiles}
             selectedProject={d.selectedProject}
             isSupervisor={isSupervisor}
+            readOnly={isProjectReadOnly}
             onToggleFile={d.toggleFileSection}
             onApproveAll={d.approveAllInGroup}
             onApproveSelected={d.approveSelectedInGroup}
@@ -153,7 +211,7 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
             getGroupKey={d.getGroupKey}
             getGroupDraftOrders={d.getGroupDraftOrders}
           />
-          {isSupervisor && (
+          {isSupervisor && !isProjectReadOnly && (
             <ServiceForm
               serviceForm={d.serviceForm}
               onFormChange={d.setServiceForm}
@@ -165,6 +223,7 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
             serviceOrders={d.serviceOrders}
             selectedServices={d.selectedServices}
             isSupervisor={isSupervisor}
+            readOnly={isProjectReadOnly}
             onApproveAll={() => d.approveServicesBulk(d.serviceOrders.filter(o => o.status === 'draft').map(o => o.id), 'Aprobar todos los servicios')}
             onApproveSelected={() => d.approveServicesBulk(d.selectedServices, 'Aprobar servicios seleccionados')}
             onApproveService={d.approveService}
@@ -194,6 +253,14 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
     // ─── Projects List ───
     return (
       <div className="space-y-5">
+        {!isSupervisor && (
+          <div className="flex justify-end">
+            <Button variant="primary" size="md" onClick={d.openCreateModal} className="gap-2 text-sm">
+              <PlusIcon className="size-5" />
+              Crear Proyecto
+            </Button>
+          </div>
+        )}
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatsCard title="Total" value={d.stats.total_projects} icon={<FolderIcon className="size-8" />} iconBg="bg-amber-100" iconColor="text-amber-600" />
           <StatsCard title="Activos" value={d.stats.active_projects} icon={<ChartBarIcon className="size-8" />} iconBg="bg-emerald-100" iconColor="text-emerald-600" />
@@ -250,37 +317,31 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="w-full px-12 py-4">
-        {/* ── Page Header ── */}
-        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-4 mb-6">
-          <div className="flex items-center gap-4">
-            <Button variant="primary" size="md" onClick={d.goBack} className="gap-2">
-              <ArrowLeftIcon className="size-4" />
-              Volver
-            </Button>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
-                <FolderIcon className="size-7" />
-              </span>
-              {isSupervisor ? 'MIS PROYECTOS ASIGNADOS' : 'GESTIÓN DE PROYECTOS'}
-            </h1>
-            {isSupervisor && (
-              <Badge variant="primary" className="gap-1">
-                <UserIcon className="size-3.5" />
-                SUPERVISOR
-              </Badge>
-            )}
-          </div>
+        {/* ── Page Header ── (oculto en vistas de detalle) */}
+        {activeTab !== 'project-detail' && activeTab !== 'lead-detail' && (
+          <header className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-4 mb-6">
+            <div className="flex items-center gap-4">
+              <Button variant="primary" size="md" onClick={d.goBack} className="gap-2">
+                <ArrowLeftIcon className="size-4" />
+                Volver
+              </Button>
+              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+                <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
+                  <FolderIcon className="size-7" />
+                </span>
+                {isSupervisor ? 'MIS PROYECTOS ASIGNADOS' : 'GESTIÓN DE PROYECTOS'}
+              </h1>
+              {isSupervisor && (
+                <Badge variant="primary" className="gap-1">
+                  <UserIcon className="size-3.5" />
+                  SUPERVISOR
+                </Badge>
+              )}
+            </div>
+          </header>
+        )}
 
-          {/* Action buttons */}
-          {(activeTab === 'projects' && !isSupervisor) && (
-            <Button variant="primary" onClick={d.openCreateModal} className="gap-2">
-              <PlusIcon className="size-4" />
-              Nuevo Proyecto
-            </Button>
-          )}
-        </header>
-
-        {/* ── HyperUI Tabs (solo no-supervisor, solo en vistas de lista) ── */}
+        {/* ── HyperUI Tabs (siempre visible para no-supervisor, excepto en detalle) ── */}
         {canSeePipeline && (activeTab === 'pipeline' || activeTab === 'projects') && (
           <div className="border-b border-gray-200 mb-6">
             <div role="tablist" className="flex gap-1">
@@ -370,6 +431,15 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
         importing={d.importingFile}
         onConfirmRename={d.confirmDuplicateUpload}
       />
+      <RejectModal
+        open={d.showRejectModal}
+        onClose={() => d.setShowRejectModal(false)}
+        title={d.rejectType === 'servicio' ? 'Rechazar Servicio' : 'Rechazar Material'}
+        notes={d.rejectNotes}
+        onNotesChange={d.setRejectNotes}
+        processing={d.rejectingOrder}
+        onConfirm={d.confirmRejectOrder}
+      />
       <ConfigModal
         open={showConfigModal}
         onClose={() => setShowConfigModal(false)}
@@ -389,6 +459,15 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
         onRemove={d.removeWorkerFromProject}
         showEditSection={!isSupervisor}
         showWorkersSection={isSupervisor}
+      />
+      <CompletionApprovalModal
+        open={d.showCompletionApprovalModal}
+        onClose={() => d.setShowCompletionApprovalModal(false)}
+        completionRequest={d.completionRequest}
+        onApprove={(reqId) => d.approveCompletion(d.selectedProject?.id, reqId)}
+        onReject={(reqId, notes) => d.rejectCompletion(d.selectedProject?.id, reqId, notes)}
+        loading={d.completionLoading}
+        projectName={d.selectedProject?.name || ''}
       />
 
       {/* ======== PIPELINE MODALS ======== */}

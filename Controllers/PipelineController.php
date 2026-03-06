@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Modulos_ERP\CecosKrsft\Services\CecoHierarchyService;
 
 /**
@@ -23,6 +25,7 @@ class PipelineController extends Controller
     protected string $budgetsTable = 'pipeline_budgets';
     protected string $negotiationsTable = 'pipeline_negotiations';
     protected string $historyTable = 'pipeline_stage_history';
+    protected string $filesTable = 'pipeline_files';
 
     /**
      * Orden lógico de las etapas del pipeline.
@@ -135,9 +138,9 @@ class PipelineController extends Controller
             'cliente_telefono'    => 'nullable|string|max:50',
             'cliente_email'       => 'nullable|email|max:255',
             'cliente_empresa'     => 'nullable|string|max:255',
+            'cargo_cliente'       => 'nullable|string|max:150',
+            'tipo_negocio'        => 'nullable|string|max:150',
             'descripcion'         => 'nullable|string|max:2000',
-            'presupuesto_estimado' => 'nullable|numeric|min:0',
-            'moneda'              => 'nullable|in:PEN,USD',
             'ubicacion'           => 'nullable|string|max:500',
             'team_ids'            => 'required|array|min:2',
             'team_ids.*'          => 'integer',
@@ -155,9 +158,11 @@ class PipelineController extends Controller
                 'cliente_telefono'     => $request->cliente_telefono,
                 'cliente_email'        => $request->cliente_email,
                 'cliente_empresa'      => $request->cliente_empresa,
+                'cargo_cliente'        => $request->cargo_cliente,
+                'tipo_negocio'         => $request->tipo_negocio,
                 'descripcion'          => $request->descripcion,
-                'presupuesto_estimado' => floatval($request->presupuesto_estimado ?? 0),
-                'moneda'               => $request->moneda ?? 'PEN',
+                'presupuesto_estimado' => 0,
+                'moneda'               => 'PEN',
                 'ubicacion'            => $request->ubicacion,
                 'etapa'                => 'ingresado',
                 'created_by'           => auth()->id(),
@@ -253,6 +258,13 @@ class PipelineController extends Controller
             ->where('pipeline_id', $id)
             ->select('pipeline_stage_history.*', 'users.name as cambiado_por_nombre')
             ->orderByDesc('pipeline_stage_history.created_at')
+            ->get()->toArray();
+
+        $lead->files = DB::table($this->filesTable)
+            ->leftJoin('users', 'pipeline_files.uploaded_by', '=', 'users.id')
+            ->where('pipeline_id', $id)
+            ->select('pipeline_files.*', 'users.name as uploaded_by_name')
+            ->orderByDesc('pipeline_files.created_at')
             ->get()->toArray();
 
         return response()->json(['success' => true, 'lead' => $lead]);
@@ -1035,5 +1047,163 @@ class PipelineController extends Controller
                 ? round(($counts['cerrado_ganado'] ?? 0) / $totalLeads * 100, 1)
                 : 0,
         ]);
+    }
+
+    // ── Archivos adjuntos del lead ──────────────────────────────────────
+
+    /**
+     * Categorías válidas para archivos del pipeline.
+     */
+    const FILE_CATEGORIES = ['general', 'plano', 'presupuesto', 'contrato', 'foto', 'otro'];
+
+    /**
+     * Subir uno o varios archivos a un lead del pipeline.
+     * Acepta multipart/form-data con campo files[].
+     * Máximo 10 MB por archivo, tipos comunes permitidos.
+     */
+    public function uploadFiles(Request $request, $id)
+    {
+        if (!$this->checkPipelineAccess()) return $this->denyAccess();
+
+        $lead = DB::table($this->pipelineTable)->find($id);
+        if (!$lead) {
+            return response()->json(['success' => false, 'message' => 'Lead no encontrado'], 404);
+        }
+
+        // Verificar errores de upload antes de validar
+        $files = $request->file('files');
+        if (is_array($files)) {
+            foreach ($files as $idx => $file) {
+                if (!$file->isValid()) {
+                    $errorCode = $file->getError();
+                    $errorMessages = [
+                        UPLOAD_ERR_INI_SIZE => 'El archivo "' . $file->getClientOriginalName() . '" excede el límite máximo permitido por el servidor.',
+                        UPLOAD_ERR_FORM_SIZE => 'El archivo "' . $file->getClientOriginalName() . '" excede el límite máximo de 10 MB.',
+                        UPLOAD_ERR_PARTIAL => 'El archivo "' . $file->getClientOriginalName() . '" se subió parcialmente. Intenta de nuevo.',
+                        UPLOAD_ERR_NO_FILE => 'No se recibió ningún archivo.',
+                        UPLOAD_ERR_NO_TMP_DIR => 'Falta el directorio temporal en el servidor.',
+                        UPLOAD_ERR_CANT_WRITE => 'No se pudo escribir el archivo en el disco.',
+                        UPLOAD_ERR_EXTENSION => 'Una extensión de PHP detuvo la subida del archivo.',
+                    ];
+                    $message = $errorMessages[$errorCode] ?? 'Error desconocido al subir el archivo.';
+                    return response()->json(['success' => false, 'message' => $message], 422);
+                }
+            }
+        }
+
+        try {
+            $validated = $request->validate([
+                'files'      => 'required|array|min:1|max:10',
+                'files.*'    => [
+                    'required',
+                    'file',
+                    'max:10240', // 10 MB
+                ],
+                'category'   => 'nullable|string|in:' . implode(',', self::FILE_CATEGORIES),
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $errors = $e->validator->errors()->all();
+            return response()->json([
+                'success' => false,
+                'message' => implode(' ', $errors),
+            ], 422);
+        }
+
+        $category = $request->input('category', 'general');
+        $uploaded = [];
+
+        try {
+            foreach ($request->file('files') as $file) {
+                $originalName = $file->getClientOriginalName();
+                $extension = $file->getClientOriginalExtension();
+                $storedName = Str::uuid() . '.' . $extension;
+                $mimeType = $file->getMimeType();
+                $size = $file->getSize();
+
+                // Almacenar en storage/app/private/pipeline_files/{pipeline_id}/
+                $file->storeAs("pipeline_files/{$id}", $storedName, 'local');
+
+                $fileId = DB::table($this->filesTable)->insertGetId([
+                    'pipeline_id'   => $id,
+                    'original_name' => $originalName,
+                    'stored_name'   => $storedName,
+                    'mime_type'     => $mimeType,
+                    'size'          => $size,
+                    'category'      => $category,
+                    'uploaded_by'   => auth()->id(),
+                    'created_at'    => now(),
+                    'updated_at'    => now(),
+                ]);
+
+                $uploaded[] = [
+                    'id'            => $fileId,
+                    'original_name' => $originalName,
+                    'mime_type'     => $mimeType,
+                    'size'          => $size,
+                    'category'      => $category,
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => count($uploaded) === 1
+                    ? 'Archivo subido correctamente'
+                    : count($uploaded) . ' archivos subidos correctamente',
+                'files' => $uploaded,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error subiendo archivos al pipeline', ['error' => $e->getMessage(), 'pipeline_id' => $id]);
+            return response()->json(['success' => false, 'message' => 'Error al subir archivos'], 500);
+        }
+    }
+
+    /**
+     * Descargar un archivo adjunto del pipeline.
+     */
+    public function downloadFile($fileId)
+    {
+        if (!$this->checkPipelineAccess()) return $this->denyAccess();
+
+        $file = DB::table($this->filesTable)->find($fileId);
+        if (!$file) {
+            return response()->json(['success' => false, 'message' => 'Archivo no encontrado'], 404);
+        }
+
+        $path = "pipeline_files/{$file->pipeline_id}/{$file->stored_name}";
+
+        if (!Storage::disk('local')->exists($path)) {
+            return response()->json(['success' => false, 'message' => 'Archivo no encontrado en el servidor'], 404);
+        }
+
+        return Storage::disk('local')->download($path, $file->original_name);
+    }
+
+    /**
+     * Eliminar un archivo adjunto del pipeline.
+     */
+    public function deleteFile($fileId)
+    {
+        if (!$this->checkPipelineAccess()) return $this->denyAccess();
+
+        $file = DB::table($this->filesTable)->find($fileId);
+        if (!$file) {
+            return response()->json(['success' => false, 'message' => 'Archivo no encontrado'], 404);
+        }
+
+        try {
+            // Eliminar archivo físico
+            $path = "pipeline_files/{$file->pipeline_id}/{$file->stored_name}";
+            if (Storage::disk('local')->exists($path)) {
+                Storage::disk('local')->delete($path);
+            }
+
+            // Eliminar registro
+            DB::table($this->filesTable)->where('id', $fileId)->delete();
+
+            return response()->json(['success' => true, 'message' => 'Archivo eliminado']);
+        } catch (\Exception $e) {
+            Log::error('Error eliminando archivo pipeline', ['error' => $e->getMessage(), 'file_id' => $fileId]);
+            return response()->json(['success' => false, 'message' => 'Error al eliminar archivo'], 500);
+        }
     }
 }

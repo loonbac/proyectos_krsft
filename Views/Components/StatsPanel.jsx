@@ -1,8 +1,9 @@
 import { memo, useMemo } from 'react';
-import { CheckCircleIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon, ClockIcon, ClipboardDocumentListIcon } from '@heroicons/react/24/outline';
 import { PieChart, pieArcLabelClasses, pieArcClasses } from '@mui/x-charts/PieChart';
 import { useDrawingArea } from '@mui/x-charts/hooks';
 import { styled } from '@mui/material/styles';
+import Badge from './ui/Badge';
 import {
   formatNumber, getCurrencySymbol, getProjectStateClass,
   getProjectStateLabel, canFinalizeProject, getProjectColor,
@@ -44,10 +45,12 @@ const FILE_COLORS = [
  * StatsPanel – Financial stats rows + MUI pie chart (detail view).
  */
 function StatsPanel({
-  project, projectSummary, usagePercent, spentColor, onStateClick, ordersGroupedByFile,
+  project, projectSummary, usagePercent, spentColor, onStateClick, ordersGroupedByFile, completionRequest, isSupervisor,
 }) {
   const cur = getCurrencySymbol(project.currency);
-  const isCompleted = getProjectStateClass(project) === 'completed';
+  const stateClass = getProjectStateClass(project);
+  const isCompleted = stateClass === 'completed';
+  const isPendingRecount = stateClass === 'pending-recount';
   const total = parseFloat(project.total_amount || 0);
   const projectColor = getProjectColor(project.id);
 
@@ -83,7 +86,11 @@ function StatsPanel({
     if (!ordersGroupedByFile || ordersGroupedByFile.length === 0) return [];
     const groups = ordersGroupedByFile
       .map((g, i) => {
-        const groupTotal = (g.orders || []).reduce((acc, o) => acc + parseFloat(o.amount || 0), 0);
+        const groupTotal = (g.orders || []).reduce((acc, o) => {
+          const base = parseFloat(o.amount || 0);
+          const igv = o.igv_enabled ? base * (parseFloat(o.igv_rate ?? 18) / 100) : 0;
+          return acc + base + igv;
+        }, 0);
         return {
           id: `file-${i}`,
           label: g.filename ? g.filename.replace(/\.xlsx?$/i, '') : 'Manual',
@@ -136,16 +143,54 @@ function StatsPanel({
               className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
                 isCompleted
                   ? 'bg-blue-100 text-blue-700'
-                  : 'bg-primary-100 text-primary-700 hover:bg-primary-200 cursor-pointer'
+                  : isPendingRecount
+                    ? 'bg-amber-100 text-amber-700'
+                    : 'bg-primary-100 text-primary-700 hover:bg-primary-200 cursor-pointer'
               }`}
               onClick={() => canFinalizeProject(project) && onStateClick(project)}
-              title={canFinalizeProject(project) ? 'Click para finalizar proyecto' : ''}
+              title={
+                canFinalizeProject(project)
+                  ? 'Click para finalizar proyecto'
+                  : isPendingRecount
+                    ? 'Recuento de sobrantes pendiente'
+                    : ''
+              }
               disabled={!canFinalizeProject(project)}
             >
-              {isCompleted ? <CheckCircleIcon className="size-4" /> : <ClockIcon className="size-4" />}
+              {isCompleted
+                ? <CheckCircleIcon className="size-4" />
+                : isPendingRecount
+                  ? <ClipboardDocumentListIcon className="size-4" />
+                  : <ClockIcon className="size-4" />
+              }
               {getProjectStateLabel(project)}
             </button>
           </div>
+
+          {/* Completion request indicator */}
+          {completionRequest && completionRequest.status === 'pending' && (
+            <div className="flex items-center justify-between border-b border-gray-50 pb-2">
+              <span className="text-sm text-gray-500">Recuento de sobrantes</span>
+              <Badge variant="amber" dot>
+                Pendiente de aprobación
+              </Badge>
+            </div>
+          )}
+          {completionRequest && completionRequest.status === 'rejected' && (
+            <div className="space-y-1 border-b border-gray-50 pb-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500">Recuento de sobrantes</span>
+                <Badge variant="red" dot>
+                  Rechazado
+                </Badge>
+              </div>
+              {completionRequest.rejection_notes && (
+                <p className="text-xs text-red-600 bg-red-50 rounded px-2 py-1">
+                  Motivo: {completionRequest.rejection_notes}
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="flex items-center justify-between pt-2">
             <span className="text-sm font-medium text-gray-700">Umbral ({project.spending_threshold || 75}%)</span>

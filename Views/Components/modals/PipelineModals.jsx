@@ -25,11 +25,58 @@ import Input from '../ui/Input';
 import Select from '../ui/Select';
 import { getCurrencySymbol } from '../../utils';
 
+// ── Datos geográficos Perú ───────────────────────────────────────────────
+const PERU_UBIGEO = {
+  'Amazonas': ['Bagua', 'Bagua Grande', 'Chachapoyas', 'Condorcanqui', 'Luya', 'Rodríguez de Mendoza', 'Utcubamba'],
+  'Áncash': ['Caraz', 'Carhuaz', 'Chimbote', 'Huaraz', 'Huari', 'Nuevo Chimbote', 'Recuay', 'Yungay'],
+  'Apurímac': ['Abancay', 'Andahuaylaas', 'Aymaraes', 'Cotabambas', 'Chincheros', 'Grau'],
+  'Arequipa': ['Arequipa', 'Camaná', 'Caravelí', 'Castilla', 'Caylloma', 'Condesuyos', 'Islay', 'La Unión'],
+  'Ayacucho': ['Ayacucho', 'Cangallo', 'Huamanga', 'Huanta', 'La Mar', 'Lucanas', 'Parinacochas', 'Sucre', 'Víctor Fajardo'],
+  'Cajamarca': ['Cajabamba', 'Cajamarca', 'Celendín', 'Chota', 'Contumazá', 'Cutervo', 'Hualgayoc', 'Jaén', 'San Marcos', 'San Miguel', 'Santa Cruz'],
+  'Callao': ['Bellavista', 'Callao', 'Carmen de la Legua Reynoso', 'La Perla', 'La Punta', 'Mi Perú', 'Ventanilla'],
+  'Cusco': ['Acomayo', 'Anta', 'Calca', 'Canas', 'Canchis', 'Chumbivilcas', 'Cusco', 'Espinar', 'La Convención', 'Paruro', 'Paucartambo', 'Quispicanchis', 'Urubamba'],
+  'Huancavelica': ['Acobamba', 'Angaraes', 'Castrovirreyna', 'Churcampa', 'Huancavelica', 'Huaytará', 'Tayacaja'],
+  'Huánuco': ['Ambo', 'Dos de Mayo', 'Huacaybamba', 'Huamalíes', 'Huánuco', 'Lauricocha', 'Leoncio Prado', 'Marañón', 'Pachitea', 'Puerto Inca', 'Yarowilca'],
+  'Ica': ['Chincha', 'Ica', 'Nasca', 'Palpa', 'Pisco'],
+  'Junín': ['Chanchamayo', 'Chupaca', 'Concepción', 'Huancayo', 'Jauja', 'Junín', 'Satipo', 'Tarma', 'Yauli'],
+  'La Libertad': ['Ascope', 'Bolívar', 'Chepén', 'Gran Chimú', 'Julcán', 'Otuzco', 'Pacasmayo', 'Pataz', 'Sánchez Carrión', 'Santiago de Chuco', 'Trujillo', 'Virú'],
+  'Lambayeque': ['Chiclayo', 'Ferreñafe', 'Lambayeque'],
+  'Lima': ['Ate', 'Barranco', 'Breña', 'Carabayllo', 'Chorrillos', 'Cieneguilla', 'Comas', 'El Agustino', 'Independencia', 'Jesús María', 'La Molina', 'La Victoria', 'Lima', 'Lince', 'Los Olivos', 'Lurigancho', 'Lurín', 'Magdalena del Mar', 'Miraflores', 'Pachacámac', 'Pucusana', 'Pueblo Libre', 'Puente Piedra', 'Punta Hermosa', 'Punta Negra', 'Rímac', 'San Bartolo', 'San Borja', 'San Isidro', 'San Juan de Lurigancho', 'San Juan de Miraflores', 'San Luis', 'San Martín de Porres', 'San Miguel', 'Santa Anita', 'Santa María del Mar', 'Santa Rosa', 'Santiago de Surco', 'Surquillo', 'Villa El Salvador', 'Villa María del Triunfo'],
+  'Loreto': ['Alto Amazonas', 'Datem del Marañón', 'Iquitos', 'Loreto', 'Mariscal Ramón Castilla', 'Maynas', 'Putumayo', 'Requena', 'Ucayali'],
+  'Madre de Dios': ['Manu', 'Puerto Maldonado', 'Tahuamanu', 'Tambopata'],
+  'Moquegua': ['General Sánchez Cerro', 'Ilo', 'Mariscal Nieto', 'Moquegua'],
+  'Pasco': ['Daniel Alcides Carrión', 'Oxapampa', 'Pasco'],
+  'Piura': ['Ayabaca', 'Huancabamba', 'Morropón', 'Paita', 'Piura', 'Sechura', 'Sullana', 'Talara'],
+  'Puno': ['Azángaro', 'Carabaya', 'Chucuito', 'El Collao', 'Huancané', 'Lampa', 'Melgar', 'Moho', 'Puno', 'San Antonio de Putina', 'San Román', 'Sandia', 'Yunguyo'],
+  'San Martín': ['Bellavista', 'El Dorado', 'Huallaga', 'Lamas', 'Mariscal Cáceres', 'Moyobamba', 'Picota', 'Rioja', 'San Martín', 'Tarapoto', 'Tocache'],
+  'Tacna': ['Candarave', 'Jorge Basadre', 'Tacna', 'Tarata'],
+  'Tumbes': ['Contralmirante Villar', 'Tumbes', 'Zarumilla'],
+  'Ucayali': ['Atalaya', 'Coronel Portillo', 'Padre Abad', 'Pucallpa', 'Purús'],
+};
+
 // ── CreateLeadModal ─────────────────────────────────────────────────────
 
 export const CreateLeadModal = memo(function CreateLeadModal({
   open, onClose, form, onFormChange, workers, saving, onCreate,
 }) {
+  const [departamento, setDepartamento] = useState('');
+  const [distrito, setDistrito] = useState('');
+  const [workerSearch, setWorkerSearch] = useState('');
+  const departamentos = Object.keys(PERU_UBIGEO).sort();
+  const distritos = departamento ? PERU_UBIGEO[departamento] : [];
+
+  // Sync ubicacion into form whenever dept/distrito changes
+  useEffect(() => {
+    const parts = ['Perú', departamento, distrito].filter(Boolean);
+    onFormChange({ ...form, ubicacion: parts.join(' — ') });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [departamento, distrito]);
+
+  // Reset geo when modal closes
+  useEffect(() => {
+    if (!open) { setDepartamento(''); setDistrito(''); setWorkerSearch(''); }
+  }, [open]);
+
   const toggleWorker = (id) => {
     const ids = form.team_ids || [];
     onFormChange({
@@ -55,31 +102,49 @@ export const CreateLeadModal = memo(function CreateLeadModal({
       }
     >
       <div className="space-y-4">
+        {/* Fila 1: Nombre del Proyecto | Cliente */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input label="Nombre del Proyecto" required value={form.nombre_proyecto} onChange={e => onFormChange({ ...form, nombre_proyecto: e.target.value })} placeholder="Ej: Construcción Edificio Central" />
-          <Input label="Cliente (nombre)" required value={form.cliente_nombre} onChange={e => onFormChange({ ...form, cliente_nombre: e.target.value })} placeholder="Nombre del cliente" />
+          <Input label="Cliente (nombre)" required value={form.cliente_nombre} onChange={e => onFormChange({ ...form, cliente_nombre: e.target.value.replace(/[^A-Za-z\u00C0-\u00FF\s]/g, '') })} placeholder="Nombre del cliente" />
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Input label="Teléfono" value={form.cliente_telefono} onChange={e => onFormChange({ ...form, cliente_telefono: e.target.value })} placeholder="999 999 999" />
+        {/* Fila 2: Teléfono | Email | Empresa | Cargo */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Input label="Teléfono" value={form.cliente_telefono} onChange={e => onFormChange({ ...form, cliente_telefono: e.target.value.replace(/\D/g, '').slice(0, 9) })} placeholder="999 999 999" inputMode="numeric" maxLength={9} />
           <Input label="Email" type="email" value={form.cliente_email} onChange={e => onFormChange({ ...form, cliente_email: e.target.value })} placeholder="cliente@empresa.com" />
           <Input label="Empresa" value={form.cliente_empresa} onChange={e => onFormChange({ ...form, cliente_empresa: e.target.value })} placeholder="Empresa S.A.C." />
+          <Input label="Cargo del cliente" value={form.cargo_cliente || ''} onChange={e => onFormChange({ ...form, cargo_cliente: e.target.value })} placeholder="Ej: Gerente de obras" />
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="sm:col-span-1">
-            <span className="block text-sm font-medium text-gray-700 mb-1">Moneda</span>
-            <div className="flex gap-2">
-              {['PEN', 'USD'].map(c => (
-                <button key={c} type="button" onClick={() => onFormChange({ ...form, moneda: c })}
-                  className={`flex-1 rounded border px-3 py-2 text-sm font-medium transition-colors ${form.moneda === c ? 'border-primary bg-primary-50 text-primary-700' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}
-                >
-                  {c === 'PEN' ? 'S/ Soles' : '$ Dólares'}
-                </button>
-              ))}
-            </div>
+        {/* Fila 3: Ubicación (Departamento, Distrito) */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* Departamento */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
+            <select
+              value={departamento}
+              onChange={e => { setDepartamento(e.target.value); setDistrito(''); }}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary focus:ring-primary"
+            >
+              <option value="">Selecciona departamento...</option>
+              {departamentos.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
           </div>
-          <Input label={`Presupuesto estimado (${getCurrencySymbol(form.moneda)})`} type="number" min="0" step="0.01" value={form.presupuesto_estimado || ''} onChange={e => onFormChange({ ...form, presupuesto_estimado: parseFloat(e.target.value) || 0 })} placeholder="0.00" />
-          <Input label="Ubicación" value={form.ubicacion} onChange={e => onFormChange({ ...form, ubicacion: e.target.value })} placeholder="Dirección o distrito" />
+          {/* Distrito */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Distrito / Provincia</label>
+            <select
+              value={distrito}
+              onChange={e => setDistrito(e.target.value)}
+              disabled={!departamento}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary focus:ring-primary disabled:bg-gray-50 disabled:text-gray-400"
+            >
+              <option value="">Selecciona distrito...</option>
+              {distritos.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
         </div>
+        {/* Tipo de negocio */}
+        <Input label="Tipo de negocio" value={form.tipo_negocio || ''} onChange={e => onFormChange({ ...form, tipo_negocio: e.target.value })} placeholder="Ej: Construcción civil, Minería, Inmobiliaria..." />
+        {/* Descripción */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
           <textarea rows={2} value={form.descripcion} onChange={e => onFormChange({ ...form, descripcion: e.target.value })} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary focus:ring-primary" placeholder="Descripción breve del proyecto..." />
@@ -93,27 +158,49 @@ export const CreateLeadModal = memo(function CreateLeadModal({
           {(form.team_ids || []).length < 2 && (
             <p className="mb-2 text-xs text-red-500">Selecciona al menos 2 personas</p>
           )}
+          {/* Search bar */}
+          <div className="relative mb-1.5">
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35m0 0A7 7 0 1 0 6.65 6.65a7 7 0 0 0 9.9 9.9Z" /></svg>
+            <input
+              type="text"
+              placeholder="Buscar por nombre o cargo…"
+              value={workerSearch}
+              onChange={e => setWorkerSearch(e.target.value)}
+              className="w-full rounded-md border border-gray-300 pl-8 pr-3 py-1.5 text-xs shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
           <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 max-h-40 overflow-y-auto border border-gray-200 rounded-md p-2">
-            {workers.map((w) => {
-              const selected = (form.team_ids || []).includes(w.id);
-              return (
-                <button key={w.id} type="button" onClick={() => toggleWorker(w.id)}
-                  className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors ${selected ? 'bg-primary-50 text-primary-800 ring-1 ring-primary-300' : 'hover:bg-gray-50 text-gray-700'}`}
-                >
-                  <span className={`inline-flex size-5 items-center justify-center rounded-full text-[10px] font-bold text-white ${selected ? 'bg-primary' : 'bg-gray-300'}`}>
-                    {selected ? <CheckIcon className="size-3" /> : w.nombre_completo?.charAt(0)?.toUpperCase()}
-                  </span>
-                  <span className="truncate">{w.nombre_completo}</span>
-                  <span className="text-[10px] text-gray-400 truncate ml-auto">{w.cargo}</span>
-                </button>
-              );
-            })}
+            {workers
+              .filter(w => {
+                const q = workerSearch.trim().toLowerCase();
+                if (!q) return true;
+                return (
+                  (w.nombre_completo || '').toLowerCase().includes(q) ||
+                  (w.cargo || '').toLowerCase().includes(q)
+                );
+              })
+              .map((w) => {
+                const selected = (form.team_ids || []).includes(w.id);
+                return (
+                  <button key={w.id} type="button" onClick={() => toggleWorker(w.id)}
+                    className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors ${selected ? 'bg-primary-50 text-primary-800 ring-1 ring-primary-300' : 'hover:bg-gray-50 text-gray-700'}`}
+                  >
+                    <span className={`inline-flex size-5 items-center justify-center rounded-full text-[10px] font-bold text-white ${selected ? 'bg-primary' : 'bg-gray-300'}`}>
+                      {selected ? <CheckIcon className="size-3" /> : w.nombre_completo?.charAt(0)?.toUpperCase()}
+                    </span>
+                    <span className="truncate">{w.nombre_completo}</span>
+                    <span className="text-[10px] text-gray-400 truncate ml-auto">{w.cargo}</span>
+                  </button>
+                );
+              })
+            }
           </div>
         </div>
       </div>
     </Modal>
   );
 });
+
 
 // ── CommunicationModal ──────────────────────────────────────────────────
 
@@ -163,7 +250,7 @@ export const CommunicationModal = memo(function CommunicationModal({
           <label className="block text-sm font-medium text-gray-700 mb-1">Resumen <span className="text-red-500">*</span></label>
           <textarea rows={3} value={form.resumen} onChange={e => setForm({ ...form, resumen: e.target.value })} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary focus:ring-primary" placeholder="Describe la comunicación..." />
         </div>
-        <Input label="Nombre del contacto" value={form.contacto_nombre} onChange={e => setForm({ ...form, contacto_nombre: e.target.value })} placeholder="¿Con quién hablaste?" />
+        <Input label="Nombre del contacto" value={form.contacto_nombre} onChange={e => setForm({ ...form, contacto_nombre: e.target.value.replace(/[^A-Za-z\u00C0-\u00FF\s]/g, '') })} placeholder="¿Con quién hablaste?" />
         <label className="flex items-center gap-2 text-sm text-gray-700">
           <input type="checkbox" checked={form.contacto_exitoso} onChange={e => setForm({ ...form, contacto_exitoso: e.target.checked })} className="rounded border-gray-300 text-primary" />
           Comunicación exitosa (se logró contactar al encargado)
@@ -294,7 +381,7 @@ export const BudgetModal = memo(function BudgetModal({
       }
     >
       <div className="space-y-4">
-        <Input label={`Monto base (${getCurrencySymbol(currency)})`} required type="number" min="0.01" step="0.01" value={form.monto_base} onChange={e => setForm({ ...form, monto_base: e.target.value })} placeholder="0.00" />
+        <Input label={`Monto base (${getCurrencySymbol(currency)})`} required inputMode="decimal" value={form.monto_base} onChange={e => setForm({ ...form, monto_base: e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1') })} placeholder="0.00" />
         <div className="flex items-center gap-4">
           <label className="flex items-center gap-2 text-sm text-gray-700">
             <input type="checkbox" checked={form.igv_incluido} onChange={e => setForm({ ...form, igv_incluido: e.target.checked })} className="rounded border-gray-300 text-primary" />
@@ -303,7 +390,7 @@ export const BudgetModal = memo(function BudgetModal({
           {form.igv_incluido && (
             <div className="flex items-center gap-1 text-sm">
               <span className="text-gray-500">Tasa:</span>
-              <input type="number" min="0" max="100" value={form.igv_rate} onChange={e => setForm({ ...form, igv_rate: parseInt(e.target.value) || 18 })} className="w-16 rounded border border-gray-300 px-2 py-1 text-sm shadow-sm" />
+              <input type="number" min="0" max="100" value={form.igv_rate} onChange={e => { const v = Math.min(100, Math.max(0, parseInt(e.target.value) || 0)); setForm({ ...form, igv_rate: v }); }} className="w-16 rounded border border-gray-300 px-2 py-1 text-sm shadow-sm" />
               <span className="text-gray-500">%</span>
             </div>
           )}
@@ -372,7 +459,7 @@ export const NegotiationModal = memo(function NegotiationModal({
           <textarea rows={3} value={form.nota} onChange={e => setForm({ ...form, nota: e.target.value })} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary focus:ring-primary" placeholder="Detalles de la negociación..." />
         </div>
         {(form.tipo === 'contraoferta' || form.tipo === 'acuerdo') && (
-          <Input label={`Monto propuesto (${getCurrencySymbol(currency)})`} type="number" min="0" step="0.01" value={form.monto_propuesto} onChange={e => setForm({ ...form, monto_propuesto: e.target.value })} placeholder="0.00" />
+          <Input label={`Monto propuesto (${getCurrencySymbol(currency)})`} inputMode="decimal" value={form.monto_propuesto} onChange={e => setForm({ ...form, monto_propuesto: e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1') })} placeholder="0.00" />
         )}
       </div>
     </Modal>

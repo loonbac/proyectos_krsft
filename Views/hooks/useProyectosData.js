@@ -69,6 +69,20 @@ export default function useProyectosData({ isSupervisor }) {
   const [confirmProcessing, setConfirmProcessing] = useState(false);
   const confirmActionRef = useRef(null);
 
+  // Reject Modal State
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectNotes, setRejectNotes] = useState('');
+  const [orderToReject, setOrderToReject] = useState(null);
+  const [rejectingOrder, setRejectingOrder] = useState(false);
+  const [rejectType, setRejectType] = useState('material'); // 'material' or 'service'
+
+  // Completion Modal State (sobras de materiales)
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [showCompletionApprovalModal, setShowCompletionApprovalModal] = useState(false);
+  const [completionMaterials, setCompletionMaterials] = useState([]);
+  const [completionRequest, setCompletionRequest] = useState(null);
+  const [completionLoading, setCompletionLoading] = useState(false);
+
   const [editForm, setEditForm] = useState({ name: '', spending_threshold: 75, supervisor_id: null });
   const [form, setForm] = useState({ ...DEFAULT_CREATE_FORM });
   const [selectedWorkerId, setSelectedWorkerId] = useState('');
@@ -122,17 +136,18 @@ export default function useProyectosData({ isSupervisor }) {
         if (o.delivery_confirmed) g.deliveredCount++; else g.allDelivered = false;
       } else { manual.push(o); }
     });
-    const result = Object.values(groups).sort((a, b) => new Date(b.imported_at) - new Date(a.imported_at));
+    const result = Object.values(groups).sort((a, b) => new Date(a.imported_at) - new Date(b.imported_at));
+    const output = [];
     if (manual.length > 0) {
       let mp = 0, md = 0;
       for (const o of manual) { if (o.payment_confirmed) mp++; if (o.delivery_confirmed) md++; }
-      result.push({
+      output.push({
         filename: null, orders: manual, imported_at: null,
         allPaid: mp === manual.length, allDelivered: md === manual.length,
         paidCount: mp, deliveredCount: md, totalCount: manual.length,
       });
     }
-    return result;
+    return [...output, ...result];
   }, [projectOrders]);
 
   const usagePercent = selectedProject
@@ -284,6 +299,20 @@ export default function useProyectosData({ isSupervisor }) {
         setProjectOrders(data.orders || []);
         setProjectSummary(data.summary || {});
         setEditForm({ name: data.project.name, spending_threshold: data.project.spending_threshold, supervisor_id: data.project.supervisor_id });
+        // Fetch secondary data in parallel (non-blocking)
+        if (data.project.status === 'active' || data.project.status === 'pendiente_recuento') {
+          const promises = [
+            fetch(`${API_BASE}/${id}/completion-request`).then(r => r.json()).then(d => setCompletionRequest(d.success ? d.request : null)).catch(() => setCompletionRequest(null)),
+          ];
+          if (data.project.status === 'pendiente_recuento') {
+            promises.push(
+              fetch(`${API_BASE}/${id}/completion-materials`).then(r => r.json()).then(d => setCompletionMaterials(d.success ? d.materials || [] : [])).catch(() => setCompletionMaterials([]))
+            );
+          }
+          Promise.all(promises);
+        } else {
+          setCompletionRequest(null);
+        }
       }
     } catch (e) { console.error(e); }
   }, []);
@@ -314,6 +343,27 @@ export default function useProyectosData({ isSupervisor }) {
         setProjectSummary(prev => JSON.stringify(prev) === JSON.stringify(ns) ? prev : ns);
         if (np) setEditForm({ name: np.name, spending_threshold: np.spending_threshold, supervisor_id: np.supervisor_id });
         if (isSupervisor) loadPaidOrders(np.id);
+        // Refresh completion request and materials for pendiente_recuento projects
+        if (np.status === 'pendiente_recuento' || np.status === 'active') {
+          try {
+            const crRes = await fetch(`${API_BASE}/${np.id}/completion-request`);
+            const crData = await crRes.json();
+            setCompletionRequest(prev => {
+              const next = crData.success ? crData.request : null;
+              return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+            });
+          } catch { /* no-op */ }
+          if (np.status === 'pendiente_recuento') {
+            try {
+              const cmRes = await fetch(`${API_BASE}/${np.id}/completion-materials`);
+              const cmData = await cmRes.json();
+              setCompletionMaterials(prev => {
+                const next = cmData.success ? cmData.materials || [] : [];
+                return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+              });
+            } catch { /* no-op */ }
+          }
+        }
       }
     } catch { }
   }, [isSupervisor, loadPaidOrders]);
@@ -353,19 +403,125 @@ export default function useProyectosData({ isSupervisor }) {
     setUpdatingProjectState(false);
   }, [updatingProjectState, loadProjects, selectProject, showToastMsg]);
 
-  const handleProjectStateClick = useCallback((project) => {
-    if (!project || !canFinalizeProject(project)) return;
-    openConfirmModal({
-      title: 'Finalizar Proyecto',
-      message: '¿Estás seguro de finalizar este proyecto? Esta acción marcará el proyecto como completado.',
-      actionLabel: 'Finalizar',
-      variant: 'success',
-      onConfirm: async () => {
-        await finalizeProjectAction(project);
-        closeConfirmModal();
+  // ── Completion with sobras ───
+  const fetchCompletionMaterials = useCallback(async (projectId) => {
+    try {
+      const res = await fetch(`${API_BASE}/${projectId}/completion-materials`);
+      const data = await res.json();
+      if (data.success) return data.materials || [];
+    } catch { /* no-op */ }
+    return [];
+  }, []);
+
+  const fetchCompletionRequest = useCallback(async (projectId) => {
+    try {
+      const res = await fetch(`${API_BASE}/${projectId}/completion-request`);
+      const data = await res.json();
+      if (data.success) return data.request;
+    } catch { /* no-op */ }
+    return null;
+  }, []);
+
+  const requestCompletion = useCallback(async (projectId, materials) => {
+    setCompletionLoading(true);
+    try {
+      const res = await fetchWithCsrf(`${API_BASE}/${projectId}/request-completion`, {
+        method: 'POST',
+        body: JSON.stringify({ materials }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToastMsg(data.message || 'Recuento de sobrantes enviado');
+        // Refresh to show pending status
+        if (selectedProjectRef.current?.id === projectId) await selectProject(projectId);
+      } else {
+        showToastMsg(data.message || 'Error al enviar recuento', 'error');
       }
-    });
-  }, [openConfirmModal, finalizeProjectAction, closeConfirmModal]);
+    } catch { showToastMsg('Error de conexión', 'error'); }
+    setCompletionLoading(false);
+  }, [showToastMsg, selectProject]);
+
+  const approveCompletion = useCallback(async (projectId, requestId) => {
+    setCompletionLoading(true);
+    try {
+      const res = await fetchWithCsrf(`${API_BASE}/${projectId}/approve-completion`, {
+        method: 'POST',
+        body: JSON.stringify({ request_id: requestId, action: 'approve' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToastMsg(data.message || 'Proyecto finalizado y materiales actualizados');
+        setShowCompletionApprovalModal(false);
+        setCompletionRequest(null);
+        await loadProjects();
+        if (selectedProjectRef.current?.id === projectId) await selectProject(projectId);
+      } else {
+        showToastMsg(data.message || 'Error al aprobar', 'error');
+      }
+    } catch { showToastMsg('Error de conexión', 'error'); }
+    setCompletionLoading(false);
+  }, [showToastMsg, loadProjects, selectProject]);
+
+  const rejectCompletion = useCallback(async (projectId, requestId, notes) => {
+    setCompletionLoading(true);
+    try {
+      const res = await fetchWithCsrf(`${API_BASE}/${projectId}/approve-completion`, {
+        method: 'POST',
+        body: JSON.stringify({ request_id: requestId, action: 'reject', rejection_notes: notes }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToastMsg(data.message || 'Solicitud rechazada');
+        setShowCompletionApprovalModal(false);
+        setCompletionRequest(null);
+      } else {
+        showToastMsg(data.message || 'Error al rechazar', 'error');
+      }
+    } catch { showToastMsg('Error de conexión', 'error'); }
+    setCompletionLoading(false);
+  }, [showToastMsg]);
+
+  const handleProjectStateClick = useCallback(async (project) => {
+    if (!project) return;
+
+    const status = (project.status || '').toLowerCase();
+
+    if (isSupervisor) {
+      // Supervisor: si el proyecto está en pendiente_recuento,
+      // el panel RecuentoSobrantesPanel ya está visible, no hay acción click.
+      if (status === 'pendiente_recuento') {
+        showToastMsg('Usa el panel de recuento de sobrantes para enviar las cantidades', 'warning');
+        return;
+      }
+      // Supervisor no puede finalizar desde aquí
+      return;
+    }
+
+    // Manager/Admin:
+    if (status === 'active') {
+      // Finalizar proyecto → cambiar a pendiente_recuento
+      openConfirmModal({
+        title: 'Finalizar Proyecto',
+        message: '¿Estás seguro de finalizar este proyecto? El supervisor deberá hacer un recuento de los materiales sobrantes antes de completar el cierre.',
+        actionLabel: 'Finalizar',
+        variant: 'success',
+        onConfirm: async () => {
+          await finalizeProjectAction(project);
+          closeConfirmModal();
+        }
+      });
+    } else if (status === 'pendiente_recuento') {
+      // Check if there's a pending completion request to approve
+      const existingReq = await fetchCompletionRequest(project.id);
+      setCompletionRequest(existingReq);
+
+      if (existingReq && existingReq.status === 'pending') {
+        setShowCompletionApprovalModal(true);
+      } else {
+        showToastMsg('El supervisor aún no ha enviado el recuento de sobrantes', 'warning');
+      }
+    }
+  }, [isSupervisor, fetchCompletionRequest, openConfirmModal, finalizeProjectAction, closeConfirmModal, showToastMsg]);
 
   const runConfirmAction = useCallback(async () => {
     if (!confirmActionRef.current || confirmProcessing) return;
@@ -425,12 +581,20 @@ export default function useProyectosData({ isSupervisor }) {
   }, [selectProject, showToastMsg]);
 
   const createOrder = useCallback(async () => {
-    if (!selectedProjectRef.current || !materialForm.description || !materialForm.qty) return;
+    if (!selectedProjectRef.current || !materialForm.material_type || !materialForm.qty) return;
     setSavingOrder(true);
     try {
-      const mats = [{ name: materialForm.description.trim(), qty: materialForm.qty }];
+      const mats = [{ name: materialForm.material_type.trim(), qty: materialForm.qty }];
       const res = await fetchWithCsrf(`${API_BASE}/${selectedProjectRef.current.id}/order`, {
-        method: 'POST', body: JSON.stringify({ type: 'material', description: materialForm.description.trim(), materials: mats, unit: materialForm.unit, diameter: materialForm.diameter || null, series: materialForm.series || null, material_type: materialForm.material_type || null, item_number: materialForm.item_number || null })
+        method: 'POST', body: JSON.stringify({
+          type: 'material',
+          description: materialForm.description.trim() || materialForm.material_type.trim(),
+          materials: mats,
+          material_type: materialForm.material_type.trim(),
+          diameter: materialForm.diameter || null,
+          series: materialForm.series || null,
+          notes: materialForm.notes || null,
+        })
       });
       const data = await res.json();
       if (data.success) { showToastMsg('Material enviado a aprobación'); setMaterialForm({ ...DEFAULT_MATERIAL_FORM }); await selectProject(selectedProjectRef.current.id); }
@@ -497,16 +661,12 @@ export default function useProyectosData({ isSupervisor }) {
     });
   }, [openConfirmModal, selectProject, showToastMsg]);
 
-  const rejectService = useCallback(async (orderId) => {
-    const notes = prompt('¿Por qué se rechaza este servicio? (opcional)');
-    if (notes === null) return;
-    try {
-      const res = await fetchWithCsrf(`${API_BASE}/orders/${orderId}/reject`, { method: 'POST', body: JSON.stringify({ notes: notes || 'Rechazado por el Jefe de Proyectos' }) });
-      const data = await res.json();
-      if (data.success) { showToastMsg(data.message || 'Servicio rechazado'); await selectProject(selectedProjectRef.current.id); }
-      else showToastMsg(data.message || 'Error', 'error');
-    } catch { showToastMsg('Error al rechazar', 'error'); }
-  }, [selectProject, showToastMsg]);
+  const rejectService = useCallback((orderId) => {
+    setOrderToReject(orderId);
+    setRejectType('servicio');
+    setRejectNotes('');
+    setShowRejectModal(true);
+  }, []);
 
   const approveMaterial = useCallback((orderId) => {
     openConfirmModal({
@@ -564,16 +724,32 @@ export default function useProyectosData({ isSupervisor }) {
   const approveAllInGroup = useCallback((g) => { approveMaterialsBulk(getGroupDraftOrders(g).map(o => o.id), 'Aprobar toda la lista'); clearGroupSelection(g); }, [approveMaterialsBulk, clearGroupSelection]);
   const approveSelectedInGroup = useCallback((g) => { const ids = getSelectedIds(g); if (!ids.length) return; approveMaterialsBulk(ids, 'Aprobar seleccionados'); clearGroupSelection(g); }, [approveMaterialsBulk, getSelectedIds, clearGroupSelection]);
 
-  const rejectMaterial = useCallback(async (orderId) => {
-    const notes = prompt('¿Por qué se rechaza este material? (opcional)');
-    if (notes === null) return;
+  const rejectMaterial = useCallback((orderId) => {
+    setOrderToReject(orderId);
+    setRejectType('material');
+    setRejectNotes('');
+    setShowRejectModal(true);
+  }, []);
+
+  const confirmRejectOrder = useCallback(async () => {
+    if (!orderToReject) return;
+    setRejectingOrder(true);
     try {
-      const res = await fetchWithCsrf(`${API_BASE}/orders/${orderId}/reject`, { method: 'POST', body: JSON.stringify({ notes: notes || 'Rechazado por el Jefe de Proyectos' }) });
+      const res = await fetchWithCsrf(`${API_BASE}/orders/${orderToReject}/reject`, {
+        method: 'POST',
+        body: JSON.stringify({ notes: rejectNotes.trim() || 'Rechazado por el Jefe de Proyectos' })
+      });
       const data = await res.json();
-      if (data.success) { showToastMsg(data.message || 'Material rechazado'); await selectProject(selectedProjectRef.current.id); }
-      else showToastMsg(data.message || 'Error', 'error');
+      if (data.success) {
+        showToastMsg(data.message || `${rejectType === 'servicio' ? 'Servicio rechazado' : 'Material rechazado'}`);
+        setShowRejectModal(false);
+        await selectProject(selectedProjectRef.current.id);
+      } else {
+        showToastMsg(data.message || 'Error', 'error');
+      }
     } catch { showToastMsg('Error al rechazar', 'error'); }
-  }, [selectProject, showToastMsg]);
+    setRejectingOrder(false);
+  }, [orderToReject, rejectNotes, rejectType, selectProject, showToastMsg]);
 
   const downloadTemplate = useCallback(() => { window.location.href = `${API_BASE}/material-template`; }, []);
 
@@ -716,6 +892,7 @@ export default function useProyectosData({ isSupervisor }) {
     showConfirmModal, confirmTitle, confirmMessage, confirmActionLabel, confirmActionVariant, confirmProcessing,
     showImportPreview, setShowImportPreview, importPreviewItems,
     showDuplicateModal, setShowDuplicateModal, duplicateData,
+    showRejectModal, setShowRejectModal, rejectNotes, setRejectNotes, rejectingOrder, rejectType,
     // Derived
     statusFilters, filteredProjects, ordersGroupedByFile,
     serviceOrders,
@@ -738,6 +915,12 @@ export default function useProyectosData({ isSupervisor }) {
     isServiceSelected, toggleServiceSelection, getSelectedServiceCount,
     closeConfirmModal, runConfirmAction,
     confirmImport, confirmDuplicateUpload,
+    confirmRejectOrder,
+    // Completion (sobras)
+    showCompletionModal, setShowCompletionModal, completionMaterials, completionLoading,
+    showCompletionApprovalModal, setShowCompletionApprovalModal, completionRequest,
+    requestCompletion, approveCompletion, rejectCompletion,
+    fetchCompletionRequest, setCompletionRequest,
     // Refs (for flatpickr)
     dateFromInputRef, dateToInputRef,
     openDateFromPicker, openDateToPicker, clearDateFilters,

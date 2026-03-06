@@ -38,17 +38,17 @@ function MaterialForm({
       </h3>
       <div className="space-y-3">
         <div className="grid grid-cols-3 gap-3">
-          <Input label="Cant." type="number" min="1" value={materialForm.qty} onChange={handleChange('qty')} />
-          <Input label="Unidad" placeholder="Ej: pza, kg, m..." value={materialForm.unit} onChange={handleChange('unit')} />
-          <Input label="Descripción" placeholder="Descripción del material..." value={materialForm.description} onChange={handleChange('description')} />
+          <Input label="Cantidad *" type="number" min="1" value={materialForm.qty} onChange={handleChange('qty')} />
+          <Input label="Tipo de Material *" placeholder="Ej: ángulo, brida..." value={materialForm.material_type} onChange={handleChange('material_type')} />
+          <Input label="Especificación Técnica" placeholder="Ej: ángulos de 2&quot; x 3/16&quot;" value={materialForm.description} onChange={handleChange('description')} />
         </div>
         <div className="grid grid-cols-3 gap-3">
-          <Input label="Diámetro" placeholder='Ej: 1/2"' value={materialForm.diameter} onChange={handleChange('diameter')} />
-          <Input label="Serie" placeholder="Ej: SCH-40" value={materialForm.series} onChange={handleChange('series')} />
-          <Input label="Material" placeholder="Ej: A-106 Gr.B" value={materialForm.material_type} onChange={handleChange('material_type')} />
+          <Input label="Medida" placeholder="Ej: und, kg, m..." value={materialForm.diameter} onChange={handleChange('diameter')} />
+          <Input label="Tipo de Conexión" placeholder="Ej: soldable, roscado..." value={materialForm.series} onChange={handleChange('series')} />
+          <Input label="Observaciones" placeholder="Notas adicionales..." value={materialForm.notes} onChange={handleChange('notes')} />
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
-          <Button variant="primary" onClick={onCreateOrder} disabled={savingOrder || !materialForm.description || !materialForm.qty} loading={savingOrder} className="gap-2">
+          <Button variant="primary" onClick={onCreateOrder} disabled={savingOrder || !materialForm.material_type || !materialForm.qty} loading={savingOrder} className="gap-2">
             <PlusIcon className="size-4" />
             {savingOrder ? 'Enviando...' : 'Agregar Material'}
           </Button>
