@@ -45,7 +45,7 @@ const FILE_COLORS = [
  * StatsPanel – Financial stats rows + MUI pie chart (detail view).
  */
 function StatsPanel({
-  project, projectSummary, usagePercent, spentColor, onStateClick, ordersGroupedByFile, completionRequest, isSupervisor,
+  project, projectSummary, usagePercent, spentColor, onStateClick, ordersGroupedByFile, completionRequest,
 }) {
   const cur = getCurrencySymbol(project.currency);
   const stateClass = getProjectStateClass(project);

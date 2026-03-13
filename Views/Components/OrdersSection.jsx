@@ -4,6 +4,7 @@ import {
   ChevronRightIcon,
   CheckIcon,
   XMarkIcon,
+  CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
@@ -15,17 +16,18 @@ import {
 
 /**
  * OrdersSection – Orders grouped by file with expand/collapse (detail view).
+ * Includes material arrival tracking.
  */
 function OrdersSection({
   ordersGroupedByFile,
   expandedFiles,
   selectedProject,
-  isSupervisor,
+  canApprove,
   readOnly,
   onToggleFile,
   onApproveAll,
   onApproveSelected,
-  onConfirmFileDelivery,
+
   onApproveMaterial,
   onRejectMaterial,
   isOrderSelected,
@@ -33,7 +35,18 @@ function OrdersSection({
   getSelectedCount,
   getGroupKey,
   getGroupDraftOrders,
+  onMarkArrived,
+  onMarkNotArrived,
 }) {
+  const handleArrivalToggle = (order) => {
+    if (!order.payment_confirmed) return;
+    if (order.material_arrived) {
+      onMarkNotArrived?.([order.id]);
+    } else {
+      onMarkArrived?.([order.id]);
+    }
+  };
+
   return (
     <section className="rounded-lg border-2 border-gray-200 bg-white p-6 shadow-sm">
       <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900 mb-4">
@@ -50,6 +63,9 @@ function OrdersSection({
             const isExpanded = expandedFiles[gKey];
             const draftOrders = getGroupDraftOrders(group);
             const selectedCount = getSelectedCount(group);
+            const paidOrders = group.orders.filter(o => o.payment_confirmed);
+            const arrivedCount = paidOrders.filter(o => o.material_arrived).length;
+            const hasPendingArrival = paidOrders.length > 0 && arrivedCount < paidOrders.length;
 
             return (
               <div key={gKey} className="rounded-lg border-2 border-gray-200 overflow-hidden shadow-sm">
@@ -65,10 +81,10 @@ function OrdersSection({
                   <div className="flex items-center gap-2 min-w-0">
                     <ChevronRightIcon className={`size-4 shrink-0 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                     <DocumentTextIcon className="size-4 shrink-0 text-gray-400" />
-                    <span className="truncate font-medium text-gray-700">{group.filename || 'Órdenes Manuales'}</span>
+                    <span className="truncate font-medium text-gray-700">{group.isInventoryGroup ? 'Materiales de Inventario' : (group.filename || 'Órdenes Manuales')}</span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
-                    {!isSupervisor && !readOnly && draftOrders.length > 0 && (
+                    {canApprove && !readOnly && draftOrders.length > 0 && (
                       <>
                         {selectedCount > 0 && (
                           <Button variant="success" size="sm" onClick={() => onApproveSelected(group)}>
@@ -80,15 +96,19 @@ function OrdersSection({
                         </Button>
                       </>
                     )}
-                    {group.allPaid && !group.allDelivered && isSupervisor && !readOnly && (
-                      <Button variant="primary" size="sm" onClick={() => onConfirmFileDelivery(group)}>
-                        Confirmar Entrega
-                      </Button>
-                    )}
+
                     <Badge variant="gray">{group.totalCount} items</Badge>
                     <Badge variant={group.allDelivered ? 'emerald' : group.allPaid ? 'blue' : 'amber'}>
                       {group.allDelivered ? 'Entregado' : group.allPaid ? 'Pagado' : `${group.paidCount}/${group.totalCount}`}
                     </Badge>
+                    {paidOrders.length > 0 && (
+                      <Badge variant={hasPendingArrival ? 'amber' : 'emerald'}>
+                        {hasPendingArrival
+                          ? `Recibido ${arrivedCount}/${paidOrders.length}`
+                          : <><CheckCircleIcon className="size-3.5 inline -mt-0.5" /> Todo recibido</>
+                        }
+                      </Badge>
+                    )}
                   </div>
                 </div>
 
@@ -98,7 +118,7 @@ function OrdersSection({
                     <table className="w-full divide-y divide-gray-200 text-sm">
                       <thead className="bg-gray-50">
                         <tr>
-                          {!isSupervisor && <th className="px-3 py-2 text-center  text-xs font-medium uppercase text-gray-500 w-12"><input type="checkbox" disabled className="rounded border-gray-300" /></th>}
+                          {canApprove && <th className="px-3 py-2 text-center  text-xs font-medium uppercase text-gray-500 w-12"><input type="checkbox" disabled className="rounded border-gray-300" /></th>}
                           <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 whitespace-nowrap">ITEM</th>
                           <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 whitespace-nowrap">CANTIDAD</th>
                           <th className="px-3 py-2 text-left  text-xs font-medium uppercase text-gray-500 whitespace-nowrap">TIPO DE MATERIAL</th>
@@ -108,23 +128,25 @@ function OrdersSection({
                           <th className="px-3 py-2 text-left  text-xs font-medium uppercase text-gray-500 whitespace-nowrap">OBSERVACIONES</th>
                           <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 whitespace-nowrap">ESTADO</th>
                           <th className="px-3 py-2 text-right  text-xs font-medium uppercase text-gray-500 whitespace-nowrap">MONTO</th>
-                          {!isSupervisor && !readOnly && <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 whitespace-nowrap">ACCIONES</th>}
+                          <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 whitespace-nowrap">RECIBIDO</th>
+                          {canApprove && !readOnly && <th className="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500 whitespace-nowrap">ACCIONES</th>}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {group.orders.map(order => {
                           const isSelected = isOrderSelected(group, order.id);
                           const isDraft = order.status === 'draft';
+                          const isPaid = !!order.payment_confirmed;
 
                           return (
                             <tr
                               key={order.id}
-                              className={`transition-colors ${isDraft ? 'cursor-pointer' : ''
+                              className={`transition-colors ${isDraft && canApprove ? 'cursor-pointer' : ''
                                 } ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
                                 }`}
-                              onClick={() => isDraft && !isSupervisor && toggleOrderSelection(group, order)}
+                              onClick={() => isDraft && canApprove && toggleOrderSelection(group, order)}
                             >
-                              {!isSupervisor && (
+                              {canApprove && (
                                 <td className="px-3 py-2 text-center">
                                   <input
                                     type="checkbox"
@@ -150,7 +172,26 @@ function OrdersSection({
                                 )}
                               </td>
                               <td className="px-3 py-2 text-right text-gray-700 whitespace-nowrap font-medium">{order.amount != null ? `${getCurrencySymbol(selectedProject.currency)} ${formatNumber(getOrderEffectiveAmount(order))}` : '-'}</td>
-                              {!isSupervisor && !readOnly && (
+                              <td className="px-3 py-2 text-center whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                {isPaid ? (
+                                  <button
+                                    onClick={() => handleArrivalToggle(order)}
+                                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                                      order.material_arrived
+                                        ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                                        : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                                    }`}
+                                  >
+                                    {order.material_arrived
+                                      ? <><CheckCircleIcon className="size-3.5" /> Sí</>
+                                      : 'No'
+                                    }
+                                  </button>
+                                ) : (
+                                  <span className="text-gray-300">—</span>
+                                )}
+                              </td>
+                              {canApprove && !readOnly && (
                                 <td className="px-3 py-2 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                                   {isDraft ? (
                                     <div className="flex justify-center gap-2">

@@ -166,7 +166,7 @@ function Section({ title, icon: Icon, badge, children, actions }) {
  *   onDeleteFile: Function,
  *   getFileDownloadUrl: Function,
  *   cecos: Array,
- *   supervisors: Array,
+ *   workers: Array,
  *   showCreateProjectModal: boolean,
  *   setShowCreateProjectModal: Function,
  *   onCreateProjectFromLead: Function,
@@ -190,7 +190,7 @@ function PipelineDetail({
   onDeleteFile,
   getFileDownloadUrl,
   cecos = [],
-  supervisors = [],
+  workers = [],
   showCreateProjectModal = false,
   setShowCreateProjectModal = () => { },
   onCreateProjectFromLead = () => { },
@@ -283,6 +283,7 @@ function PipelineDetail({
             {lead.ubicacion && <div className="flex justify-between"><dt className="text-gray-500">Ubicación</dt><dd className="font-medium text-gray-900">{lead.ubicacion}</dd></div>}
             <div className="flex justify-between"><dt className="text-gray-500">Presupuesto est.</dt><dd className="font-mono font-semibold text-gray-900">{getCurrencySymbol(lead.moneda)} {formatNumber(lead.presupuesto_estimado)}</dd></div>
             <div className="flex justify-between"><dt className="text-gray-500">Creado</dt><dd className="text-gray-700">{formatDate(lead.created_at)}</dd></div>
+            {lead.creator_name && <div className="flex justify-between"><dt className="text-gray-500">Iniciado por</dt><dd className="font-medium text-gray-900">{lead.creator_name}</dd></div>}
           </dl>
           {lead.descripcion && (
             <div className="mt-3 border-t border-gray-100 pt-3">
@@ -592,7 +593,7 @@ function PipelineDetail({
         onClose={() => setShowCreateProjectModal(false)}
         lead={lead}
         cecos={cecos}
-        supervisors={supervisors}
+        workers={workers}
         saving={savingProject}
         onCreate={onCreateProjectFromLead}
       />

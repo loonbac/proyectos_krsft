@@ -1,3 +1,4 @@
+import { isValidElement } from 'react';
 import { createPortal } from 'react-dom';
 
 /**
@@ -7,7 +8,7 @@ export default function Modal({
     open,
     onClose,
     title,
-    titleIcon,
+    titleIcon: TitleIcon,
     children,
     footer,
     size = 'md',
@@ -40,7 +41,7 @@ export default function Modal({
                 {title && (
                     <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 shrink-0">
                         <h2 className="flex items-center gap-2 text-lg font-medium text-gray-900">
-                            {titleIcon}
+                            {TitleIcon && (isValidElement(TitleIcon) ? TitleIcon : <TitleIcon className="size-5" />)}
                             {title}
                         </h2>
                     </div>

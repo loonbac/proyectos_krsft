@@ -34,6 +34,15 @@ function EditProjectSection({
           placeholder="Sin supervisor"
         />
       </div>
+      <div className="mt-4">
+        <Select
+          label="Supervisor PDR"
+          value={editForm.supervisor_pdr_id || ''}
+          onChange={e => onEditChange({ ...editForm, supervisor_pdr_id: e.target.value || null })}
+          options={supervisors.map(s => ({ value: s.id, label: `${s.name} — ${s.cargo}` }))}
+          placeholder="Sin supervisor PDR"
+        />
+      </div>
       <div className="mt-4 flex gap-3">
         <Button variant="primary" onClick={onSave} disabled={saving} loading={saving}>
           {saving ? 'Guardando...' : 'Guardar Cambios'}

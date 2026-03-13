@@ -3,7 +3,7 @@
  * Incluye: CreateProyectoModal, CommunicationModal, VisitModal, BudgetModal,
  *          NegotiationModal, TeamModal.
  */
-import { useState, useEffect, memo, useCallback } from 'react';
+import { useState, useEffect, memo, useCallback, useRef } from 'react';
 import {
   PlusIcon,
   PhoneIcon,
@@ -13,6 +13,8 @@ import {
   ChatBubbleLeftRightIcon,
   UserGroupIcon,
   CheckIcon,
+  XMarkIcon,
+  MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -539,19 +541,87 @@ export const TeamModal = memo(function TeamModal({
 // ── CreateProjectFromLeadModal ─────────────────────────────────────────
 
 export const CreateProjectFromLeadModal = memo(function CreateProjectFromLeadModal({
-  open, onClose, lead, cecos, supervisors = [], saving, onCreate,
+  open, onClose, lead, cecos, workers = [], saving, onCreate,
 }) {
   const [form, setForm] = useState({
     abbreviation: '',
     ceco_id: '',
     supervisor_id: '',
+    supervisor_pdr_id: '',
   });
+  const [search, setSearch] = useState('');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const comboRef = useRef(null);
+
+  // PDR combobox state
+  const [pdrSearch, setPdrSearch] = useState('');
+  const [pdrDropdownOpen, setPdrDropdownOpen] = useState(false);
+  const pdrComboRef = useRef(null);
 
   useEffect(() => {
     if (open) {
-      setForm({ abbreviation: '', ceco_id: '', supervisor_id: '' });
+      setForm({ abbreviation: '', ceco_id: '', supervisor_id: '', supervisor_pdr_id: '' });
+      setSearch('');
+      setDropdownOpen(false);
+      setPdrSearch('');
+      setPdrDropdownOpen(false);
     }
   }, [open]);
+
+  // Cerrar dropdown al hacer click fuera
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (comboRef.current && !comboRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+      if (pdrComboRef.current && !pdrComboRef.current.contains(e.target)) {
+        setPdrDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedWorker = workers.find(w => w.id === form.supervisor_id) || null;
+  const selectedPdrWorker = workers.find(w => w.id === form.supervisor_pdr_id) || null;
+
+  const filteredWorkers = search.trim()
+    ? workers.filter(w => {
+        const q = search.toLowerCase();
+        return (w.nombre_completo || '').toLowerCase().includes(q)
+          || (w.cargo || '').toLowerCase().includes(q);
+      })
+    : workers;
+
+  const filteredPdrWorkers = pdrSearch.trim()
+    ? workers.filter(w => {
+        const q = pdrSearch.toLowerCase();
+        return (w.nombre_completo || '').toLowerCase().includes(q)
+          || (w.cargo || '').toLowerCase().includes(q);
+      })
+    : workers;
+
+  const handleSelectWorker = (worker) => {
+    setForm(f => ({ ...f, supervisor_id: worker.id }));
+    setSearch('');
+    setDropdownOpen(false);
+  };
+
+  const handleClearWorker = () => {
+    setForm(f => ({ ...f, supervisor_id: '' }));
+    setSearch('');
+  };
+
+  const handleSelectPdrWorker = (worker) => {
+    setForm(f => ({ ...f, supervisor_pdr_id: worker.id }));
+    setPdrSearch('');
+    setPdrDropdownOpen(false);
+  };
+
+  const handleClearPdrWorker = () => {
+    setForm(f => ({ ...f, supervisor_pdr_id: '' }));
+    setPdrSearch('');
+  };
 
   const handleCreate = () => {
     if (!form.abbreviation.trim()) {
@@ -637,23 +707,108 @@ export const CreateProjectFromLeadModal = memo(function CreateProjectFromLeadMod
           maxLength={50}
         />
 
-        {/* Supervisor del proyecto - select */}
-        <div>
+        {/* Supervisor del proyecto - combobox con búsqueda */}
+        <div ref={comboRef} className="relative">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Supervisor del Proyecto <span className="text-red-500">*</span>
+            Supervisor <span className="text-red-500">*</span>
           </label>
-          <select
-            value={form.supervisor_id || ''}
-            onChange={e => setForm({ ...form, supervisor_id: parseInt(e.target.value) || '' })}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary focus:ring-primary"
-          >
-            <option value="">Selecciona un supervisor...</option>
-            {(supervisors || []).map(s => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+
+          {selectedWorker ? (
+            <div className="flex items-center justify-between rounded-md border border-primary bg-primary/5 px-3 py-2 text-sm">
+              <span>
+                <span className="font-medium text-gray-900">{selectedWorker.nombre_completo}</span>
+                {selectedWorker.cargo && (
+                  <span className="ml-2 text-gray-500">— {selectedWorker.cargo}</span>
+                )}
+              </span>
+              <button type="button" onClick={handleClearWorker} className="ml-2 text-gray-400 hover:text-red-500">
+                <XMarkIcon className="size-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="relative">
+              <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={e => { setSearch(e.target.value); setDropdownOpen(true); }}
+                onFocus={() => setDropdownOpen(true)}
+                placeholder="Buscar trabajador por nombre o cargo..."
+                className="w-full rounded-md border border-gray-300 py-2 pl-9 pr-3 text-sm shadow-sm focus:border-primary focus:ring-primary"
+              />
+            </div>
+          )}
+
+          {dropdownOpen && !selectedWorker && (
+            <ul className="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
+              {filteredWorkers.length === 0 ? (
+                <li className="px-3 py-2 text-sm text-gray-500">Sin resultados</li>
+              ) : (
+                filteredWorkers.map(w => (
+                  <li
+                    key={w.id}
+                    onClick={() => handleSelectWorker(w)}
+                    className="flex cursor-pointer items-center justify-between px-3 py-2 text-sm hover:bg-primary/10"
+                  >
+                    <span className="font-medium text-gray-900">{w.nombre_completo}</span>
+                    {w.cargo && <span className="text-xs text-gray-500">{w.cargo}</span>}
+                  </li>
+                ))
+              )}
+            </ul>
+          )}
+        </div>
+
+        {/* Supervisor PDR - combobox con búsqueda (opcional) */}
+        <div ref={pdrComboRef} className="relative">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Supervisor PDR
+          </label>
+
+          {selectedPdrWorker ? (
+            <div className="flex items-center justify-between rounded-md border border-primary bg-primary/5 px-3 py-2 text-sm">
+              <span>
+                <span className="font-medium text-gray-900">{selectedPdrWorker.nombre_completo}</span>
+                {selectedPdrWorker.cargo && (
+                  <span className="ml-2 text-gray-500">— {selectedPdrWorker.cargo}</span>
+                )}
+              </span>
+              <button type="button" onClick={handleClearPdrWorker} className="ml-2 text-gray-400 hover:text-red-500">
+                <XMarkIcon className="size-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="relative">
+              <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={pdrSearch}
+                onChange={e => { setPdrSearch(e.target.value); setPdrDropdownOpen(true); }}
+                onFocus={() => setPdrDropdownOpen(true)}
+                placeholder="Buscar trabajador por nombre o cargo..."
+                className="w-full rounded-md border border-gray-300 py-2 pl-9 pr-3 text-sm shadow-sm focus:border-primary focus:ring-primary"
+              />
+            </div>
+          )}
+
+          {pdrDropdownOpen && !selectedPdrWorker && (
+            <ul className="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
+              {filteredPdrWorkers.length === 0 ? (
+                <li className="px-3 py-2 text-sm text-gray-500">Sin resultados</li>
+              ) : (
+                filteredPdrWorkers.map(w => (
+                  <li
+                    key={w.id}
+                    onClick={() => handleSelectPdrWorker(w)}
+                    className="flex cursor-pointer items-center justify-between px-3 py-2 text-sm hover:bg-primary/10"
+                  >
+                    <span className="font-medium text-gray-900">{w.nombre_completo}</span>
+                    {w.cargo && <span className="text-xs text-gray-500">{w.cargo}</span>}
+                  </li>
+                ))
+              )}
+            </ul>
+          )}
         </div>
 
         {/* CECO - select con jerarquía */}

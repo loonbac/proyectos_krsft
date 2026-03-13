@@ -158,8 +158,7 @@ function LeadFilesSection({ files = [], isClosed = false, onUpload, onDelete, ge
       </div>
 
       <div className="p-4 space-y-4">
-        {!isClosed && (
-          <div className="space-y-3">
+        <div className="space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-medium text-gray-500">Categoría:</span>
               {FILE_CATEGORIES.map((cat) => (
@@ -218,7 +217,6 @@ function LeadFilesSection({ files = [], isClosed = false, onUpload, onDelete, ge
               />
             </div>
           </div>
-        )}
 
         {previewFiles.length > 0 && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
@@ -315,8 +313,7 @@ function LeadFilesSection({ files = [], isClosed = false, onUpload, onDelete, ge
                     <a href={getDownloadUrl(file.id)} className="rounded p-1.5 bg-blue-500 hover:bg-blue-600 text-white transition-colors" title="Descargar">
                       <ArrowDownTrayIcon className="size-4" />
                     </a>
-                    {!isClosed && (
-                      <button
+                    <button
                         onClick={() => handleDeleteFile(file.id)}
                         disabled={isDeleting}
                         className={clsx('rounded p-1.5 transition-colors', isDeleting ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600 text-white')}
@@ -331,7 +328,6 @@ function LeadFilesSection({ files = [], isClosed = false, onUpload, onDelete, ge
                           <TrashIcon className="size-4" />
                         )}
                       </button>
-                    )}
                   </div>
                 </div>
               );

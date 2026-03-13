@@ -17,12 +17,13 @@ flatpickr.localize(Spanish);
 
 let didInit = false;
 
-export default function useProyectosData({ isSupervisor }) {
+export default function useProyectosData({ permissions }) {
   /* -------- STATE -------- */
   const [projects, setProjects] = useState(() => loadFromCache('projects') || []);
   const [stats, setStats] = useState(() => loadFromCache('stats') || { total_projects: 0, active_projects: 0, total_budget: 0, total_spent: 0, total_remaining: 0 });
   const [selectedProject, setSelectedProject] = useState(null);
   const [projectWorkers, setProjectWorkers] = useState([]);
+  const [projectFieldWorkers, setProjectFieldWorkers] = useState([]);
   const [projectOrders, setProjectOrders] = useState([]);
   const [projectSummary, setProjectSummary] = useState({});
   const [supervisors, setSupervisors] = useState([]);
@@ -50,11 +51,6 @@ export default function useProyectosData({ isSupervisor }) {
 
   const [paidOrders, setPaidOrders] = useState([]);
   const [loadingPaidOrders, setLoadingPaidOrders] = useState(false);
-  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
-  const [selectedOrderForDelivery, setSelectedOrderForDelivery] = useState(null);
-  const [deliveryNotes, setDeliveryNotes] = useState('');
-  const [confirmingDelivery, setConfirmingDelivery] = useState(false);
-
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -83,9 +79,16 @@ export default function useProyectosData({ isSupervisor }) {
   const [completionRequest, setCompletionRequest] = useState(null);
   const [completionLoading, setCompletionLoading] = useState(false);
 
-  const [editForm, setEditForm] = useState({ name: '', spending_threshold: 75, supervisor_id: null });
+  const [editForm, setEditForm] = useState({ name: '', spending_threshold: 75, supervisor_id: null, supervisor_pdr_id: null });
   const [form, setForm] = useState({ ...DEFAULT_CREATE_FORM });
   const [selectedWorkerId, setSelectedWorkerId] = useState('');
+  const [selectedFieldWorkerId, setSelectedFieldWorkerId] = useState('');
+
+  // Arrival reports state (materiales faltantes)
+  const [arrivalReports, setArrivalReports] = useState([]);
+  const [showCreateArrivalReportModal, setShowCreateArrivalReportModal] = useState(false);
+  const [showArrivalReportDetailModal, setShowArrivalReportDetailModal] = useState(false);
+  const [selectedArrivalReport, setSelectedArrivalReport] = useState(null);
 
   const dateFromInputRef = useRef(null);
   const dateToInputRef = useRef(null);
@@ -122,9 +125,12 @@ export default function useProyectosData({ isSupervisor }) {
   const ordersGroupedByFile = useMemo(() => {
     const groups = {};
     const manual = [];
+    const inventory = [];
     // Only include material orders (not services) in this section
     projectOrders.filter(o => (o.type || 'material') !== 'service').forEach(o => {
-      if (o.source_filename) {
+      if (o.source_type === 'inventory') {
+        inventory.push(o);
+      } else if (o.source_filename) {
         if (!groups[o.source_filename]) {
           groups[o.source_filename] = {
             filename: o.source_filename, orders: [], imported_at: o.imported_at,
@@ -145,6 +151,16 @@ export default function useProyectosData({ isSupervisor }) {
         filename: null, orders: manual, imported_at: null,
         allPaid: mp === manual.length, allDelivered: md === manual.length,
         paidCount: mp, deliveredCount: md, totalCount: manual.length,
+      });
+    }
+    if (inventory.length > 0) {
+      let ip = 0, id = 0;
+      for (const o of inventory) { if (o.payment_confirmed) ip++; if (o.delivery_confirmed) id++; }
+      output.push({
+        filename: '__inventory__', orders: inventory, imported_at: null,
+        allPaid: ip === inventory.length, allDelivered: id === inventory.length,
+        paidCount: ip, deliveredCount: id, totalCount: inventory.length,
+        isInventoryGroup: true,
       });
     }
     return [...output, ...result];
@@ -211,6 +227,11 @@ export default function useProyectosData({ isSupervisor }) {
     const assigned = new Set(projectWorkers.map(w => w.id));
     return allWorkers.filter(w => !assigned.has(w.id));
   }, [allWorkers, projectWorkers]);
+
+  const availableFieldWorkersFiltered = useMemo(() => {
+    const assigned = new Set(projectFieldWorkers.map(w => w.id));
+    return allWorkers.filter(w => !assigned.has(w.id));
+  }, [allWorkers, projectFieldWorkers]);
 
   /* -------- TOAST -------- */
   const showToastMsg = useCallback((message, type = 'success') => {
@@ -285,7 +306,7 @@ export default function useProyectosData({ isSupervisor }) {
   }, []);
 
   const loadAllWorkers = useCallback(async () => {
-    try { const res = await fetch(`${API_BASE}/workers`); const data = await res.json(); if (data.success) setAllWorkers(data.workers || []); } catch { }
+    try { const res = await fetch(`${API_BASE}/workers`); const data = await res.json(); if (data.success) setAllWorkers((data.workers || []).map(w => ({ ...w, name: w.nombre_completo || w.name }))); } catch { }
   }, []);
 
   const selectProject = useCallback(async (project) => {
@@ -296,9 +317,10 @@ export default function useProyectosData({ isSupervisor }) {
       if (data.success) {
         setSelectedProject(data.project);
         setProjectWorkers(data.workers || []);
+        setProjectFieldWorkers(data.field_workers || []);
         setProjectOrders(data.orders || []);
         setProjectSummary(data.summary || {});
-        setEditForm({ name: data.project.name, spending_threshold: data.project.spending_threshold, supervisor_id: data.project.supervisor_id });
+        setEditForm({ name: data.project.name, spending_threshold: data.project.spending_threshold, supervisor_id: data.project.supervisor_id, supervisor_pdr_id: data.project.supervisor_pdr_id });
         // Fetch secondary data in parallel (non-blocking)
         if (data.project.status === 'active' || data.project.status === 'pendiente_recuento') {
           const promises = [
@@ -329,6 +351,80 @@ export default function useProyectosData({ isSupervisor }) {
     setLoadingPaidOrders(false);
   }, []);
 
+  // ── Arrival Reports (materiales faltantes) ──────────────────────────
+  const loadArrivalReports = useCallback(async (projId) => {
+    const pid = projId || selectedProjectRef.current?.id;
+    if (!pid) return;
+    try {
+      const res = await fetch(`${API_BASE}/${pid}/arrival-reports`);
+      const data = await res.json();
+      if (data.success) { setArrivalReports(prev => arraysEqual(prev, data.reports) ? prev : data.reports); }
+    } catch { }
+  }, []);
+
+  const markMaterialArrived = useCallback(async (orderIds) => {
+    const pid = selectedProjectRef.current?.id;
+    if (!pid || !orderIds?.length) return;
+    try {
+      const res = await fetchWithCsrf(`${API_BASE}/${pid}/mark-material-arrived`, { method: 'POST', body: JSON.stringify({ order_ids: orderIds }) });
+      const data = await res.json();
+      if (data.success) { showToastMsg('Materiales marcados como recibidos'); await refreshSelectedProject(); }
+      else showToastMsg(data.message || 'Error', 'error');
+    } catch { showToastMsg('Error de conexión', 'error'); }
+  }, [showToastMsg]);
+
+  const markMaterialNotArrived = useCallback(async (orderIds) => {
+    const pid = selectedProjectRef.current?.id;
+    if (!pid || !orderIds?.length) return;
+    try {
+      const res = await fetchWithCsrf(`${API_BASE}/${pid}/mark-material-not-arrived`, { method: 'POST', body: JSON.stringify({ order_ids: orderIds }) });
+      const data = await res.json();
+      if (data.success) { showToastMsg('Marca de recepción revertida'); await refreshSelectedProject(); }
+      else showToastMsg(data.message || 'Error', 'error');
+    } catch { showToastMsg('Error de conexión', 'error'); }
+  }, [showToastMsg]);
+
+  const createArrivalReport = useCallback(async (orderIds, notas) => {
+    const pid = selectedProjectRef.current?.id;
+    if (!pid || !orderIds?.length) return;
+    try {
+      const res = await fetchWithCsrf(`${API_BASE}/${pid}/arrival-reports`, { method: 'POST', body: JSON.stringify({ order_ids: orderIds, notas }) });
+      const data = await res.json();
+      if (data.success) {
+        showToastMsg(data.message || 'Reporte enviado a inventario');
+        setShowCreateArrivalReportModal(false);
+        await loadArrivalReports(pid);
+      } else showToastMsg(data.message || 'Error', 'error');
+    } catch { showToastMsg('Error de conexión', 'error'); }
+  }, [showToastMsg, loadArrivalReports]);
+
+  const resolveArrivalReport = useCallback(async (reportId) => {
+    try {
+      const res = await fetchWithCsrf(`${API_BASE}/arrival-reports/${reportId}/resolve`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        showToastMsg(data.message || 'Reporte resuelto');
+        setShowArrivalReportDetailModal(false);
+        setSelectedArrivalReport(null);
+        const pid = selectedProjectRef.current?.id;
+        if (pid) { await loadArrivalReports(pid); await refreshSelectedProject(); }
+      } else showToastMsg(data.message || 'Error', 'error');
+    } catch { showToastMsg('Error de conexión', 'error'); }
+  }, [showToastMsg, loadArrivalReports]);
+
+  const openArrivalReportDetail = useCallback((report) => {
+    setSelectedArrivalReport(report);
+    setShowArrivalReportDetailModal(true);
+  }, []);
+
+  const purchasedNotArrivedOrders = useMemo(() => {
+    return projectOrders.filter(o =>
+      (o.type || 'material') !== 'service' &&
+      o.payment_confirmed &&
+      !o.material_arrived
+    );
+  }, [projectOrders]);
+
   const refreshSelectedProject = useCallback(async () => {
     const proj = selectedProjectRef.current;
     if (!proj) return;
@@ -336,13 +432,14 @@ export default function useProyectosData({ isSupervisor }) {
       const res = await fetch(`${API_BASE}/${proj.id}`);
       const data = await res.json();
       if (data.success) {
-        const np = data.project, nw = data.workers || [], no = data.orders || [], ns = data.summary || {};
+        const np = data.project, nw = data.workers || [], nfw = data.field_workers || [], no = data.orders || [], ns = data.summary || {};
         setSelectedProject(prev => JSON.stringify(prev) === JSON.stringify(np) ? prev : np);
         setProjectWorkers(prev => arraysEqual(prev, nw) ? prev : nw);
+        setProjectFieldWorkers(prev => arraysEqual(prev, nfw) ? prev : nfw);
         setProjectOrders(prev => arraysEqual(prev, no) ? prev : no);
         setProjectSummary(prev => JSON.stringify(prev) === JSON.stringify(ns) ? prev : ns);
-        if (np) setEditForm({ name: np.name, spending_threshold: np.spending_threshold, supervisor_id: np.supervisor_id });
-        if (isSupervisor) loadPaidOrders(np.id);
+        if (np) setEditForm({ name: np.name, spending_threshold: np.spending_threshold, supervisor_id: np.supervisor_id, supervisor_pdr_id: np.supervisor_pdr_id });
+        loadPaidOrders(np.id);
         // Refresh completion request and materials for pendiente_recuento projects
         if (np.status === 'pendiente_recuento' || np.status === 'active') {
           try {
@@ -366,7 +463,7 @@ export default function useProyectosData({ isSupervisor }) {
         }
       }
     } catch { }
-  }, [isSupervisor, loadPaidOrders]);
+  }, [loadPaidOrders]);
 
   /* -------- ACTIONS -------- */
   const goBack = useCallback(() => { window.location.href = '/'; }, []);
@@ -462,6 +559,20 @@ export default function useProyectosData({ isSupervisor }) {
     setCompletionLoading(false);
   }, [showToastMsg, loadProjects, selectProject]);
 
+  const cancelFinalization = useCallback(async (projectId) => {
+    try {
+      const res = await fetchWithCsrf(`${API_BASE}/${projectId}/cancel-finalization`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        showToastMsg(data.message || 'Finalización cancelada');
+        await selectProject(projectId);
+        await loadProjects();
+      } else {
+        showToastMsg(data.message || 'Error al cancelar', 'error');
+      }
+    } catch { showToastMsg('Error de conexión', 'error'); }
+  }, [showToastMsg, selectProject, loadProjects]);
+
   const rejectCompletion = useCallback(async (projectId, requestId, notes) => {
     setCompletionLoading(true);
     try {
@@ -486,18 +597,16 @@ export default function useProyectosData({ isSupervisor }) {
 
     const status = (project.status || '').toLowerCase();
 
-    if (isSupervisor) {
-      // Supervisor: si el proyecto está en pendiente_recuento,
-      // el panel RecuentoSobrantesPanel ya está visible, no hay acción click.
+    if (!permissions.configure) {
+      // User without configure permission: show hint for recuento panel
       if (status === 'pendiente_recuento') {
         showToastMsg('Usa el panel de recuento de sobrantes para enviar las cantidades', 'warning');
         return;
       }
-      // Supervisor no puede finalizar desde aquí
       return;
     }
 
-    // Manager/Admin:
+    // User with configure permission:
     if (status === 'active') {
       // Finalizar proyecto → cambiar a pendiente_recuento
       openConfirmModal({
@@ -521,7 +630,7 @@ export default function useProyectosData({ isSupervisor }) {
         showToastMsg('El supervisor aún no ha enviado el recuento de sobrantes', 'warning');
       }
     }
-  }, [isSupervisor, fetchCompletionRequest, openConfirmModal, finalizeProjectAction, closeConfirmModal, showToastMsg]);
+  }, [permissions.configure, fetchCompletionRequest, openConfirmModal, finalizeProjectAction, closeConfirmModal, showToastMsg]);
 
   const runConfirmAction = useCallback(async () => {
     if (!confirmActionRef.current || confirmProcessing) return;
@@ -529,42 +638,10 @@ export default function useProyectosData({ isSupervisor }) {
     try { await confirmActionRef.current(); } finally { closeConfirmModal(); }
   }, [confirmProcessing, closeConfirmModal]);
 
-  const confirmFileDelivery = useCallback((group) => {
-    openConfirmModal({
-      title: 'Confirmar entrega',
-      message: `¿Marcar todos los ${group.orders.length} items de "${group.filename || 'Órdenes Manuales'}" como entregados?`,
-      actionLabel: 'Confirmar', variant: 'primary',
-      onConfirm: async () => {
-        try {
-          const ids = group.orders.map(o => o.id);
-          const res = await fetchWithCsrf(`${API_BASE}/confirm-file-delivery`, { method: 'POST', body: JSON.stringify({ order_ids: ids }) });
-          const data = await res.json();
-          if (data.success) { showToastMsg(`${data.updated || ids.length} items marcados como entregados`); if (selectedProjectRef.current) await selectProject(selectedProjectRef.current.id); }
-          else showToastMsg(data.message || 'Error', 'error');
-        } catch { showToastMsg('Error de conexión', 'error'); }
-      }
-    });
-  }, [openConfirmModal, showToastMsg, selectProject]);
-
-  const openDeliveryModal = useCallback((order) => { setSelectedOrderForDelivery(order); setDeliveryNotes(''); setShowDeliveryModal(true); }, []);
-  const closeDeliveryModal = useCallback(() => { setShowDeliveryModal(false); setSelectedOrderForDelivery(null); setDeliveryNotes(''); }, []);
-
-  const confirmDeliveryOrder = useCallback(async () => {
-    if (!selectedOrderForDelivery) return;
-    setConfirmingDelivery(true);
-    try {
-      const res = await fetchWithCsrf(`${API_BASE}/orders/${selectedOrderForDelivery.id}/confirm-delivery`, { method: 'POST', body: JSON.stringify({ notes: deliveryNotes }) });
-      const data = await res.json();
-      if (data.success) { showToastMsg('Entrega confirmada'); closeDeliveryModal(); loadPaidOrders(); }
-      else showToastMsg(data.message || 'Error', 'error');
-    } catch { showToastMsg('Error al confirmar', 'error'); }
-    setConfirmingDelivery(false);
-  }, [selectedOrderForDelivery, deliveryNotes, showToastMsg, closeDeliveryModal, loadPaidOrders]);
-
   const addWorkerToProject = useCallback(async () => {
     if (!selectedWorkerId || !selectedProjectRef.current) return;
     try {
-      const res = await fetchWithCsrf(`${API_BASE}/${selectedProjectRef.current.id}/workers`, { method: 'POST', body: JSON.stringify({ trabajador_id: selectedWorkerId }) });
+      const res = await fetchWithCsrf(`${API_BASE}/${selectedProjectRef.current.id}/workers`, { method: 'POST', body: JSON.stringify({ trabajador_id: selectedWorkerId, type: 'admin' }) });
       const data = await res.json();
       if (data.success) { showToastMsg('Trabajador agregado'); setSelectedWorkerId(''); await selectProject(selectedProjectRef.current.id); }
       else showToastMsg(data.message || 'Error', 'error');
@@ -574,9 +651,28 @@ export default function useProyectosData({ isSupervisor }) {
   const removeWorkerFromProject = useCallback(async (trabajadorId) => {
     if (!selectedProjectRef.current) return;
     try {
-      const res = await fetchWithCsrf(`${API_BASE}/${selectedProjectRef.current.id}/workers/${trabajadorId}`, { method: 'DELETE' });
+      const res = await fetchWithCsrf(`${API_BASE}/${selectedProjectRef.current.id}/workers/${trabajadorId}?type=admin`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) { showToastMsg('Trabajador removido'); await selectProject(selectedProjectRef.current.id); }
+    } catch { showToastMsg('Error', 'error'); }
+  }, [selectProject, showToastMsg]);
+
+  const addFieldWorkerToProject = useCallback(async () => {
+    if (!selectedFieldWorkerId || !selectedProjectRef.current) return;
+    try {
+      const res = await fetchWithCsrf(`${API_BASE}/${selectedProjectRef.current.id}/workers`, { method: 'POST', body: JSON.stringify({ trabajador_id: selectedFieldWorkerId, type: 'field' }) });
+      const data = await res.json();
+      if (data.success) { showToastMsg('Trabajador de campo agregado'); setSelectedFieldWorkerId(''); await selectProject(selectedProjectRef.current.id); }
+      else showToastMsg(data.message || 'Error', 'error');
+    } catch { showToastMsg('Error', 'error'); }
+  }, [selectedFieldWorkerId, selectProject, showToastMsg]);
+
+  const removeFieldWorkerFromProject = useCallback(async (trabajadorId) => {
+    if (!selectedProjectRef.current) return;
+    try {
+      const res = await fetchWithCsrf(`${API_BASE}/${selectedProjectRef.current.id}/workers/${trabajadorId}?type=field`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) { showToastMsg('Trabajador de campo removido'); await selectProject(selectedProjectRef.current.id); }
     } catch { showToastMsg('Error', 'error'); }
   }, [selectProject, showToastMsg]);
 
@@ -588,7 +684,7 @@ export default function useProyectosData({ isSupervisor }) {
       const res = await fetchWithCsrf(`${API_BASE}/${selectedProjectRef.current.id}/order`, {
         method: 'POST', body: JSON.stringify({
           type: 'material',
-          description: materialForm.description.trim() || materialForm.material_type.trim(),
+          description: materialForm.description.trim(),
           materials: mats,
           material_type: materialForm.material_type.trim(),
           diameter: materialForm.diameter || null,
@@ -857,18 +953,27 @@ export default function useProyectosData({ isSupervisor }) {
   }, [openConfirmModal, loadProjects, loadStats, showToastMsg]);
 
   /* -------- LIFECYCLE -------- */
+  const canSeeProjects = permissions.started_projects_personal;
+
   useEffect(() => {
     if (didInit) return;
     didInit = true;
-    loadProjects(); loadStats(); loadSupervisors();
-    if (isSupervisor) loadAllWorkers();
-    pollingRef.current = setInterval(() => { loadProjects(); loadStats(); refreshSelectedProject(); }, POLLING_MS);
+
+    if (canSeeProjects) {
+      loadProjects(); loadStats(); loadSupervisors(); loadAllWorkers();
+      pollingRef.current = setInterval(() => { loadProjects(); loadStats(); refreshSelectedProject(); }, POLLING_MS);
+    }
+
     return () => { if (pollingRef.current) clearInterval(pollingRef.current); destroyDatePickers(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (selectedProject && isSupervisor) loadPaidOrders(selectedProject.id);
-  }, [selectedProject, isSupervisor, loadPaidOrders]);
+    if (selectedProject) loadPaidOrders(selectedProject.id);
+  }, [selectedProject, loadPaidOrders]);
+
+  useEffect(() => {
+    if (selectedProject) loadArrivalReports(selectedProject.id);
+  }, [selectedProject, loadArrivalReports]);
 
   /* -------- RETURN -------- */
   return {
@@ -884,9 +989,8 @@ export default function useProyectosData({ isSupervisor }) {
     expandedFiles, selectedOrders,
     editForm, setEditForm, form, setForm, errorMessage,
     selectedWorkerId, setSelectedWorkerId,
+    projectFieldWorkers, selectedFieldWorkerId, setSelectedFieldWorkerId, availableFieldWorkersFiltered,
     updatingProjectState,
-    // Delivery
-    showDeliveryModal, selectedOrderForDelivery, deliveryNotes, setDeliveryNotes, confirmingDelivery,
     // Modals
     showCreateModal, setShowCreateModal,
     showConfirmModal, confirmTitle, confirmMessage, confirmActionLabel, confirmActionVariant, confirmProcessing,
@@ -902,14 +1006,13 @@ export default function useProyectosData({ isSupervisor }) {
     goBack, selectProject, handleProjectStateClick,
     toggleFileSection, openCreateModal, createProject, updateProject,
     confirmDeleteProject,
-    openDeliveryModal, closeDeliveryModal, confirmDeliveryOrder,
     addWorkerToProject, removeWorkerFromProject,
+    addFieldWorkerToProject, removeFieldWorkerFromProject,
     createOrder, createService, downloadTemplate, importExcel,
     approveMaterial, rejectMaterial,
     approveAllInGroup, approveSelectedInGroup,
     isOrderSelected, toggleOrderSelection, getSelectedCount,
     getGroupKey, getGroupDraftOrders,
-    confirmFileDelivery,
     // Service actions
     approveService, rejectService, approveServicesBulk,
     isServiceSelected, toggleServiceSelection, getSelectedServiceCount,
@@ -919,8 +1022,15 @@ export default function useProyectosData({ isSupervisor }) {
     // Completion (sobras)
     showCompletionModal, setShowCompletionModal, completionMaterials, completionLoading,
     showCompletionApprovalModal, setShowCompletionApprovalModal, completionRequest,
-    requestCompletion, approveCompletion, rejectCompletion,
+    requestCompletion, approveCompletion, rejectCompletion, cancelFinalization,
     fetchCompletionRequest, setCompletionRequest,
+    // Arrival reports (materiales faltantes)
+    arrivalReports, showCreateArrivalReportModal, setShowCreateArrivalReportModal,
+    showArrivalReportDetailModal, setShowArrivalReportDetailModal,
+    selectedArrivalReport, setSelectedArrivalReport,
+    markMaterialArrived, markMaterialNotArrived,
+    createArrivalReport, resolveArrivalReport, loadArrivalReports,
+    openArrivalReportDetail, purchasedNotArrivedOrders,
     // Refs (for flatpickr)
     dateFromInputRef, dateToInputRef,
     openDateFromPicker, openDateToPicker, clearDateFilters,

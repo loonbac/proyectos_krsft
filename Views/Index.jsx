@@ -8,8 +8,6 @@ import {
   FunnelIcon,
   RocketLaunchIcon,
   ArrowLeftIcon,
-  UserIcon,
-  PlusIcon,
 } from '@heroicons/react/24/outline';
 
 import useProyectosData from './hooks/useProyectosData';
@@ -18,7 +16,6 @@ import { formatNumber, canFinalizeProject } from './utils';
 
 import StatsCard from './Components/ui/StatsCard';
 import Button from './Components/ui/Button';
-import Badge from './Components/ui/Badge';
 import Toast from './Components/ui/Toast';
 
 import ProjectCard from './Components/ProjectCard';
@@ -29,6 +26,8 @@ import MaterialForm from './Components/MaterialForm';
 import ServiceForm from './Components/ServiceForm';
 import OrdersSection from './Components/OrdersSection';
 import ServicesSection from './Components/ServicesSection';
+import WorkersSection from './Components/WorkersSection';
+import FieldWorkersSection from './Components/FieldWorkersSection';
 
 import PipelineBoard from './Components/PipelineBoard';
 import PipelineDetail from './Components/PipelineDetail';
@@ -41,26 +40,29 @@ import {
   TeamModal,
 } from './Components/modals/PipelineModals';
 
-import DeliveryModal from './Components/modals/DeliveryModal';
-import CreateProjectModal from './Components/modals/CreateProjectModal';
 import ConfirmModal from './Components/modals/ConfirmModal';
 import ImportPreviewModal from './Components/modals/ImportPreviewModal';
 import DuplicateFileModal from './Components/modals/DuplicateFileModal';
 import ConfigModal from './Components/modals/ConfigModal';
 import RejectModal from './Components/modals/RejectModal';
 import CompletionApprovalModal from './Components/modals/CompletionApprovalModal';
+import CreateArrivalReportModal from './Components/modals/CreateArrivalReportModal';
+import ArrivalReportDetailModal from './Components/modals/ArrivalReportDetailModal';
 import RecuentoSobrantesPanel from './Components/RecuentoSobrantesPanel';
 import AdminRecuentoPanel from './Components/AdminRecuentoPanel';
+import ArrivalReportsSection from './Components/ArrivalReportsSection';
 
 /* ============================================
    ORCHESTRATOR — Proyectos Module
-   Pipeline (Pre-Proyecto) = vista principal
-   Proyectos Iniciados = vista secundaria
+   Pipeline (Pre-Proyecto) + Proyectos Iniciados
+   Visibilidad controlada 100% por permisos
    ============================================ */
-export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorProp, trabajadorId }) {
-  const isSupervisor = isSupervisorProp;
-  const canSeePipeline = !isSupervisor;
-  const d = useProyectosData({ isSupervisor });
+export default function ProyectosIndex({ permissions, trabajadorId }) {
+  const canSeePipeline = permissions.pre_projects;
+  const canSeeProjects = permissions.started_projects_personal;
+  const hasBothTabs = canSeePipeline && canSeeProjects;
+
+  const d = useProyectosData({ permissions });
 
   // Pipeline hook — siempre se invoca (regla de hooks), enabled controla fetching
   const showToastFn = useCallback((msg, type) => d.setToast({ show: true, message: msg, type }), [d.setToast]);
@@ -70,8 +72,15 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
     onProjectCreated: d.loadProjects
   });
 
-  // Navigation: 'pipeline' | 'projects' | 'project-detail' | 'lead-detail'
-  const [activeTab, setActiveTab] = useState(isSupervisor ? 'projects' : 'pipeline');
+  // Determine initial tab
+  const getInitialTab = () => {
+    if (canSeePipeline) return 'pipeline';
+    if (canSeeProjects) return 'projects';
+    return 'empty';
+  };
+
+  // Navigation: 'pipeline' | 'projects' | 'project-detail' | 'lead-detail' | 'empty'
+  const [activeTab, setActiveTab] = useState(getInitialTab);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [loadingProjectDetail, setLoadingProjectDetail] = useState(false);
 
@@ -100,6 +109,19 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
 
   // ── Render view ──
   const renderView = () => {
+    // ─── Empty: solo tiene access ───
+    if (activeTab === 'empty') {
+      return (
+        <div className="rounded-lg border-2 border-gray-200 bg-white p-12 text-center shadow-sm">
+          <FolderIcon className="mx-auto size-16 text-gray-300" />
+          <h3 className="mt-4 text-lg font-semibold text-gray-900">Bienvenido al modulo de Proyectos</h3>
+          <p className="mt-2 text-sm text-gray-500">
+            Contacta al administrador para que te asigne permisos adicionales.
+          </p>
+        </div>
+      );
+    }
+
     // ─── Detalle de Pre-Proyecto ───
     if (activeTab === 'lead-detail' && canSeePipeline) {
       return (
@@ -120,7 +142,7 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
           onDeleteFile={pipe.deleteFile}
           getFileDownloadUrl={pipe.getFileDownloadUrl}
           cecos={pipe.cecos}
-          supervisors={d.supervisors}
+          workers={pipe.workers}
           showCreateProjectModal={pipe.showCreateProjectModal}
           setShowCreateProjectModal={pipe.setShowCreateProjectModal}
           onCreateProjectFromLead={pipe.createProjectFromLeadModal}
@@ -142,9 +164,9 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
           </div>
         );
       }
-      const isProjectReadOnly = isSupervisor && (d.selectedProject.status === 'pendiente_recuento' || d.selectedProject.status === 'completed');
-      const showRecuento = isSupervisor && d.selectedProject.status === 'pendiente_recuento';
-      const showAdminApproval = !isSupervisor && d.selectedProject.status === 'pendiente_recuento' && d.completionRequest?.status === 'pending';
+      const isProjectReadOnly = d.selectedProject.status === 'pendiente_recuento' || d.selectedProject.status === 'completed';
+      const showRecuento = permissions.surplus_count && d.selectedProject.status === 'pendiente_recuento';
+      const showAdminApproval = permissions.approve_surplus && d.selectedProject.status === 'pendiente_recuento' && d.completionRequest?.status === 'pending';
 
       return (
         <div className="space-y-6">
@@ -152,7 +174,7 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
             project={d.selectedProject}
             onBack={backFromDetail}
             onStateClick={d.handleProjectStateClick}
-            onOpenConfig={() => setShowConfigModal(true)}
+            onOpenConfig={permissions.configure ? () => setShowConfigModal(true) : undefined}
           />
           <StatsPanel
             project={d.selectedProject}
@@ -162,7 +184,6 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
             onStateClick={d.handleProjectStateClick}
             ordersGroupedByFile={d.ordersGroupedByFile}
             completionRequest={d.completionRequest}
-            isSupervisor={isSupervisor}
           />
           {showRecuento && (
             <RecuentoSobrantesPanel
@@ -181,7 +202,7 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
               projectName={d.selectedProject?.name || ''}
             />
           )}
-          {isSupervisor && !isProjectReadOnly && (
+          {!isProjectReadOnly && (
             <MaterialForm
               materialForm={d.materialForm}
               onFormChange={d.setMaterialForm}
@@ -197,12 +218,11 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
             ordersGroupedByFile={d.ordersGroupedByFile}
             expandedFiles={d.expandedFiles}
             selectedProject={d.selectedProject}
-            isSupervisor={isSupervisor}
+            canApprove={permissions.approve}
             readOnly={isProjectReadOnly}
             onToggleFile={d.toggleFileSection}
             onApproveAll={d.approveAllInGroup}
             onApproveSelected={d.approveSelectedInGroup}
-            onConfirmFileDelivery={d.confirmFileDelivery}
             onApproveMaterial={d.approveMaterial}
             onRejectMaterial={d.rejectMaterial}
             isOrderSelected={d.isOrderSelected}
@@ -210,8 +230,16 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
             getSelectedCount={d.getSelectedCount}
             getGroupKey={d.getGroupKey}
             getGroupDraftOrders={d.getGroupDraftOrders}
+            onMarkArrived={d.markMaterialArrived}
+            onMarkNotArrived={d.markMaterialNotArrived}
           />
-          {isSupervisor && !isProjectReadOnly && (
+          <ArrivalReportsSection
+            arrivalReports={d.arrivalReports}
+            purchasedNotArrivedOrders={d.purchasedNotArrivedOrders}
+            onOpenCreate={() => d.setShowCreateArrivalReportModal(true)}
+            onOpenDetail={d.openArrivalReportDetail}
+          />
+          {!isProjectReadOnly && (
             <ServiceForm
               serviceForm={d.serviceForm}
               onFormChange={d.setServiceForm}
@@ -222,7 +250,7 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
           <ServicesSection
             serviceOrders={d.serviceOrders}
             selectedServices={d.selectedServices}
-            isSupervisor={isSupervisor}
+            canApprove={permissions.approve}
             readOnly={isProjectReadOnly}
             onApproveAll={() => d.approveServicesBulk(d.serviceOrders.filter(o => o.status === 'draft').map(o => o.id), 'Aprobar todos los servicios')}
             onApproveSelected={() => d.approveServicesBulk(d.selectedServices, 'Aprobar servicios seleccionados')}
@@ -232,11 +260,27 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
             toggleServiceSelection={d.toggleServiceSelection}
             getSelectedServiceCount={d.getSelectedServiceCount}
           />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <WorkersSection
+              projectWorkers={d.projectWorkers}
+              readOnly
+            />
+            {permissions.field_workers && (
+              <FieldWorkersSection
+                projectFieldWorkers={d.projectFieldWorkers}
+                availableFieldWorkersFiltered={d.availableFieldWorkersFiltered}
+                selectedFieldWorkerId={d.selectedFieldWorkerId}
+                onWorkerChange={v => d.setSelectedFieldWorkerId(v)}
+                onAdd={d.addFieldWorkerToProject}
+                onRemove={d.removeFieldWorkerFromProject}
+              />
+            )}
+          </div>
         </div>
       );
     }
 
-    // ─── Pipeline Board (default for non-supervisor) ───
+    // ─── Pipeline Board ───
     if (activeTab === 'pipeline' && canSeePipeline) {
       return (
         <PipelineBoard
@@ -253,14 +297,6 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
     // ─── Projects List ───
     return (
       <div className="space-y-5">
-        {!isSupervisor && (
-          <div className="flex justify-end">
-            <Button variant="primary" size="md" onClick={d.openCreateModal} className="gap-2 text-sm">
-              <PlusIcon className="size-5" />
-              Crear Proyecto
-            </Button>
-          </div>
-        )}
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatsCard title="Total" value={d.stats.total_projects} icon={<FolderIcon className="size-8" />} iconBg="bg-amber-100" iconColor="text-amber-600" />
           <StatsCard title="Activos" value={d.stats.active_projects} icon={<ChartBarIcon className="size-8" />} iconBg="bg-emerald-100" iconColor="text-emerald-600" />
@@ -295,12 +331,12 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
           <div className="rounded-lg border-2 border-gray-200 bg-white p-12 text-center shadow-sm">
             <DocumentTextIcon className="mx-auto size-16 text-gray-300" />
             <h3 className="mt-4 text-lg font-semibold text-gray-900">
-              {isSupervisor ? 'No tienes proyectos asignados' : 'No hay proyectos iniciados'}
+              {!permissions.started_projects_total ? 'No tienes proyectos asignados' : 'No hay proyectos iniciados'}
             </h3>
             <p className="mt-2 text-sm text-gray-500">
-              {isSupervisor
+              {!permissions.started_projects_total
                 ? 'Espera a que te asignen un proyecto'
-                : 'Los proyectos se crean automáticamente cuando un pre-proyecto del pipeline se cierra como ganado.'}
+                : 'Los proyectos se crean desde Pre-Proyectos cuando un lead se cierra como ganado.'}
             </p>
           </div>
         ) : (
@@ -329,20 +365,14 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
                 <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
                   <FolderIcon className="size-7" />
                 </span>
-                {isSupervisor ? 'MIS PROYECTOS ASIGNADOS' : 'GESTIÓN DE PROYECTOS'}
+                GESTIÓN DE PROYECTOS
               </h1>
-              {isSupervisor && (
-                <Badge variant="primary" className="gap-1">
-                  <UserIcon className="size-3.5" />
-                  SUPERVISOR
-                </Badge>
-              )}
             </div>
           </header>
         )}
 
-        {/* ── HyperUI Tabs (siempre visible para no-supervisor, excepto en detalle) ── */}
-        {canSeePipeline && (activeTab === 'pipeline' || activeTab === 'projects') && (
+        {/* ── Tabs (solo si el usuario tiene ambas secciones, y solo en vistas principales) ── */}
+        {hasBothTabs && (activeTab === 'pipeline' || activeTab === 'projects') && (
           <div className="border-b border-gray-200 mb-6">
             <div role="tablist" className="flex gap-1">
               <button
@@ -388,25 +418,7 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
       </div>
 
       {/* ======== PROJECT MODALS ======== */}
-      <DeliveryModal
-        open={d.showDeliveryModal}
-        onClose={d.closeDeliveryModal}
-        order={d.selectedOrderForDelivery}
-        notes={d.deliveryNotes}
-        onNotesChange={d.setDeliveryNotes}
-        confirming={d.confirmingDelivery}
-        onConfirm={d.confirmDeliveryOrder}
-      />
-      <CreateProjectModal
-        open={d.showCreateModal}
-        onClose={() => d.setShowCreateModal(false)}
-        form={d.form}
-        onFormChange={d.setForm}
-        supervisors={d.supervisors}
-        saving={d.saving}
-        errorMessage={d.errorMessage}
-        onCreate={d.createProject}
-      />
+
       <ConfirmModal
         open={d.showConfirmModal}
         onClose={d.closeConfirmModal}
@@ -440,26 +452,30 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
         processing={d.rejectingOrder}
         onConfirm={d.confirmRejectOrder}
       />
-      <ConfigModal
-        open={showConfigModal}
-        onClose={() => setShowConfigModal(false)}
-        editForm={d.editForm}
-        onEditChange={d.setEditForm}
-        supervisors={d.supervisors}
-        saving={d.saving}
-        onSave={() => { d.updateProject(); setShowConfigModal(false); }}
-        onDelete={() => { setShowConfigModal(false); d.confirmDeleteProject(); }}
-        onFinalize={() => { setShowConfigModal(false); d.handleProjectStateClick(d.selectedProject); }}
-        canFinalize={d.selectedProject ? canFinalizeProject(d.selectedProject) : false}
-        projectWorkers={d.projectWorkers}
-        availableWorkersFiltered={d.availableWorkersFiltered}
-        selectedWorkerId={d.selectedWorkerId}
-        onWorkerChange={d.setSelectedWorkerId}
-        onAdd={d.addWorkerToProject}
-        onRemove={d.removeWorkerFromProject}
-        showEditSection={!isSupervisor}
-        showWorkersSection={isSupervisor}
-      />
+      {permissions.configure && (
+        <ConfigModal
+          open={showConfigModal}
+          onClose={() => setShowConfigModal(false)}
+          editForm={d.editForm}
+          onEditChange={d.setEditForm}
+          workers={pipe.workers}
+          saving={d.saving}
+          onSave={() => { d.updateProject(); setShowConfigModal(false); }}
+          onDelete={() => { setShowConfigModal(false); d.confirmDeleteProject(); }}
+          onFinalize={() => { setShowConfigModal(false); d.handleProjectStateClick(d.selectedProject); }}
+          canFinalize={d.selectedProject ? canFinalizeProject(d.selectedProject) : false}
+          onCancelFinalization={() => { setShowConfigModal(false); d.cancelFinalization(d.selectedProject?.id); }}
+          canCancelFinalization={d.selectedProject?.status === 'pendiente_recuento'}
+          projectWorkers={d.projectWorkers}
+          availableWorkersFiltered={d.availableWorkersFiltered}
+          selectedWorkerId={d.selectedWorkerId}
+          onWorkerChange={d.setSelectedWorkerId}
+          onAdd={d.addWorkerToProject}
+          onRemove={d.removeWorkerFromProject}
+          showEditSection
+          showWorkersSection
+        />
+      )}
       <CompletionApprovalModal
         open={d.showCompletionApprovalModal}
         onClose={() => d.setShowCompletionApprovalModal(false)}
@@ -468,6 +484,19 @@ export default function ProyectosIndex({ userRole, isSupervisor: isSupervisorPro
         onReject={(reqId, notes) => d.rejectCompletion(d.selectedProject?.id, reqId, notes)}
         loading={d.completionLoading}
         projectName={d.selectedProject?.name || ''}
+      />
+      <CreateArrivalReportModal
+        open={d.showCreateArrivalReportModal}
+        onClose={() => d.setShowCreateArrivalReportModal(false)}
+        purchasedNotArrivedOrders={d.purchasedNotArrivedOrders}
+        currency={d.selectedProject?.currency || 'PEN'}
+        onSubmit={d.createArrivalReport}
+      />
+      <ArrivalReportDetailModal
+        open={d.showArrivalReportDetailModal}
+        onClose={() => d.setShowArrivalReportDetailModal(false)}
+        report={d.selectedArrivalReport}
+        onResolve={d.resolveArrivalReport}
       />
 
       {/* ======== PIPELINE MODALS ======== */}

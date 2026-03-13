@@ -18,15 +18,16 @@ class ProyectoController extends Controller
     const RETENTION_RATE = 0.12;
     const AVAILABLE_RATE = 0.88;
 
+    protected $moduleSlug = 'proyectoskrsft';
+
     public function index()
     {
         $moduleName = basename(dirname(__DIR__));
-        $userInfo = $this->getUserRoleInfo();
-        
+        $permissions = $this->getUserPermissions();
+
         return Inertia::render("{$moduleName}/Index", [
-            'userRole' => $userInfo['role'],
-            'isSupervisor' => $userInfo['isSupervisor'],
-            'trabajadorId' => $userInfo['trabajadorId']
+            'permissions' => $permissions,
+            'trabajadorId' => auth()->user()->trabajador_id ?? null,
         ]);
     }
 
@@ -42,68 +43,37 @@ class ProyectoController extends Controller
     }
 
     /**
-     * Determine user role and supervisor status
-     * Supports role simulation for admins via ?simulate_role parameter
+     * Get the user's permissions for this module as a boolean map.
      */
-    protected function getUserRoleInfo(): array
+    protected function getUserPermissions(): array
     {
         $user = auth()->user();
-        
+
         if (!$user) {
-            return ['role' => 'guest', 'isSupervisor' => false, 'trabajadorId' => null];
+            return [
+                'pre_projects' => false,
+                'started_projects_personal' => false,
+                'started_projects_total' => false,
+                'approve' => false,
+                'configure' => false,
+                'field_workers' => false,
+                'surplus_count' => false,
+                'approve_surplus' => false,
+            ];
         }
 
-        // Detectar admin usando hasRole (compara por slug, no por display name)
         $isAdmin = $user->isAdmin();
 
-        // === SIMULACIÓN DE ROL (solo para admins) ===
-        if ($isAdmin && request()->has('simulate_role')) {
-            $simulatedRole = request()->input('simulate_role');
-            
-            if ($simulatedRole === 'supervisor') {
-                // Buscar un trabajador con cargo supervisor
-                $supervisor = DB::table('trabajadores')
-                    ->whereRaw('LOWER(cargo) LIKE ?', ['%supervisor%'])
-                    ->where('estado', 'LIKE', '%activo%')
-                    ->first();
-                
-                return [
-                    'role' => 'supervisor', 
-                    'isSupervisor' => true, 
-                    'trabajadorId' => $supervisor ? $supervisor->id : $user->trabajador_id
-                ];
-            }
-            
-            // admin - vista normal de jefe/manager
-            return ['role' => 'admin', 'isSupervisor' => false, 'trabajadorId' => $user->trabajador_id];
-        }
-
-        // Admin always has full access (sin simulación)
-        if ($isAdmin) {
-            return ['role' => 'admin', 'isSupervisor' => false, 'trabajadorId' => $user->trabajador_id];
-        }
-
-        // Check if user has linked trabajador with cargo
-        if ($user->trabajador_id && $this->hasTrabajadoresTable()) {
-            $trabajador = DB::table('trabajadores')->find($user->trabajador_id);
-            
-            if ($trabajador) {
-                $cargo = mb_strtolower(trim($trabajador->cargo ?? ''), 'UTF-8');
-                
-                // Check for supervisor cargo
-                if (str_contains($cargo, 'supervisor')) {
-                    return ['role' => 'supervisor', 'isSupervisor' => true, 'trabajadorId' => $user->trabajador_id];
-                }
-                
-                // Check for sub-gerente or jefe de proyectos
-                if (str_contains($cargo, 'sub-gerente') || str_contains($cargo, 'subgerente') || 
-                    str_contains($cargo, 'jefe de proyectos') || str_contains($cargo, 'gerente')) {
-                    return ['role' => 'manager', 'isSupervisor' => false, 'trabajadorId' => $user->trabajador_id];
-                }
-            }
-        }
-
-        return ['role' => 'user', 'isSupervisor' => false, 'trabajadorId' => $user->trabajador_id ?? null];
+        return [
+            'pre_projects' => $isAdmin || $user->hasPermission("module.{$this->moduleSlug}.pre_projects"),
+            'started_projects_personal' => $isAdmin || $user->hasPermission("module.{$this->moduleSlug}.started_projects_personal") || $user->hasPermission("module.{$this->moduleSlug}.started_projects_total"),
+            'started_projects_total' => $isAdmin || $user->hasPermission("module.{$this->moduleSlug}.started_projects_total"),
+            'approve' => $isAdmin || $user->hasPermission("module.{$this->moduleSlug}.approve"),
+            'configure' => $isAdmin || $user->hasPermission("module.{$this->moduleSlug}.configure"),
+            'field_workers' => $isAdmin || $user->hasPermission("module.{$this->moduleSlug}.field_workers"),
+            'surplus_count' => $isAdmin || $user->hasPermission("module.{$this->moduleSlug}.surplus_count"),
+            'approve_surplus' => $isAdmin || $user->hasPermission("module.{$this->moduleSlug}.approve_surplus"),
+        ];
     }
 
     /**
@@ -117,7 +87,7 @@ class ProyectoController extends Controller
             }
 
             $supervisors = DB::table('trabajadores')
-                ->join('users', 'trabajadores.id', '=', 'users.trabajador_id')
+                ->leftJoin('users', 'trabajadores.id', '=', 'users.trabajador_id')
                 ->where('trabajadores.estado', 'LIKE', '%activo%')
                 ->whereRaw('LOWER(trabajadores.cargo) LIKE ?', ['%supervisor%'])
                 ->orderBy('trabajadores.nombre_completo')
@@ -149,7 +119,7 @@ class ProyectoController extends Controller
             $workers = DB::table('trabajadores')
                 ->where('estado', 'LIKE', '%activo%')
                 ->orderBy('nombre_completo')
-                ->get(['id', 'nombre_completo', 'cargo', 'dni']);
+                ->get(['id', 'nombre_completo', 'cargo', 'dni', 'tipo_trabajador']);
 
             return response()->json(['success' => true, 'workers' => $workers]);
         } catch (\Exception $e) {
@@ -160,8 +130,20 @@ class ProyectoController extends Controller
 
     public function list(Request $request)
     {
-        $userInfo = $this->getUserRoleInfo();
-        
+        $permissions = $this->getUserPermissions();
+        $user = auth()->user();
+        $trabajadorId = $user->trabajador_id ?? null;
+
+        // If user has no started_projects permission, return empty
+        if (!$permissions['started_projects_personal']) {
+            return response()->json([
+                'success' => true,
+                'projects' => [],
+                'total' => 0,
+                'permissions' => $permissions,
+            ]);
+        }
+
         $query = DB::table($this->projectsTable)
             ->select([
                 'projects.id',
@@ -175,11 +157,13 @@ class ProyectoController extends Controller
                 'projects.igv_enabled',
                 'projects.igv_rate',
                 'projects.supervisor_id',
+                'projects.supervisor_pdr_id',
                 'projects.status',
                 'projects.user_id',
                 'projects.created_at',
                 'projects.updated_at',
                 'trabajadores.nombre_completo as supervisor_name',
+                'trab_pdr.nombre_completo as supervisor_pdr_name',
                 'users.name as creator_name',
                 DB::raw("
                     COALESCE(SUM(CASE WHEN purchase_orders.status = 'approved' THEN
@@ -212,13 +196,29 @@ class ProyectoController extends Controller
                 "),
                 DB::raw("SUM(CASE WHEN purchase_orders.status = 'pending' THEN 1 ELSE 0 END) as pending_orders")
             ])
-            ->leftJoin('purchase_orders', 'projects.id', '=', 'purchase_orders.project_id')
+            ->leftJoin('purchase_orders', function ($join) {
+                $join->on('projects.id', '=', 'purchase_orders.project_id')
+                     ->where(function ($q) {
+                         $q->whereNull('purchase_orders.cancellation_status')
+                           ->orWhere('purchase_orders.cancellation_status', '!=', 'anulada');
+                     });
+            })
             ->leftJoin('trabajadores', 'projects.supervisor_id', '=', 'trabajadores.id')
+            ->leftJoin('trabajadores as trab_pdr', 'projects.supervisor_pdr_id', '=', 'trab_pdr.id')
             ->leftJoin('users', 'projects.user_id', '=', 'users.id');
 
-        // If supervisor, only show their assigned projects
-        if ($userInfo['isSupervisor'] && $userInfo['trabajadorId']) {
-            $query->where('projects.supervisor_id', $userInfo['trabajadorId']);
+        // If user only has personal permission (not total), filter by assigned projects
+        if (!$permissions['started_projects_total'] && $trabajadorId) {
+            $query->where(function ($q) use ($trabajadorId) {
+                $q->where('projects.supervisor_id', $trabajadorId)
+                  ->orWhere('projects.supervisor_pdr_id', $trabajadorId)
+                  ->orWhereExists(function ($sub) use ($trabajadorId) {
+                      $sub->select(DB::raw(1))
+                          ->from('project_workers')
+                          ->whereColumn('project_workers.project_id', 'projects.id')
+                          ->where('project_workers.trabajador_id', $trabajadorId);
+                  });
+            });
         }
 
         $projects = $query->groupBy([
@@ -226,9 +226,10 @@ class ProyectoController extends Controller
                 'projects.total_amount', 'projects.retained_amount',
                 'projects.available_amount', 'projects.spending_threshold',
                 'projects.igv_enabled', 'projects.igv_rate', 'projects.supervisor_id',
-                'projects.status', 'projects.user_id', 
+                'projects.supervisor_pdr_id',
+                'projects.status', 'projects.user_id',
                 'projects.created_at', 'projects.updated_at',
-                'trabajadores.nombre_completo', 'users.name'
+                'trabajadores.nombre_completo', 'trab_pdr.nombre_completo', 'users.name'
             ])
             ->orderBy('projects.created_at', 'desc')
             ->get();
@@ -252,8 +253,7 @@ class ProyectoController extends Controller
             'success' => true,
             'projects' => $projects,
             'total' => $projects->count(),
-            'userRole' => $userInfo['role'],
-            'isSupervisor' => $userInfo['isSupervisor']
+            'permissions' => $permissions,
         ]);
     }
 
@@ -261,10 +261,12 @@ class ProyectoController extends Controller
     {
         $project = DB::table($this->projectsTable)
             ->leftJoin('trabajadores', 'projects.supervisor_id', '=', 'trabajadores.id')
+            ->leftJoin('trabajadores as trab_pdr', 'projects.supervisor_pdr_id', '=', 'trab_pdr.id')
             ->leftJoin('cecos', 'projects.ceco_id', '=', 'cecos.id')
             ->select(
-                'projects.*', 
+                'projects.*',
                 'trabajadores.nombre_completo as supervisor_name',
+                'trab_pdr.nombre_completo as supervisor_pdr_name',
                 'cecos.codigo as ceco_codigo',
                 'cecos.nombre as ceco_nombre'
             )
@@ -275,9 +277,13 @@ class ProyectoController extends Controller
             return response()->json(['success' => false, 'message' => 'Proyecto no encontrado'], 404);
         }
 
-        // Get purchase orders
+        // Get purchase orders (excluir anuladas)
         $orders = DB::table('purchase_orders')
             ->where('project_id', $id)
+            ->where(function ($q) {
+                $q->whereNull('cancellation_status')
+                  ->orWhere('cancellation_status', '!=', 'anulada');
+            })
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($order) {
@@ -301,11 +307,20 @@ class ProyectoController extends Controller
                 return $order;
             });
 
-        // Get assigned workers
+        // Get assigned workers (admin = pipeline/administrativos)
         $workers = DB::table('project_workers')
             ->join('trabajadores', 'project_workers.trabajador_id', '=', 'trabajadores.id')
             ->where('project_workers.project_id', $id)
-            ->select('trabajadores.id', 'trabajadores.nombre_completo', 'trabajadores.cargo', 'trabajadores.dni')
+            ->where('project_workers.type', 'admin')
+            ->select('trabajadores.id', 'trabajadores.nombre_completo as name', 'trabajadores.cargo', 'trabajadores.dni')
+            ->get();
+
+        // Get field workers (trabajadores de campo)
+        $fieldWorkers = DB::table('project_workers')
+            ->join('trabajadores', 'project_workers.trabajador_id', '=', 'trabajadores.id')
+            ->where('project_workers.project_id', $id)
+            ->where('project_workers.type', 'field')
+            ->select('trabajadores.id', 'trabajadores.nombre_completo as name', 'trabajadores.cargo', 'trabajadores.dni')
             ->get();
 
         $approvedOrders = $orders->where('status', 'approved');
@@ -334,6 +349,7 @@ class ProyectoController extends Controller
             'project' => $project,
             'orders' => $orders,
             'workers' => $workers,
+            'field_workers' => $fieldWorkers,
             'summary' => [
                 'spent' => $spent,
                 'remaining' => $remaining,
@@ -349,13 +365,19 @@ class ProyectoController extends Controller
      */
     public function addWorker(Request $request, $projectId)
     {
-        $request->validate(['trabajador_id' => 'required|integer']);
+        $request->validate([
+            'trabajador_id' => 'required|integer|exists:trabajadores,id',
+            'type' => 'sometimes|in:admin,field',
+        ]);
+
+        $type = $request->input('type', 'admin');
 
         try {
-            // Check if already assigned
+            // Check if already assigned with same type
             $exists = DB::table('project_workers')
                 ->where('project_id', $projectId)
                 ->where('trabajador_id', $request->trabajador_id)
+                ->where('type', $type)
                 ->exists();
 
             if ($exists) {
@@ -365,6 +387,7 @@ class ProyectoController extends Controller
             DB::table('project_workers')->insert([
                 'project_id' => $projectId,
                 'trabajador_id' => $request->trabajador_id,
+                'type' => $type,
                 'created_at' => now(),
                 'updated_at' => now()
             ]);
@@ -379,12 +402,15 @@ class ProyectoController extends Controller
     /**
      * Remove worker from project
      */
-    public function removeWorker($projectId, $trabajadorId)
+    public function removeWorker(Request $request, $projectId, $trabajadorId)
     {
+        $type = $request->query('type', 'admin');
+
         try {
             DB::table('project_workers')
                 ->where('project_id', $projectId)
                 ->where('trabajador_id', $trabajadorId)
+                ->where('type', $type)
                 ->delete();
 
             return response()->json(['success' => true, 'message' => 'Trabajador removido']);
@@ -439,7 +465,7 @@ class ProyectoController extends Controller
         }
 
         $request->validate([
-            'description' => 'required|string|max:255',
+            'description' => 'nullable|string|max:255',
             'type' => 'required|in:service,material',
             'item_number' => 'nullable|integer|min:1',
         ]);
@@ -465,7 +491,7 @@ class ProyectoController extends Controller
                 'project_id' => $id,
                 'item_number' => $itemNumber,
                 'type' => $request->type,
-                'description' => trim($request->description),
+                'description' => trim($request->description ?? ''),
                 'currency' => $project->currency ?? 'PEN',
                 'created_by' => auth()->id(),
                 'created_at' => now(),
@@ -545,12 +571,11 @@ class ProyectoController extends Controller
             ], 400);
         }
 
-        // Check user is manager (Jefe de Proyectos) or admin
-        $userInfo = $this->getUserRoleInfo();
-        if ($userInfo['role'] !== 'manager' && $userInfo['role'] !== 'admin') {
+        // Check user has approve permission
+        $user = auth()->user();
+        if (!$user->isAdmin() && !$user->hasPermission("module.{$this->moduleSlug}.approve")) {
             Log::warning('Intento de aprobación sin permisos', [
                 'user_id' => auth()->id(),
-                'resolved_role' => $userInfo['role'],
                 'order_id' => $orderId
             ]);
             return response()->json([
@@ -616,12 +641,12 @@ class ProyectoController extends Controller
             ], 400);
         }
 
-        // Check user is manager (Jefe de Proyectos) or admin
-        $userInfo = $this->getUserRoleInfo();
-        if ($userInfo['role'] !== 'manager' && $userInfo['role'] !== 'admin') {
+        // Check user has approve permission
+        $user = auth()->user();
+        if (!$user->isAdmin() && !$user->hasPermission("module.{$this->moduleSlug}.approve")) {
             return response()->json([
                 'success' => false,
-                'message' => "No tiene permisos para rechazar materiales (rol actual: {$userInfo['role']})",
+                'message' => 'No tiene permisos para rechazar materiales',
                 'error_code' => 'FORBIDDEN'
             ], 403);
         }
@@ -691,80 +716,7 @@ class ProyectoController extends Controller
     /**
      * Confirm delivery of a paid order
      */
-    public function confirmDelivery(Request $request, $orderId)
-    {
-        $order = DB::table('purchase_orders')->find($orderId);
 
-        if (!$order) {
-            return response()->json(['success' => false, 'message' => 'Orden no encontrada'], 404);
-        }
-
-        if (!$order->payment_confirmed) {
-            return response()->json(['success' => false, 'message' => 'Esta orden no ha sido pagada'], 400);
-        }
-
-        if ($order->delivery_confirmed) {
-            return response()->json(['success' => false, 'message' => 'Esta orden ya fue marcada como entregada'], 400);
-        }
-
-        try {
-            DB::table('purchase_orders')
-                ->where('id', $orderId)
-                ->update([
-                    'delivery_confirmed' => true,
-                    'delivery_confirmed_at' => now(),
-                    'delivery_confirmed_by' => auth()->id(),
-                    'delivery_notes' => $request->input('notes', ''),
-                    'updated_at' => now()
-                ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Entrega confirmada exitosamente'
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Error en confirmDelivery', ['error' => $e->getMessage()]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Error interno al confirmar entrega'
-            ], 500);
-        }
-    }
-
-    /**
-     * Confirm delivery of multiple orders (batch)
-     */
-    public function confirmFileDelivery(Request $request)
-    {
-        $request->validate([
-            'order_ids' => 'required|array',
-            'order_ids.*' => 'integer'
-        ]);
-
-        try {
-            $updated = DB::table('purchase_orders')
-                ->whereIn('id', $request->order_ids)
-                ->where('payment_confirmed', true)
-                ->update([
-                    'delivery_confirmed' => true,
-                    'delivery_confirmed_at' => now(),
-                    'delivery_confirmed_by' => auth()->id(),
-                    'updated_at' => now()
-                ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => $updated . ' órdenes marcadas como entregadas',
-                'updated' => $updated
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Error en confirmFileDelivery', ['error' => $e->getMessage()]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Error interno al confirmar entregas'
-            ], 500);
-        }
-    }
 
     public function store(Request $request)
     {
@@ -828,6 +780,7 @@ class ProyectoController extends Controller
             if ($request->has('igv_enabled')) $data['igv_enabled'] = $request->boolean('igv_enabled');
             if ($request->has('igv_rate')) $data['igv_rate'] = floatval($request->igv_rate);
             if ($request->has('supervisor_id')) $data['supervisor_id'] = intval($request->supervisor_id);
+            if ($request->has('supervisor_pdr_id')) $data['supervisor_pdr_id'] = $request->supervisor_pdr_id ? intval($request->supervisor_pdr_id) : null;
             if ($request->has('status')) $data['status'] = $request->status;
 
             if ($request->has('amount')) {
@@ -952,9 +905,9 @@ class ProyectoController extends Controller
             return response()->json(['success' => false, 'message' => 'Solo se pueden finalizar proyectos activos'], 400);
         }
 
-        // Verificar permisos (solo manager o admin)
-        $userInfo = $this->getUserRoleInfo();
-        if (!in_array($userInfo['role'], ['manager', 'admin'])) {
+        // Verificar permisos
+        $user = auth()->user();
+        if (!$user->isAdmin() && !$user->hasPermission("module.{$this->moduleSlug}.configure")) {
             return response()->json(['success' => false, 'message' => 'No tiene permisos para finalizar proyectos'], 403);
         }
 
@@ -989,25 +942,98 @@ class ProyectoController extends Controller
         }
     }
 
+    /**
+     * Cancelar la finalización: devuelve el proyecto de 'pendiente_recuento' a 'active'.
+     * POST /api/proyectoskrsft/{id}/cancel-finalization
+     */
+    public function cancelFinalization(Request $request, $id)
+    {
+        $project = DB::table($this->projectsTable)->find($id);
+
+        if (!$project) {
+            return response()->json(['success' => false, 'message' => 'Proyecto no encontrado'], 404);
+        }
+
+        if ($project->status !== 'pendiente_recuento') {
+            return response()->json(['success' => false, 'message' => 'El proyecto no está en proceso de finalización'], 400);
+        }
+
+        $user = auth()->user();
+        if (!$user->isAdmin() && !$user->hasPermission("module.{$this->moduleSlug}.configure")) {
+            return response()->json(['success' => false, 'message' => 'No tiene permisos para cancelar la finalización'], 403);
+        }
+
+        try {
+            // Eliminar también cualquier solicitud de recuento pendiente
+            DB::table('project_completion_requests')
+                ->where('project_id', $id)
+                ->where('status', 'pending')
+                ->delete();
+
+            DB::table($this->projectsTable)
+                ->where('id', $id)
+                ->update([
+                    'status'     => 'active',
+                    'updated_at' => now(),
+                ]);
+
+            try {
+                app(\App\Services\AuditService::class)->logModelChange(
+                    'project.finalization_cancelled',
+                    'Project',
+                    (int) $id,
+                    ['status' => 'pendiente_recuento'],
+                    ['status' => 'active', 'cancelled_by' => auth()->id()]
+                );
+            } catch (\Exception $e) {
+                Log::warning('Error registrando auditoría de cancelación de finalización', ['error' => $e->getMessage()]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Finalización cancelada. El proyecto vuelve a estado activo.',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error en cancelFinalization', ['id' => $id, 'error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Error interno al cancelar la finalización'], 500);
+        }
+    }
+
     public function stats()
     {
-        $userInfo = $this->getUserRoleInfo();
-        
+        $permissions = $this->getUserPermissions();
+        $user = auth()->user();
+        $trabajadorId = $user->trabajador_id ?? null;
+
         $query = DB::table($this->projectsTable);
-        
-        if ($userInfo['isSupervisor'] && $userInfo['trabajadorId']) {
-            $query->where('supervisor_id', $userInfo['trabajadorId']);
+
+        // Same filter as list(): personal = only assigned, total = all
+        if (!$permissions['started_projects_total'] && $trabajadorId) {
+            $query->where(function ($q) use ($trabajadorId) {
+                $q->where('supervisor_id', $trabajadorId)
+                  ->orWhere('supervisor_pdr_id', $trabajadorId)
+                  ->orWhereExists(function ($sub) use ($trabajadorId) {
+                      $sub->select(DB::raw(1))
+                          ->from('project_workers')
+                          ->whereColumn('project_workers.project_id', 'projects.id')
+                          ->where('project_workers.trabajador_id', $trabajadorId);
+                  });
+            });
         }
 
         $totalProjects = $query->count();
         $totalBudget = $query->sum('available_amount');
         $activeProjects = (clone $query)->where('status', 'active')->count();
-        
-        // Calcular gasto total real de órdenes aprobadas
+
+        // Calcular gasto total real de órdenes aprobadas (excluir anuladas)
         $projectIds = (clone $query)->pluck('id');
         $totalSpent = DB::table('purchase_orders')
             ->whereIn('project_id', $projectIds)
             ->where('status', 'approved')
+            ->where(function ($q) {
+                $q->whereNull('cancellation_status')
+                  ->orWhere('cancellation_status', '!=', 'anulada');
+            })
             ->sum(DB::raw('COALESCE(amount_pen, amount, 0)'));
 
         return response()->json([
@@ -1470,8 +1496,10 @@ class ProyectoController extends Controller
             return response()->json(['success' => false, 'message' => 'Proyecto no encontrado'], 404);
         }
 
-        $userInfo = $this->getUserRoleInfo();
-        if ($userInfo['isSupervisor'] && $project->supervisor_id != $userInfo['trabajadorId']) {
+        $permissions = $this->getUserPermissions();
+        $user = auth()->user();
+        $trabajadorId = $user->trabajador_id ?? null;
+        if (!$permissions['started_projects_total'] && !$permissions['surplus_count'] && $project->supervisor_id != $trabajadorId) {
             return response()->json(['success' => false, 'message' => 'No tiene acceso a este proyecto'], 403);
         }
 
@@ -1761,9 +1789,9 @@ class ProyectoController extends Controller
             return response()->json(['success' => false, 'message' => 'El proyecto debe estar en estado "Recuento Pendiente" para enviar sobrantes'], 400);
         }
 
-        $userInfo = $this->getUserRoleInfo();
-        if (!$userInfo['isSupervisor'] || $project->supervisor_id != $userInfo['trabajadorId']) {
-            return response()->json(['success' => false, 'message' => 'Solo el supervisor asignado puede enviar el recuento de sobrantes'], 403);
+        $user = auth()->user();
+        if (!$user->isAdmin() && !$user->hasPermission("module.{$this->moduleSlug}.surplus_count")) {
+            return response()->json(['success' => false, 'message' => 'No tienes permiso para enviar el recuento de sobrantes.'], 403);
         }
 
         // Verificar que no exista solicitud pendiente
@@ -1912,8 +1940,8 @@ class ProyectoController extends Controller
             return response()->json(['success' => false, 'message' => 'Proyecto no encontrado'], 404);
         }
 
-        $userInfo = $this->getUserRoleInfo();
-        if (!in_array($userInfo['role'], ['manager', 'admin'])) {
+        $user = auth()->user();
+        if (!$user->isAdmin() && !$user->hasPermission("module.{$this->moduleSlug}.approve_surplus")) {
             return response()->json(['success' => false, 'message' => 'No tiene permisos para aprobar finalizaciones'], 403);
         }
 
@@ -2204,6 +2232,224 @@ class ProyectoController extends Controller
                 'materials_con_sobras' => $materialsConSobras,
                 'total_sobra_devuelta' => $totalSobra,
             ]);
+        });
+    }
+
+    // ── Recepción de materiales ─────────────────────────────────────────
+
+    /**
+     * Marcar materiales (purchase_orders) como recibidos por el supervisor.
+     */
+    public function markMaterialArrived(Request $request, $id)
+    {
+        $user = $request->user();
+        if (!$user->isAdmin() && !$user->hasPermission("module.{$this->moduleSlug}.started_projects_personal")) {
+            abort(403, 'No tienes permiso para marcar materiales como recibidos.');
+        }
+
+        $request->validate(['order_ids' => 'required|array|min:1', 'order_ids.*' => 'integer']);
+
+        $updated = DB::table('purchase_orders')
+            ->where('project_id', $id)
+            ->whereIn('id', $request->input('order_ids'))
+            ->where('payment_confirmed', true)
+            ->update([
+                'material_arrived'    => true,
+                'material_arrived_at' => now(),
+                'material_arrived_by' => $user->id,
+                'updated_at'          => now(),
+            ]);
+
+        return response()->json(['success' => true, 'updated' => $updated]);
+    }
+
+    /**
+     * Revertir: marcar materiales como NO recibidos.
+     */
+    public function markMaterialNotArrived(Request $request, $id)
+    {
+        $user = $request->user();
+        if (!$user->isAdmin() && !$user->hasPermission("module.{$this->moduleSlug}.started_projects_personal")) {
+            abort(403, 'No tienes permiso para modificar la recepción de materiales.');
+        }
+
+        $request->validate(['order_ids' => 'required|array|min:1', 'order_ids.*' => 'integer']);
+
+        $updated = DB::table('purchase_orders')
+            ->where('project_id', $id)
+            ->whereIn('id', $request->input('order_ids'))
+            ->update([
+                'material_arrived'    => false,
+                'material_arrived_at' => null,
+                'material_arrived_by' => null,
+                'updated_at'          => now(),
+            ]);
+
+        return response()->json(['success' => true, 'updated' => $updated]);
+    }
+
+    // ── Reportes de materiales faltantes ────────────────────────────────
+
+    /**
+     * Crear un reporte de materiales faltantes (supervisor → inventario).
+     */
+    public function createArrivalReport(Request $request, $id)
+    {
+        $user = $request->user();
+        if (!$user->isAdmin() && !$user->hasPermission("module.{$this->moduleSlug}.started_projects_personal")) {
+            abort(403, 'No tienes permiso para generar reportes de materiales.');
+        }
+
+        $request->validate([
+            'order_ids' => 'required|array|min:1',
+            'order_ids.*' => 'integer',
+            'notas' => 'nullable|string|max:2000',
+        ]);
+
+        $orderIds = $request->input('order_ids');
+
+        $orders = DB::table('purchase_orders')
+            ->where('project_id', $id)
+            ->whereIn('id', $orderIds)
+            ->where('payment_confirmed', true)
+            ->where('material_arrived', false)
+            ->get();
+
+        if ($orders->isEmpty()) {
+            return response()->json(['success' => false, 'message' => 'No se encontraron materiales comprados pendientes de llegada.'], 422);
+        }
+
+        $userName = '';
+        if ($this->hasTrabajadoresTable() && $user->trabajador_id) {
+            $trabajador = DB::table('trabajadores')->find($user->trabajador_id);
+            $userName = $trabajador ? ($trabajador->nombre_completo ?: trim($trabajador->nombres . ' ' . $trabajador->apellido_paterno)) : $user->name;
+        } else {
+            $userName = $user->name;
+        }
+
+        return DB::transaction(function () use ($id, $orders, $request, $user, $userName) {
+            $reportId = DB::table('material_arrival_reports')->insertGetId([
+                'project_id'       => $id,
+                'reported_by'      => $user->id,
+                'reported_by_name' => $userName,
+                'notas_supervisor'  => $request->input('notas', ''),
+                'status'           => 'pendiente',
+                'created_at'       => now(),
+                'updated_at'       => now(),
+            ]);
+
+            $items = [];
+            foreach ($orders as $order) {
+                $items[] = [
+                    'report_id'         => $reportId,
+                    'purchase_order_id' => $order->id,
+                    'description'       => $order->description ?? $order->material_type ?? 'Material',
+                    'quantity'          => $order->qty_purchased ?? 1,
+                    'material_type'     => $order->material_type,
+                    'unit'              => $order->unit,
+                    'created_at'        => now(),
+                    'updated_at'        => now(),
+                ];
+            }
+            DB::table('material_arrival_report_items')->insert($items);
+
+            return response()->json(['success' => true, 'report_id' => $reportId, 'message' => 'Reporte enviado a inventario.']);
+        });
+    }
+
+    /**
+     * Listar reportes de materiales faltantes de un proyecto.
+     */
+    public function listArrivalReports(Request $request, $id)
+    {
+        $reports = DB::table('material_arrival_reports')
+            ->where('project_id', $id)
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function ($report) {
+                $report->items = DB::table('material_arrival_report_items')
+                    ->where('report_id', $report->id)
+                    ->get();
+                return $report;
+            });
+
+        return response()->json(['success' => true, 'reports' => $reports]);
+    }
+
+    /**
+     * Detalle de un reporte de materiales faltantes.
+     */
+    public function showArrivalReport(Request $request, $reportId)
+    {
+        $report = DB::table('material_arrival_reports')->where('id', $reportId)->first();
+        if (!$report) {
+            return response()->json(['success' => false, 'message' => 'Reporte no encontrado.'], 404);
+        }
+
+        $report->items = DB::table('material_arrival_report_items')
+            ->where('report_id', $report->id)
+            ->get();
+
+        $report->project = DB::table('projects')
+            ->where('id', $report->project_id)
+            ->select('id', 'name', 'abbreviation')
+            ->first();
+
+        return response()->json(['success' => true, 'report' => $report]);
+    }
+
+    /**
+     * Resolver un reporte (el supervisor confirma que el material llegó).
+     */
+    public function resolveArrivalReport(Request $request, $reportId)
+    {
+        $user = $request->user();
+        if (!$user->isAdmin() && !$user->hasPermission("module.{$this->moduleSlug}.started_projects_personal")) {
+            abort(403, 'No tienes permiso para resolver reportes de materiales.');
+        }
+
+        $report = DB::table('material_arrival_reports')->where('id', $reportId)->first();
+        if (!$report) {
+            return response()->json(['success' => false, 'message' => 'Reporte no encontrado.'], 404);
+        }
+
+        if ($report->status === 'resuelto') {
+            return response()->json(['success' => false, 'message' => 'Este reporte ya fue resuelto.'], 422);
+        }
+
+        $userName = '';
+        if ($this->hasTrabajadoresTable() && $user->trabajador_id) {
+            $trabajador = DB::table('trabajadores')->find($user->trabajador_id);
+            $userName = $trabajador ? ($trabajador->nombre_completo ?: trim($trabajador->nombres . ' ' . $trabajador->apellido_paterno)) : $user->name;
+        } else {
+            $userName = $user->name;
+        }
+
+        return DB::transaction(function () use ($reportId, $report, $user, $userName) {
+            DB::table('material_arrival_reports')->where('id', $reportId)->update([
+                'status'           => 'resuelto',
+                'resuelto_por'     => $user->id,
+                'resuelto_por_name' => $userName,
+                'resuelto_at'      => now(),
+                'updated_at'       => now(),
+            ]);
+
+            $orderIds = DB::table('material_arrival_report_items')
+                ->where('report_id', $reportId)
+                ->pluck('purchase_order_id');
+
+            if ($orderIds->isNotEmpty()) {
+                DB::table('purchase_orders')
+                    ->whereIn('id', $orderIds)
+                    ->update([
+                        'material_arrived'    => true,
+                        'material_arrived_at' => now(),
+                        'material_arrived_by' => $user->id,
+                        'updated_at'          => now(),
+                    ]);
+            }
+
+            return response()->json(['success' => true, 'message' => 'Reporte resuelto. Materiales marcados como recibidos.']);
         });
     }
 }

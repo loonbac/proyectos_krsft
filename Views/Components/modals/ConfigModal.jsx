@@ -4,6 +4,7 @@ import {
   Cog6ToothIcon,
   PencilIcon,
   UserGroupIcon,
+  ArrowUturnLeftIcon,
 } from '@heroicons/react/24/outline';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
@@ -25,6 +26,8 @@ export default function ConfigModal({
   onDelete,
   onFinalize,
   canFinalize = false,
+  onCancelFinalization,
+  canCancelFinalization = false,
   // Workers props
   projectWorkers,
   availableWorkersFiltered,
@@ -97,12 +100,27 @@ export default function ConfigModal({
                   placeholder="Sin supervisor"
                 />
               </div>
+              <div className="mt-4">
+                <Select
+                  label="Supervisor PDR"
+                  value={editForm?.supervisor_pdr_id || ''}
+                  onChange={e => onEditChange({ ...editForm, supervisor_pdr_id: e.target.value || null })}
+                  options={(supervisors || []).map(s => ({ value: s.id, label: `${s.name} — ${s.cargo}` }))}
+                  placeholder="Sin supervisor PDR"
+                />
+              </div>
               <div className="mt-4 flex flex-wrap gap-3">
                 <Button variant="primary" onClick={onSave} disabled={saving} loading={saving}>
                   {saving ? 'Guardando...' : 'Guardar Cambios'}
                 </Button>
                 {canFinalize && (
                   <Button variant="primary" onClick={onFinalize}>Finalizar Proyecto</Button>
+                )}
+                {canCancelFinalization && (
+                  <Button variant="warning" onClick={onCancelFinalization} className="gap-1.5">
+                    <ArrowUturnLeftIcon className="size-4" />
+                    Cancelar Finalización
+                  </Button>
                 )}
                 <Button variant="danger" onClick={onDelete}>Eliminar Proyecto</Button>
               </div>

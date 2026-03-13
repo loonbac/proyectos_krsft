@@ -1,9 +1,9 @@
 {
     "name": "ProyectosKrsft",
-    "slug": "proyectos_krsft",
+    "slug": "proyectoskrsft",
     "display_name": "PROYECTOS",
-    "version": "6.0.1",
-    "description": "Sistema completo de gestión de proyectos con tracking de presupuesto en tiempo real. v5.10.1: Fix audit issues",
+    "version": "7.0.0",
+    "description": "Sistema completo de gestión de proyectos con tracking de presupuesto en tiempo real. v7.0.0: Reestructuración de permisos por secciones",
     "icon": "icon.svg",
     "color": "#0AA4A4",
     "gradient": "#0AA4A4",
@@ -14,5 +14,78 @@
         "Jefe de Proyectos",
         "Supervisor"
     ],
-    "dependencies": []
+    "dependencies": [],
+    "permissions": [
+        {
+            "action": "access",
+            "display_name": "Proyectos: Acceder",
+            "description": "Permite acceder a la página principal del módulo de Proyectos. No muestra ninguna pestaña por sí solo."
+        },
+        {
+            "action": "pre_projects",
+            "display_name": "Proyectos: Pre-Proyectos",
+            "description": "Muestra la pestaña Pre-Proyectos (pipeline). Incluye crear leads, cambiar etapas, equipo, visitas, presupuestos, negociaciones e iniciar proyectos."
+        },
+        {
+            "action": "started_projects_personal",
+            "display_name": "Proyectos: Mis Proyectos",
+            "description": "Muestra la pestaña Proyectos Iniciados solo con los proyectos asignados al usuario. Permite subir materiales, servicios y crear reportes."
+        },
+        {
+            "action": "started_projects_total",
+            "display_name": "Proyectos: Todos los Proyectos",
+            "description": "Muestra la pestaña Proyectos Iniciados con todos los proyectos del sistema. Implica el permiso de Mis Proyectos."
+        },
+        {
+            "action": "approve",
+            "display_name": "Proyectos: Aprobar",
+            "description": "Habilita los botones de aprobar y rechazar en órdenes de materiales y servicios pendientes."
+        },
+        {
+            "action": "configure",
+            "display_name": "Proyectos: Configurar",
+            "description": "Habilita el botón de configuración para editar datos del proyecto, gestionar trabajadores del equipo y finalizar proyectos."
+        },
+        {
+            "action": "field_workers",
+            "display_name": "Proyectos: Trabajadores de Campo",
+            "description": "Habilita la sección de Trabajadores de Campo para agregar y quitar trabajadores en un proyecto."
+        },
+        {
+            "action": "surplus_count",
+            "display_name": "Proyectos: Recuento de Sobrantes",
+            "description": "Permite ver el panel de recuento de materiales sobrantes cuando se activa la finalización, y enviar el recuento."
+        },
+        {
+            "action": "approve_surplus",
+            "display_name": "Proyectos: Aprobar Recuento",
+            "description": "Permite ver el panel de aprobación del recuento de sobrantes, aprobar o rechazar el recuento y finalizar el proyecto."
+        }
+    ],
+    "permission_implies": {
+        "started_projects_total": ["started_projects_personal"]
+    },
+    "segment_permissions": {
+        "pipeline": "pre_projects",
+        "list": "started_projects_personal",
+        "stats": "started_projects_personal",
+        "supervisors": "started_projects_personal",
+        "workers": "started_projects_personal",
+        "order": "started_projects_personal",
+        "import-materials": "started_projects_personal",
+        "material-template": "started_projects_personal",
+        "request-completion": "surplus_count",
+        "completion-materials": "started_projects_personal",
+        "completion-request": "started_projects_personal",
+        "mark-material-arrived": "started_projects_personal",
+        "mark-material-not-arrived": "started_projects_personal",
+        "arrival-reports": "started_projects_personal",
+        "approve": "approve",
+        "reject": "approve",
+        "approve-completion": "approve_surplus",
+        "finalize": "configure",
+        "cancel-finalization": "configure",
+        "create": "configure",
+        "field-workers": "field_workers"
+    }
 }

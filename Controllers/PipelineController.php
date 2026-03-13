@@ -48,8 +48,10 @@ class PipelineController extends Controller
 
     // ── Verificación de acceso ──────────────────────────────────────────
 
+    protected $moduleSlug = 'proyectoskrsft';
+
     /**
-     * Solo Sub-Gerente, Jefe de Proyectos y Admin pueden acceder al pipeline.
+     * Verificar acceso al pipeline via permisos del módulo.
      */
     protected function checkPipelineAccess(): bool
     {
@@ -57,18 +59,7 @@ class PipelineController extends Controller
         if (!$user) return false;
         if ($user->isAdmin()) return true;
 
-        if ($user->trabajador_id && DB::getSchemaBuilder()->hasTable('trabajadores')) {
-            $trabajador = DB::table('trabajadores')->find($user->trabajador_id);
-            if ($trabajador) {
-                $cargo = mb_strtolower(trim($trabajador->cargo ?? ''), 'UTF-8');
-                return str_contains($cargo, 'sub-gerente')
-                    || str_contains($cargo, 'subgerente')
-                    || str_contains($cargo, 'jefe de proyectos')
-                    || str_contains($cargo, 'gerente');
-            }
-        }
-
-        return false;
+        return $user->hasPermission("module.{$this->moduleSlug}.pre_projects");
     }
 
     protected function denyAccess()
@@ -143,10 +134,11 @@ class PipelineController extends Controller
             'descripcion'         => 'nullable|string|max:2000',
             'ubicacion'           => 'nullable|string|max:500',
             'team_ids'            => 'required|array|min:2',
-            'team_ids.*'          => 'integer',
+            'team_ids.*'          => 'integer|exists:trabajadores,id',
         ], [
             'team_ids.required' => 'Debes asignar al menos 2 personas al equipo.',
             'team_ids.min'      => 'Debes asignar al menos 2 personas al equipo.',
+            'team_ids.*.exists'  => 'Uno de los trabajadores seleccionados no existe.',
         ]);
 
         try {
@@ -423,9 +415,10 @@ class PipelineController extends Controller
         }
 
         $request->validate([
-            'abbreviation'  => 'required|string|max:50',
-            'ceco_id'       => 'required|integer|exists:cecos,id',
-            'supervisor_id' => 'required|integer|exists:trabajadores,id',
+            'abbreviation'      => 'required|string|max:50',
+            'ceco_id'           => 'required|integer|exists:cecos,id',
+            'supervisor_id'     => 'required|integer|exists:trabajadores,id',
+            'supervisor_pdr_id' => 'nullable|integer|exists:trabajadores,id',
         ]);
 
         DB::beginTransaction();
@@ -437,7 +430,7 @@ class PipelineController extends Controller
             }
 
             // Crear el proyecto con el supervisor seleccionado
-            $projectId = $this->createProjectFromLead($lead, $request->input('supervisor_id'));
+            $projectId = $this->createProjectFromLead($lead, $request->input('supervisor_id'), $request->input('supervisor_pdr_id'));
 
             // Crear CECO automático usando la abreviatura del proyecto como nombre
             /** @var CecoHierarchyService $cecoHierarchyService */
@@ -568,7 +561,7 @@ class PipelineController extends Controller
      * Crear proyecto automáticamente desde un lead ganado.
      * Usa el presupuesto aceptado como base del monto del proyecto.
      */
-    protected function createProjectFromLead(object $lead, ?int $supervisorId = null): int
+    protected function createProjectFromLead(object $lead, ?int $supervisorId = null, ?int $supervisorPdrId = null): int
     {
         $retentionRate = 0.12;
         $availableRate = 0.88;
@@ -607,21 +600,20 @@ class PipelineController extends Controller
             'igv_enabled'        => $igvEnabled,
             'igv_rate'           => $igvRate,
             'supervisor_id'      => $supervisorId,
+            'supervisor_pdr_id'  => $supervisorPdrId,
             'user_id'            => auth()->id(),
             'status'             => 'active',
             'created_at'         => now(),
             'updated_at'         => now(),
         ]);
 
-        // Asignar todo el equipo del pipeline como trabajadores del proyecto
-        $teamMembers = DB::table($this->teamTable)
-            ->where('pipeline_id', $lead->id)
-            ->get();
-
-        foreach ($teamMembers as $member) {
+        // Asignar supervisor y supervisor PDR como trabajadores administrativos
+        $adminWorkerIds = array_filter(array_unique([$supervisorId, $supervisorPdrId]));
+        foreach ($adminWorkerIds as $workerId) {
             DB::table('project_workers')->insertOrIgnore([
                 'project_id'    => $projectId,
-                'trabajador_id' => $member->trabajador_id,
+                'trabajador_id' => $workerId,
+                'type'          => 'admin',
                 'created_at'    => now(),
                 'updated_at'    => now(),
             ]);
@@ -676,8 +668,11 @@ class PipelineController extends Controller
 
         $request->validate([
             'team_ids'   => 'required|array|min:2',
-            'team_ids.*' => 'integer',
-        ], ['team_ids.min' => 'Se requieren al menos 2 personas en el equipo.']);
+            'team_ids.*' => 'integer|exists:trabajadores,id',
+        ], [
+            'team_ids.min'      => 'Se requieren al menos 2 personas en el equipo.',
+            'team_ids.*.exists' => 'Uno de los trabajadores seleccionados no existe.',
+        ]);
 
         DB::table($this->teamTable)->where('pipeline_id', $id)->delete();
 

@@ -135,6 +135,7 @@ export const canFinalizeProject = (p) => getProjectStateClass(p) === 'in-progres
    ORDER HELPERS
    ============================================ */
 export const getOrderBadgeVariant = (o) => {
+  if (o.delivery_confirmed) return 'emerald';
   if (o.status === 'rejected') return 'red';
   if (o.status === 'draft') return 'amber';
   if (o.status === 'pending') return 'amber';
@@ -153,6 +154,7 @@ export const getOrderStatusText = (o) => {
 };
 
 export const getOrderStatusLabel = (o) => {
+  if (o.delivery_confirmed) return 'Entregado';
   if (o.status === 'rejected') return 'Rechazado';
   if (o.status === 'draft') return 'Pend. Aprobación Jefe';
   if (o.status === 'pending') return 'En Compras';

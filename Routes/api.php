@@ -25,8 +25,7 @@ Route::post('/{id}/order', "{$ctrl}@createPurchaseOrder")->where('id', '[0-9]+')
 Route::post('/orders/{orderId}/approve', "{$ctrl}@approveMaterialOrder")->where('orderId', '[0-9]+');
 Route::post('/orders/{orderId}/reject', "{$ctrl}@rejectMaterialOrder")->where('orderId', '[0-9]+');
 Route::get('/{id}/paid-orders', "{$ctrl}@getPaidOrders")->where('id', '[0-9]+');
-Route::post('/orders/{orderId}/confirm-delivery', "{$ctrl}@confirmDelivery")->where('orderId', '[0-9]+');
-Route::post('/confirm-file-delivery', "{$ctrl}@confirmFileDelivery");
+
 
 // Material import/export
 Route::get('/material-template', "{$ctrl}@downloadMaterialTemplate");
@@ -34,12 +33,23 @@ Route::post('/{id}/import-materials', "{$ctrl}@importMaterials")->where('id', '[
 
 // Finalizar proyecto (liberar materiales apartados → disponible)
 Route::post('/{id}/finalize', "{$ctrl}@finalizeProject")->where('id', '[0-9]+');
+Route::post('/{id}/cancel-finalization', "{$ctrl}@cancelFinalization")->where('id', '[0-9]+');
 
 // Completar proyecto con gestión de sobras de materiales
 Route::get('/{id}/completion-materials', "{$ctrl}@getCompletionMaterials")->where('id', '[0-9]+');
 Route::get('/{id}/completion-request', "{$ctrl}@getCompletionRequest")->where('id', '[0-9]+');
 Route::post('/{id}/request-completion', "{$ctrl}@requestCompletion")->where('id', '[0-9]+');
 Route::post('/{id}/approve-completion', "{$ctrl}@approveCompletion")->where('id', '[0-9]+');
+
+// Recepción de materiales (supervisor)
+Route::post('/{id}/mark-material-arrived', "{$ctrl}@markMaterialArrived")->where('id', '[0-9]+');
+Route::post('/{id}/mark-material-not-arrived', "{$ctrl}@markMaterialNotArrived")->where('id', '[0-9]+');
+
+// Reportes de materiales faltantes (supervisor → inventario)
+Route::get('/{id}/arrival-reports', "{$ctrl}@listArrivalReports")->where('id', '[0-9]+');
+Route::post('/{id}/arrival-reports', "{$ctrl}@createArrivalReport")->where('id', '[0-9]+');
+Route::get('/arrival-reports/{reportId}', "{$ctrl}@showArrivalReport")->where('reportId', '[0-9]+');
+Route::post('/arrival-reports/{reportId}/resolve', "{$ctrl}@resolveArrivalReport")->where('reportId', '[0-9]+');
 
 // ── Pipeline de Pre-Proyecto ────────────────────────────────────────────
 Route::prefix('pipeline')->group(function () use ($pipeCtrl) {
