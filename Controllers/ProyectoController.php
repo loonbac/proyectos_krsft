@@ -77,6 +77,7 @@ class ProyectoController extends Controller
             'field_workers' => $isAdmin || $user->hasPermission("module.{$this->moduleSlug}.field_workers"),
             'surplus_count' => $isAdmin || $user->hasPermission("module.{$this->moduleSlug}.surplus_count"),
             'approve_surplus' => $isAdmin || $user->hasPermission("module.{$this->moduleSlug}.approve_surplus"),
+            'view_scope_files' => $isAdmin || $user->hasPermission("module.{$this->moduleSlug}.view_scope_files"),
         ];
     }
 
@@ -364,11 +365,26 @@ class ProyectoController extends Controller
         $lead = DB::table('project_pipeline')->where('project_id', $id)->first();
         $files = [];
         if ($lead) {
-            $files = DB::table('pipeline_files')
+            $filesQuery = DB::table('pipeline_files')
                 ->leftJoin('users', 'pipeline_files.uploaded_by', '=', 'users.id')
                 ->where('pipeline_id', $lead->id)
-                ->select('pipeline_files.*', 'users.name as uploaded_by_name')
-                ->orderByDesc('pipeline_files.created_at')
+                ->select('pipeline_files.*', 'users.name as uploaded_by_name');
+
+            $currentUser = auth()->user();
+
+            // Solo ver archivos clasificados (Alcance o Comercial)
+            $filesQuery->whereNotNull('pipeline_files.sub_type');
+
+            // Archivos comerciales: NADIE los ve en proyectos iniciados
+            $filesQuery->where('pipeline_files.sub_type', '!=', 'comercial');
+
+            // Archivos de alcance: ESTRICTAMENTE solo con permiso view_scope_files
+            $canViewScope = $currentUser && $currentUser->hasPermission("module.{$this->moduleSlug}.view_scope_files");
+            if (!$canViewScope) {
+                $filesQuery->where('pipeline_files.sub_type', '!=', 'alcance');
+            }
+
+            $files = $filesQuery->orderByDesc('pipeline_files.created_at')
                 ->get();
         }
 

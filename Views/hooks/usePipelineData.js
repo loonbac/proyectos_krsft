@@ -487,7 +487,10 @@ export default function usePipelineData({ showToast, enabled = true, onProjectCr
 
   const uploadFiles = useCallback(async (id, files, category = 'general') => {
     const formData = new FormData();
-    files.forEach((file) => formData.append('files[]', file));
+    files.forEach((file) => {
+      formData.append('files[]', file);
+      if (file.sub_type) formData.append('sub_types[]', file.sub_type);
+    });
     formData.append('category', category);
 
     try {

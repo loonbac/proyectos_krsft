@@ -275,11 +275,21 @@ class PipelineController extends Controller
             ->orderByDesc('pipeline_stage_history.created_at')
             ->get()->toArray();
 
-        $lead->files = DB::table($this->filesTable)
+        $filesQuery = DB::table($this->filesTable)
             ->leftJoin('users', 'pipeline_files.uploaded_by', '=', 'users.id')
             ->where('pipeline_id', $id)
-            ->select('pipeline_files.*', 'users.name as uploaded_by_name')
-            ->orderByDesc('pipeline_files.created_at')
+            ->select('pipeline_files.*', 'users.name as uploaded_by_name');
+        // Solo ver archivos clasificados (Alcance o Comercial)
+        $filesQuery->whereNotNull('pipeline_files.sub_type');
+
+        // Archivos de alcance: ESTRICTAMENTE solo con permiso view_scope_files
+        $user = auth()->user();
+        $canViewScope = $user && $user->hasPermission("module.{$this->moduleSlug}.view_scope_files");
+        if (!$canViewScope) {
+            $filesQuery->where('pipeline_files.sub_type', '!=', 'alcance');
+        }
+
+        $lead->files = $filesQuery->orderByDesc('pipeline_files.created_at')
             ->get()->toArray();
 
         return response()->json(['success' => true, 'lead' => $lead]);

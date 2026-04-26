@@ -60,6 +60,11 @@
             "action": "approve_surplus",
             "display_name": "Proyectos: Aprobar Recuento",
             "description": "Permite ver el panel de aprobación del recuento de sobrantes, aprobar o rechazar el recuento y finalizar el proyecto."
+        },
+        {
+            "action": "view_scope_files",
+            "display_name": "Proyectos: Ver Archivos de Alcance",
+            "description": "Permite ver los archivos de tipo 'alcance' en el pipeline y en proyectos iniciados. Sin este permiso, los archivos de alcance están ocultos."
         }
     ],
     "permission_implies": {

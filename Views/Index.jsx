@@ -373,6 +373,7 @@ export default function ProyectosIndex({ permissions, trabajadorId }) {
                 onDelete={d.deleteProjectFile}
                 getDownloadUrl={d.getProjectFileDownloadUrl}
                 readOnly={isProjectReadOnly}
+                isProjectView={true}
               />
             </div>
           )}
