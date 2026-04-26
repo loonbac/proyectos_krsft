@@ -3,10 +3,14 @@
 namespace Modulos_ERP\ProyectosKrsft\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Services\LogKrsftService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class ProyectoController extends Controller
 {
@@ -185,7 +189,7 @@ class ProyectoController extends Controller
                 "),
                 DB::raw("
                     CASE WHEN projects.available_amount > 0 THEN
-                        COALESCE(SUM(CASE WHEN purchase_orders.status = 'approved' THEN
+                            COALESCE(SUM(CASE WHEN purchase_orders.status = 'pending' THEN
                             CASE
                                 WHEN projects.currency = 'USD' AND COALESCE(purchase_orders.exchange_rate, 0) > 0
                                     THEN COALESCE(purchase_orders.total_with_igv, purchase_orders.amount_pen, purchase_orders.amount) / purchase_orders.exchange_rate
@@ -259,12 +263,23 @@ class ProyectoController extends Controller
 
     public function show($id)
     {
+        // Asegurar que la columna sub_type existe en pipeline_files (hotfix si no se corrió migración)
+        try {
+            if (!Schema::hasColumn('pipeline_files', 'sub_type')) {
+                Schema::table('pipeline_files', function ($table) {
+                    $table->string('sub_type')->default('comercial')->after('category');
+                });
+            }
+        } catch (\Exception $e) { /* Silencio si falla */ }
+
         $project = DB::table($this->projectsTable)
             ->leftJoin('trabajadores', 'projects.supervisor_id', '=', 'trabajadores.id')
             ->leftJoin('trabajadores as trab_pdr', 'projects.supervisor_pdr_id', '=', 'trab_pdr.id')
             ->leftJoin('cecos', 'projects.ceco_id', '=', 'cecos.id')
+            ->leftJoin('project_pipeline', 'projects.id', '=', 'project_pipeline.project_id')
             ->select(
                 'projects.*',
+                'project_pipeline.id as pipeline_id',
                 'trabajadores.nombre_completo as supervisor_name',
                 'trab_pdr.nombre_completo as supervisor_pdr_name',
                 'cecos.codigo as ceco_codigo',
@@ -344,19 +359,31 @@ class ProyectoController extends Controller
         // Add usage_percent to project object
         $project->usage_percent = $usagePercent;
 
+        // FETCH FILES FROM PIPELINE
+        // Encontramos el lead que generó este proyecto
+        $lead = DB::table('project_pipeline')->where('project_id', $id)->first();
+        $files = [];
+        if ($lead) {
+            $files = DB::table('pipeline_files')
+                ->leftJoin('users', 'pipeline_files.uploaded_by', '=', 'users.id')
+                ->where('pipeline_id', $lead->id)
+                ->select('pipeline_files.*', 'users.name as uploaded_by_name')
+                ->orderByDesc('pipeline_files.created_at')
+                ->get();
+        }
+
         return response()->json([
             'success' => true,
             'project' => $project,
-            'orders' => $orders,
+            'orders'  => $orders,
             'workers' => $workers,
             'field_workers' => $fieldWorkers,
-            'summary' => [
-                'spent' => $spent,
-                'remaining' => $remaining,
-                'usage_percent' => $usagePercent,
-                'total_orders' => $orders->count(),
-                'pending_orders' => $orders->where('status', 'pending')->count()
-            ]
+            'stats'   => [
+                'spent'     => round($spent, 2),
+                'remaining' => round($remaining, 2),
+                'usage_percent' => round($usagePercent, 1),
+            ],
+            'files' => $files,
         ]);
     }
 
@@ -392,6 +419,16 @@ class ProyectoController extends Controller
                 'updated_at' => now()
             ]);
 
+            app(\App\Services\LogKrsftService::class)->log(
+                module: 'proyectoskrsft',
+                action: 'trabajador_asignado',
+                message: "Trabajador #{$request->trabajador_id} asignado al proyecto #{$projectId}",
+                level: 'info',
+                userId: auth()->id(),
+                userName: auth()->user()->name,
+                extra: ['project_id' => $projectId, 'worker_id' => $request->trabajador_id, 'type' => $type]
+            );
+
             return response()->json(['success' => true, 'message' => 'Trabajador agregado']);
         } catch (\Exception $e) {
             Log::error('Error en addWorker', ['error' => $e->getMessage()]);
@@ -412,6 +449,16 @@ class ProyectoController extends Controller
                 ->where('trabajador_id', $trabajadorId)
                 ->where('type', $type)
                 ->delete();
+
+            app(\App\Services\LogKrsftService::class)->log(
+                module: 'proyectoskrsft',
+                action: 'trabajador_removido',
+                message: "Trabajador #{$trabajadorId} removido del proyecto #{$projectId}",
+                level: 'warning',
+                userId: auth()->id(),
+                userName: auth()->user()->name,
+                extra: ['project_id' => $projectId, 'worker_id' => $trabajadorId, 'type' => $type]
+            );
 
             return response()->json(['success' => true, 'message' => 'Trabajador removido']);
         } catch (\Exception $e) {
@@ -531,10 +578,20 @@ class ProyectoController extends Controller
 
             $orderId = DB::table('purchase_orders')->insertGetId($orderData);
 
+            app(\App\Services\LogKrsftService::class)->log(
+                module: 'proyectoskrsft',
+                action: 'orden_creada',
+                message: "Orden de compra creada para proyecto #{$id}",
+                level: 'info',
+                userId: auth()->id(),
+                userName: auth()->user()->name,
+                extra: ['project_id' => $id, 'order_id' => $orderId, 'type' => $request->type]
+            );
+
             return response()->json([
                 'success' => true,
-                'message' => $request->type === 'service' 
-                    ? 'Gasto registrado' 
+                'message' => $request->type === 'service'
+                    ? 'Gasto registrado'
                     : 'Material agregado. Pendiente de aprobación del Jefe de Proyectos.',
                 'order_id' => $orderId
             ]);
@@ -595,6 +652,16 @@ class ProyectoController extends Controller
                     'manager_approved_at' => now(),
                     'updated_at' => now()
                 ]);
+
+            app(\App\Services\LogKrsftService::class)->log(
+                module: 'proyectoskrsft',
+                action: 'material_aprobado',
+                message: "Material #{$orderId} aprobado y enviado a Compras",
+                level: 'info',
+                userId: auth()->id(),
+                userName: auth()->user()->name,
+                extra: ['order_id' => $orderId]
+            );
 
             return response()->json([
                 'success' => true,
@@ -662,6 +729,16 @@ class ProyectoController extends Controller
                     'notes' => $notes,
                     'updated_at' => now()
                 ]);
+
+            app(\App\Services\LogKrsftService::class)->log(
+                module: 'proyectoskrsft',
+                action: 'material_rechazado',
+                message: "Material #{$orderId} rechazado",
+                level: 'warning',
+                userId: auth()->id(),
+                userName: auth()->user()->name,
+                extra: ['order_id' => $orderId, 'reason' => $notes]
+            );
 
             return response()->json([
                 'success' => true,
@@ -756,6 +833,16 @@ class ProyectoController extends Controller
                 'updated_at' => now(),
             ]);
 
+            app(\App\Services\LogKrsftService::class)->log(
+                module: 'proyectoskrsft',
+                action: 'proyecto_creado',
+                message: "Proyecto '{$name}' creado",
+                level: 'info',
+                userId: auth()->id(),
+                userName: auth()->user()->name,
+                extra: ['project_id' => $id, 'name' => $name]
+            );
+
             return response()->json(['success' => true, 'message' => 'Proyecto creado', 'project_id' => $id]);
         } catch (\Exception $e) {
             Log::error('Error en store proyecto', ['error' => $e->getMessage()]);
@@ -796,6 +883,23 @@ class ProyectoController extends Controller
             }
 
             DB::table($this->projectsTable)->where('id', $id)->update($data);
+
+            $changedFields = [];
+            foreach ($data as $key => $value) {
+                if ($key !== 'updated_at' && array_key_exists($key, (array) $project)) {
+                    $changedFields[$key] = ['from' => $project->$key, 'to' => $value];
+                }
+            }
+
+            app(\App\Services\LogKrsftService::class)->log(
+                module: 'proyectoskrsft',
+                action: 'proyecto_actualizado',
+                message: "Proyecto #{$id} actualizado",
+                level: 'info',
+                userId: auth()->id(),
+                userName: auth()->user()->name,
+                extra: ['project_id' => $id, 'changes' => $changedFields]
+            );
 
             return response()->json(['success' => true, 'message' => 'Proyecto actualizado']);
         } catch (\Exception $e) {
@@ -864,6 +968,16 @@ class ProyectoController extends Controller
                 DB::table($this->projectsTable)->where('id', $id)->delete();
             });
 
+            app(\App\Services\LogKrsftService::class)->log(
+                module: 'proyectoskrsft',
+                action: 'proyecto_eliminado',
+                message: "Proyecto #{$id} eliminado",
+                level: 'warning',
+                userId: auth()->id(),
+                userName: auth()->user()->name,
+                extra: ['project_id' => $id]
+            );
+
             return response()->json(['success' => true, 'message' => 'Proyecto, preproyectos y datos asociados eliminados correctamente']);
         } catch (\Exception $e) {
             Log::error('Error en destroy proyecto', ['error' => $e->getMessage(), 'id' => $id]);
@@ -931,6 +1045,16 @@ class ProyectoController extends Controller
             } catch (\Exception $e) {
                 Log::warning('Error registrando auditoría de finalización', ['error' => $e->getMessage()]);
             }
+
+            app(\App\Services\LogKrsftService::class)->log(
+                module: 'proyectoskrsft',
+                action: 'proyecto_finalizado',
+                message: "Proyecto #{$id} finalizado",
+                level: 'info',
+                userId: auth()->id(),
+                userName: auth()->user()->name,
+                extra: ['project_id' => $id]
+            );
 
             return response()->json([
                 'success' => true,
@@ -1036,6 +1160,15 @@ class ProyectoController extends Controller
             })
             ->sum(DB::raw('COALESCE(amount_pen, amount, 0)'));
 
+        $totalBudgeted = DB::table('purchase_orders')
+            ->whereIn('project_id', $projectIds)
+            ->where('status', 'pending')
+            ->where(function ($q) {
+                $q->whereNull('cancellation_status')
+                  ->orWhere('cancellation_status', '!=', 'anulada');
+            })
+            ->sum(DB::raw('COALESCE(amount_pen, amount, 0)'));
+
         return response()->json([
             'success' => true,
             'stats' => [
@@ -1043,6 +1176,7 @@ class ProyectoController extends Controller
                 'active_projects' => $activeProjects,
                 'total_budget' => $totalBudget,
                 'total_spent' => $totalSpent,
+                'total_budgeted' => $totalBudgeted,
                 'total_remaining' => $totalBudget - $totalSpent
             ]
         ]);
@@ -1107,6 +1241,86 @@ class ProyectoController extends Controller
     }
 
     /**
+     * Export project materials and services to XLSX
+     * GET /api/proyectoskrsft/{projectId}/export-materials
+     */
+    public function exportMaterialsExcel($projectId)
+    {
+        $project = DB::table($this->projectsTable)->find($projectId);
+
+        if (!$project) {
+            return response()->json(['success' => false, 'message' => 'Proyecto no encontrado'], 404);
+        }
+
+        // Query materials (type != 'service')
+        $materials = DB::table('purchase_orders')
+            ->where('project_id', $projectId)
+            ->where('type', '!=', 'service')
+            ->orderBy('item_number')
+            ->get();
+
+        // Query services (type = 'service')
+        $services = DB::table('purchase_orders')
+            ->where('project_id', $projectId)
+            ->where('type', 'service')
+            ->orderBy('item_number')
+            ->get();
+
+        $spreadsheet = new Spreadsheet();
+
+        // Sheet 1: Materiales
+        $sheet1 = $spreadsheet->getActiveSheet();
+        $sheet1->setTitle('Materiales');
+
+        // Headers
+        $headers1 = ['Item', 'Cantidad', 'Tipo Material', 'Especificación', 'Medida', 'Conexión', 'Observaciones', 'Estado', 'Monto (PEN)', 'Recibido'];
+        $sheet1->fromArray($headers1, null, 'A1');
+
+        // Data rows
+        $row = 2;
+        foreach ($materials as $m) {
+            $sheet1->setCellValue("A{$row}", $m->item_number ?? $row - 1);
+            $sheet1->setCellValue("B{$row}", $m->amount ?? 0);
+            $sheet1->setCellValue("C{$row}", $m->material_type ?? '-');
+            $sheet1->setCellValue("D{$row}", $m->description ?? '-');
+            $sheet1->setCellValue("E{$row}", ($m->diameter ? $m->diameter . 'mm' : '-'));
+            $sheet1->setCellValue("F{$row}", $m->series ?? '-');
+            $sheet1->setCellValue("G{$row}", $m->observations ?? '-');
+            $sheet1->setCellValue("H{$row}", $m->status ?? '-');
+            $sheet1->setCellValue("I{$row}", $m->amount_pen ?? 0);
+            $sheet1->setCellValue("J{$row}", $m->material_arrived ? 'Sí' : 'No');
+            $row++;
+        }
+
+        // Sheet 2: Servicios
+        $sheet2 = $spreadsheet->createSheet();
+        $sheet2->setTitle('Servicios');
+
+        $headers2 = ['Item', 'Descripción', 'Tiempo', 'Lugar', 'Estado'];
+        $sheet2->fromArray($headers2, null, 'A1');
+
+        $row = 2;
+        foreach ($services as $s) {
+            $sheet2->setCellValue("A{$row}", $s->item_number ?? $row - 1);
+            $sheet2->setCellValue("B{$row}", $s->description ?? '-');
+            $sheet2->setCellValue("C{$row}", $s->unit ?? '-');
+            $sheet2->setCellValue("D{$row}", $s->notes ?? '-');
+            $sheet2->setCellValue("E{$row}", $s->status ?? '-');
+            $row++;
+        }
+
+        $writer = new Xlsx($spreadsheet);
+
+        $filename = "Proyecto_{$projectId}_Materiales_Servicios_" . date('Y-m-d') . ".xlsx";
+        $tempFile = tempnam(sys_get_temp_dir(), 'xlsx');
+        $writer->save($tempFile);
+
+        return response()->download($tempFile, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
+    }
+
+    /**
      * Import materials from XLS/CSV file
      */
     public function importMaterials(Request $request, $id)
@@ -1167,18 +1381,44 @@ class ProyectoController extends Controller
                 ]);
             }
             
-            $rows = [];
+            // Parse and extract metadata + rows
+            $parsed = [];
             
             // Check file type and parse accordingly
             if ($extension === 'xlsx') {
                 // Parse modern XLSX (ZIP-based) format
-                $rows = $this->parseXlsx($file->getRealPath());
+                $parsed = $this->parseXlsx($file->getRealPath());
             } elseif ($extension === 'xls' || strpos($content, 'schemas-microsoft-com:office:spreadsheet') !== false) {
                 // Parse XML Spreadsheet format (old XLS)
-                $rows = $this->parseXmlSpreadsheet($content);
+                $parsed = $this->parseXmlSpreadsheet($content);
             } else {
                 // Parse as CSV
-                $rows = $this->parseCsv($content);
+                $parsed = $this->parseCsv($content);
+            }
+
+            // parsers return ['metadata' => [...], 'rows' => [...]]
+            // Backward compatibility: if rows is not an array, treat as legacy flat array
+            $rows = is_array($parsed['rows'] ?? null) ? $parsed['rows'] : ($parsed ?: []);
+            $metadata = is_array($parsed['metadata'] ?? null) ? $parsed['metadata'] : [];
+
+            // Normalize and validate metadata
+            $metaNormalized = [
+                'area_solicitante' => $this->cleanMetadataText($metadata['area_solicitante'] ?? null),
+                'proyecto_obra'    => $this->cleanMetadataText($metadata['proyecto_obra'] ?? null),
+                'numero_solicitud' => $this->cleanMetadataText($metadata['numero_solicitud'] ?? null),
+                'fecha_solicitud'  => $this->normalizeImportedDate($metadata['fecha_solicitud'] ?? null),
+                'fecha_requerida'  => $this->normalizeImportedDate($metadata['fecha_requerida'] ?? null),
+                'prioridad'        => null,
+                'solicitado_por'   => $this->cleanMetadataText($metadata['solicitado_por'] ?? null),
+                'cargo'            => $this->cleanMetadataText($metadata['cargo'] ?? null),
+            ];
+
+            // Validate prioridad (only alta, media, baja)
+            if (!empty($metadata['prioridad'])) {
+                $prioridad = strtolower(trim($metadata['prioridad']));
+                if (in_array($prioridad, ['alta', 'media', 'baja'])) {
+                    $metaNormalized['prioridad'] = $prioridad;
+                }
             }
 
             // If check_duplicate=true and no confirmed_import=true, return preview
@@ -1206,7 +1446,10 @@ class ProyectoController extends Controller
                 }
 
                 return response()->json([
-                    'preview' => ['items' => $previewItems],
+                    'preview' => [
+                        'items'    => $previewItems,
+                        'metadata' => $metaNormalized,
+                    ],
                     'filename' => $sourceFilename
                 ]);
             }
@@ -1259,13 +1502,66 @@ class ProyectoController extends Controller
                     'created_by'             => auth()->id(),
                     'created_at'             => now(),
                     'updated_at'             => now(),
+                    // Metadata fields — only insert columns that actually exist in the table
+                    // (the migration adds them; this guard prevents 500s on older schemas)
                 ];
+
+                static $poColumns = null;
+                if ($poColumns === null) {
+                    $rawCols = DB::select('SHOW COLUMNS FROM purchase_orders');
+                    $poColumns = array_flip(array_map(fn($col) => $col->Field, $rawCols));
+
+                    // Auto-migration: if the 4 new columns are missing, add them now
+                    $missing = [];
+                    if (!isset($poColumns['area_solicitante'])) $missing[] = "ADD COLUMN area_solicitante VARCHAR(255) NULL AFTER source_filename";
+                    if (!isset($poColumns['proyecto_obra']))    $missing[] = "ADD COLUMN proyecto_obra VARCHAR(255) NULL AFTER area_solicitante";
+                    if (!isset($poColumns['numero_solicitud'])) $missing[] = "ADD COLUMN numero_solicitud VARCHAR(100) NULL AFTER proyecto_obra";
+                    if (!isset($poColumns['fecha_solicitud']))  $missing[] = "ADD COLUMN fecha_solicitud VARCHAR(50) NULL AFTER numero_solicitud";
+
+                    if (!empty($missing)) {
+                        try {
+                            DB::statement("ALTER TABLE purchase_orders " . implode(', ', $missing));
+                            // Refresh columns after update
+                            $rawCols = DB::select('SHOW COLUMNS FROM purchase_orders');
+                            $poColumns = array_flip(array_map(fn($col) => $col->Field, $rawCols));
+                        } catch (\Exception $e) {
+                            Log::error("Error auto-migrating purchase_orders: " . $e->getMessage());
+                        }
+                    }
+                }
+
+                $metaFields = [
+                    'area_solicitante' => $metaNormalized['area_solicitante'],
+                    'proyecto_obra'    => $metaNormalized['proyecto_obra'],
+                    'numero_solicitud' => $metaNormalized['numero_solicitud'],
+                    'fecha_solicitud'  => $metaNormalized['fecha_solicitud'],
+                    'fecha_requerida'  => $metaNormalized['fecha_requerida'],
+                    'prioridad'        => $metaNormalized['prioridad'],
+                    'solicitado_por'   => $metaNormalized['solicitado_por'],
+                    'cargo'            => $metaNormalized['cargo'],
+                ];
+
+                foreach ($metaFields as $col => $value) {
+                    if (isset($poColumns[$col])) {
+                        $orderData[$col] = $value;
+                    }
+                }
 
                 DB::table('purchase_orders')->insert($orderData);
                 $imported++;
             }
 
             $message = $imported . ' materiales importados desde ' . $sourceFilename;
+
+            app(\App\Services\LogKrsftService::class)->log(
+                module: 'proyectoskrsft',
+                action: 'materiales_importados',
+                message: "Materiales importados para proyecto #{$id}",
+                level: 'info',
+                userId: auth()->id(),
+                userName: auth()->user()->name,
+                extra: ['project_id' => $id, 'count' => $imported, 'filename' => $sourceFilename]
+            );
 
             return response()->json([
                 'success' => true,
@@ -1311,158 +1607,231 @@ class ProyectoController extends Controller
 
     /**
      * Parse XML Spreadsheet format (Excel 2003 XML)
+     * Returns ['metadata' => [...], 'rows' => [...]]
      */
     private function parseXmlSpreadsheet($content)
     {
-        $rows = [];
-        
-        // Extract all Row elements after the header
-        preg_match_all('/<Row>(.*?)<\/Row>/s', $content, $rowMatches);
-        
-        if (!empty($rowMatches[1])) {
-            // Skip first 9 rows (header area); data starts at row 10
-            $dataRows = array_slice($rowMatches[1], 9);
-            
-            foreach ($dataRows as $rowXml) {
-                // Extract cell data
-                preg_match_all('/<Data[^>]*>([^<]*)<\/Data>/s', $rowXml, $cellMatches);
-                
-                if (!empty($cellMatches[1])) {
-                    $rows[] = $cellMatches[1];
+        $allRowsByNum = [];
+        $content = mb_convert_encoding($content, 'UTF-8', 'UTF-8');
+
+        preg_match_all('/<Row\b([^>]*)>(.*?)<\/Row>/su', $content, $rowMatches, PREG_SET_ORDER);
+
+        $currentRowNum = 1;
+        foreach ($rowMatches as $rowMatch) {
+            $rowAttrs = $rowMatch[1] ?? '';
+            $rowXml = $rowMatch[2] ?? '';
+
+            if (preg_match('/ss:Index="(\d+)"/i', $rowAttrs, $indexMatch)) {
+                $currentRowNum = (int) $indexMatch[1];
+            }
+
+            $currentRow = array_fill(0, 12, '');
+            $currentCol = 0;
+
+            preg_match_all('/<Cell\b([^>]*)>(.*?)<\/Cell>/su', $rowXml, $cellMatches, PREG_SET_ORDER);
+
+            foreach ($cellMatches as $cellMatch) {
+                $cellAttrs = $cellMatch[1] ?? '';
+                $cellXml = $cellMatch[2] ?? '';
+
+                if (preg_match('/ss:Index="(\d+)"/i', $cellAttrs, $cellIndexMatch)) {
+                    $currentCol = max(0, ((int) $cellIndexMatch[1]) - 1);
+                }
+
+                $cellValue = '';
+                if (preg_match('/<Data[^>]*>(.*?)<\/Data>/su', $cellXml, $valueMatch)) {
+                    $cellValue = trim(html_entity_decode(strip_tags($valueMatch[1]), ENT_QUOTES | ENT_XML1, 'UTF-8'));
+                }
+
+                if ($currentCol >= 0 && $currentCol <= 11) {
+                    $currentRow[$currentCol] = $cellValue;
+                }
+
+                $currentCol++;
+            }
+
+            $allRowsByNum[$currentRowNum] = $currentRow;
+            $currentRowNum++;
+        }
+
+        $metadata = $this->extractMetadataFromRows($allRowsByNum);
+
+        // Data rows: row 10+ (1-indexed)
+        $dataRows = [];
+        foreach ($allRowsByNum as $rowNum => $currentRow) {
+            if ($rowNum < 10) {
+                continue;
+            }
+            $hasData = false;
+            for ($i = 0; $i <= 6; $i++) {
+                if (!empty(trim((string) ($currentRow[$i] ?? '')))) {
+                    $hasData = true;
+                    break;
                 }
             }
+            if ($hasData) {
+                $dataRows[] = $currentRow;
+            }
         }
-        
-        return $rows;
+
+        return ['metadata' => $metadata, 'rows' => $dataRows];
     }
 
     /**
      * Parse CSV content
+     * Returns ['metadata' => [...], 'rows' => [...]]
      */
     private function parseCsv($content)
     {
-        $rows = [];
-        
+        $allRowsByNum = [];
+
         // Remove BOM if present
         $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
-        
+
         $lines = preg_split('/\r\n|\r|\n/', $content);
-        
-        // Skip header rows (rows 1-9); data starts at row 10
-        for ($i = 9; $i < count($lines); $i++) {
-            $line = trim($lines[$i]);
-            if (empty($line)) continue;
-            
+
+        $rowNum = 1;
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line)) {
+                $rowNum++;
+                continue;
+            }
+
             // Try semicolon first, then comma
             $columns = str_getcsv($line, ';');
             if (count($columns) === 1) {
                 $columns = str_getcsv($line, ',');
             }
-            
-            $rows[] = $columns;
+
+            $allRowsByNum[$rowNum] = $columns;
+            $rowNum++;
         }
-        
-        return $rows;
+
+        $metadata = $this->extractMetadataFromRows($allRowsByNum);
+
+        // Data rows: row 10+ (1-indexed)
+        $dataRows = [];
+        foreach ($allRowsByNum as $num => $row) {
+            if ($num >= 10) {
+                $dataRows[] = $row;
+            }
+        }
+
+        return ['metadata' => $metadata, 'rows' => $dataRows];
     }
 
     /**
      * Parse XLSX format (ZIP-based Excel 2007+)
+     * Returns ['metadata' => [...], 'rows' => [...]]
      */
     private function parseXlsx($filePath)
     {
-        $rows = [];
-        
+        $allRowsByNum = []; // $rowNum => $currentRow
+
         $zip = new \ZipArchive();
         if ($zip->open($filePath) !== true) {
             throw new \Exception('No se pudo abrir el archivo XLSX');
         }
-        
+
         // Read sharedStrings.xml for string values
         $sharedStrings = [];
         $sharedStringsXml = $zip->getFromName('xl/sharedStrings.xml');
         if ($sharedStringsXml) {
             $sharedStringsXml = mb_convert_encoding($sharedStringsXml, 'UTF-8', 'UTF-8');
-            preg_match_all('/<t[^>]*>([^<]*)<\/t>/u', $sharedStringsXml, $stringMatches);
-            if (!empty($stringMatches[1])) {
-                $sharedStrings = array_map(function($s) {
-                    return html_entity_decode($s, ENT_QUOTES | ENT_XML1, 'UTF-8');
-                }, $stringMatches[1]);
+            preg_match_all('/<si\b[^>]*>(.*?)<\/si>/su', $sharedStringsXml, $siMatches);
+            if (!empty($siMatches[1])) {
+                foreach ($siMatches[1] as $siXml) {
+                    preg_match_all('/<t[^>]*>(.*?)<\/t>/su', $siXml, $textMatches);
+                    $parts = array_map(
+                        fn($part) => html_entity_decode($part, ENT_QUOTES | ENT_XML1, 'UTF-8'),
+                        $textMatches[1] ?? []
+                    );
+                    $sharedStrings[] = implode('', $parts);
+                }
             }
         }
-        
+
         // Read sheet1.xml for data
         $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
         if (!$sheetXml) {
             $zip->close();
             throw new \Exception('No se encontró la hoja de datos');
         }
-        
+
         $zip->close();
-        
+
         $sheetXml = mb_convert_encoding($sheetXml, 'UTF-8', 'UTF-8');
-        
-        // Extract rows
+
+        // Extract rows with their row numbers
         preg_match_all('/<row[^>]*r="(\d+)"[^>]*>(.*?)<\/row>/su', $sheetXml, $rowMatches, PREG_SET_ORDER);
-        
+
         if (!empty($rowMatches)) {
             foreach ($rowMatches as $rowMatch) {
                 $rowNum = intval($rowMatch[1]);
                 $rowXml = $rowMatch[2];
-                
-                // Skip header rows (rows 1-9); data starts at row 10
-                if ($rowNum <= 9) {
-                    continue;
-                }
-                
-                // Build row with proper column positions (A-J = 0-9, support up to 10 columns)
-                $currentRow = array_fill(0, 10, '');
-                
-                // Extract each cell - match cells with or without values
-                // Use a flexible regex that doesn't assume attribute order
+
+                // Build row with proper column positions (A-L = 0-11)
+                $currentRow = array_fill(0, 12, '');
+
+                // Extract each cell
                 preg_match_all('/<c\s([^>]*?)(?:>(.*?)<\/c>|\/>)/su', $rowXml, $cellMatches, PREG_SET_ORDER);
-                
+
                 foreach ($cellMatches as $cellMatch) {
                     $allAttrs = $cellMatch[1] ?? '';
                     $cellContent = $cellMatch[2] ?? '';
-                    
-                    // Extract column letter from r="XX" attribute (anywhere in attrs)
+
+                    // Extract column letter from r="XX" attribute
                     if (!preg_match('/r="([A-Z]+)\d+"/', $allAttrs, $refMatch)) {
-                        continue; // skip cells without a reference
+                        continue;
                     }
                     $colLetter = $refMatch[1];
-                    
+
                     // Convert column letter to index (A=0, B=1, etc.)
                     $colIndex = 0;
                     $len = strlen($colLetter);
                     for ($i = 0; $i < $len; $i++) {
                         $colIndex = $colIndex * 26 + (ord($colLetter[$i]) - ord('A') + 1);
                     }
-                    $colIndex--; // Make 0-based
-                    
-                    if ($colIndex < 0 || $colIndex > 9) continue;
-                    
-                    // Check if it's a shared string (t="s")
-                    $isSharedString = preg_match('/t="s"/i', $allAttrs);
-                    
-                    // Get the value from <v>...</v>
+                    $colIndex--;
+
+                    if ($colIndex < 0 || $colIndex > 11) continue;
+
+                    // Get value
                     $cellValue = '';
-                    if (preg_match('/<v>([^<]*)<\/v>/', $cellContent, $valueMatch)) {
+                    if (preg_match('/<v>([^<]*)<\/v>/su', $cellContent, $valueMatch)) {
                         $cellValue = $valueMatch[1];
                     }
-                    
-                    // Skip cells without an actual <v> value (empty styled cells)
-                    if ($cellValue === '') {
-                        continue;
+
+                    if ($cellValue === '' && preg_match('/t="inlineStr"/i', $allAttrs)) {
+                        if (preg_match_all('/<t[^>]*>(.*?)<\/t>/su', $cellContent, $inlineMatches) && !empty($inlineMatches[1])) {
+                            $cellValue = implode('', array_map(
+                                fn($part) => html_entity_decode($part, ENT_QUOTES | ENT_XML1, 'UTF-8'),
+                                $inlineMatches[1]
+                            ));
+                        }
                     }
-                    
+
+                    if ($cellValue === '') continue;
+
                     // Apply shared string lookup if needed
-                    if ($isSharedString && isset($sharedStrings[(int)$cellValue])) {
+                    if (preg_match('/t="s"/i', $allAttrs) && isset($sharedStrings[(int)$cellValue])) {
                         $currentRow[$colIndex] = $sharedStrings[(int)$cellValue];
                     } else {
-                        $currentRow[$colIndex] = $cellValue;
+                        $currentRow[$colIndex] = html_entity_decode($cellValue, ENT_QUOTES | ENT_XML1, 'UTF-8');
                     }
                 }
-                
+
+                $allRowsByNum[$rowNum] = $currentRow;
+            }
+        }
+
+        $metadata = $this->extractMetadataFromRows($allRowsByNum);
+
+        // Data rows: row 10+ (1-indexed)
+        $dataRows = [];
+        foreach ($allRowsByNum as $rowNum => $currentRow) {
+            if ($rowNum >= 10) {
                 // Only add rows that have at least some data in relevant columns (A-G)
                 $hasData = false;
                 for ($i = 0; $i <= 6; $i++) {
@@ -1471,14 +1840,137 @@ class ProyectoController extends Controller
                         break;
                     }
                 }
-                
                 if ($hasData) {
-                    $rows[] = $currentRow;
+                    $dataRows[] = $currentRow;
                 }
             }
         }
-        
-        return $rows;
+
+        return ['metadata' => $metadata, 'rows' => $dataRows];
+    }
+
+    /**
+     * Extract order metadata from header block rows 2..8 by matching labels.
+     */
+    private function extractMetadataFromRows(array $rowsByNumber): array
+    {
+        $metadata = [
+            'area_solicitante' => null,
+            'proyecto_obra' => null,
+            'numero_solicitud' => null,
+            'fecha_solicitud' => null,
+            'fecha_requerida' => null,
+            'prioridad' => null,
+            'solicitado_por' => null,
+            'cargo' => null,
+        ];
+
+        $fieldByLabel = [
+            'areasolicitante' => 'area_solicitante',
+            'areasolicita'   => 'area_solicitante',
+            'area'           => 'area_solicitante',
+            'solicitante'    => 'area_solicitante',
+            'solicita'       => 'area_solicitante',
+            'proyectoobra'   => 'proyecto_obra',
+            'nsolicitud'     => 'numero_solicitud',
+            'nrosolicitud'   => 'numero_solicitud',
+            'numerosolicitud' => 'numero_solicitud',
+            'fechasolicitud' => 'fecha_solicitud',
+            'fecharequerida' => 'fecha_requerida',
+            'prioridad'      => 'prioridad',
+            'solicitadopor'  => 'solicitado_por',
+            'cargo'          => 'cargo',
+        ];
+
+        for ($row = 2; $row <= 8; $row++) {
+            $cells = $rowsByNumber[$row] ?? null;
+            if (!is_array($cells) || empty($cells)) {
+                continue;
+            }
+
+            $maxCol = count($cells) - 1;
+            for ($col = 0; $col <= $maxCol; $col++) {
+                $label = $this->normalizeMetadataLabel($cells[$col] ?? '');
+                if ($label === '' || !isset($fieldByLabel[$label])) {
+                    continue;
+                }
+
+                $field = $fieldByLabel[$label];
+                if (!empty($metadata[$field])) {
+                    continue;
+                }
+
+                for ($valueCol = $col + 1; $valueCol <= $maxCol; $valueCol++) {
+                    $candidate = trim((string) ($cells[$valueCol] ?? ''));
+                    if ($candidate !== '') {
+                        $metadata[$field] = $candidate;
+                        break;
+                    }
+                }
+            }
+        }
+
+        return array_filter($metadata, fn($value) => $value !== null && $value !== '');
+    }
+
+    private function normalizeMetadataLabel($value): string
+    {
+        $value = mb_strtolower(trim((string) $value), 'UTF-8');
+        if ($value === '') {
+            return '';
+        }
+
+        $value = str_replace(['&nbsp;', "\xC2\xA0"], ' ', $value);
+        $value = strtr($value, [
+            'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u',
+            'à' => 'a', 'è' => 'e', 'ì' => 'i', 'ò' => 'o', 'ù' => 'u',
+            'ä' => 'a', 'ë' => 'e', 'ï' => 'i', 'ö' => 'o', 'ü' => 'u',
+            'ñ' => 'n',
+        ]);
+
+        return preg_replace('/[^a-z0-9]/', '', $value) ?? '';
+    }
+
+    private function cleanMetadataText($value): ?string
+    {
+        $value = trim((string) ($value ?? ''));
+        return $value !== '' ? $value : null;
+    }
+
+    private function normalizeImportedDate($value): ?string
+    {
+        $value = trim((string) ($value ?? ''));
+        if ($value === '') {
+            return null;
+        }
+
+        if (is_numeric($value)) {
+            $serial = (float) $value;
+            if ($serial > 0 && $serial < 100000) {
+                try {
+                    $date = \Carbon\Carbon::create(1899, 12, 30)->addDays((int) floor($serial));
+                    if ($date->year >= 1900 && $date->year <= 2100) {
+                        return $date->format('Y-m-d');
+                    }
+                } catch (\Exception $e) {
+                    // keep trying with string formats below
+                }
+            }
+        }
+
+        $formats = ['Y-m-d', 'd/m/Y', 'd-m-Y'];
+        foreach ($formats as $format) {
+            try {
+                $date = \Carbon\Carbon::createFromFormat($format, $value);
+                if ($date && $date->year >= 1900 && $date->year <= 2100) {
+                    return $date->format('Y-m-d');
+                }
+            } catch (\Exception $e) {
+                // try next format
+            }
+        }
+
+        return null;
     }
 
     // ====================================================================
@@ -2219,6 +2711,20 @@ class ProyectoController extends Controller
                 Log::warning('Error registrando auditoría de sobras', ['error' => $e->getMessage()]);
             }
 
+            app(\App\Services\LogKrsftService::class)->log(
+                module: 'proyectoskrsft',
+                action: 'proyecto_aprobado',
+                message: "Proyecto #{$id} aprobado",
+                level: 'info',
+                userId: auth()->id(),
+                userName: auth()->user()->name,
+                extra: [
+                    'project_id' => $id,
+                    'materials_con_sobras' => $materialsConSobras,
+                    'total_sobra_devuelta' => $totalSobra
+                ]
+            );
+
             $releasedCount = count($materialsData);
             $message = "Proyecto finalizado. {$releasedCount} materiales procesados.";
             if ($materialsConSobras > 0) {
@@ -2260,6 +2766,16 @@ class ProyectoController extends Controller
                 'updated_at'          => now(),
             ]);
 
+        app(\App\Services\LogKrsftService::class)->log(
+            module: 'proyectoskrsft',
+            action: 'materiales_marcados_llegados',
+            message: "Materiales marcados como recibidos para proyecto #{$id}",
+            level: 'info',
+            userId: auth()->id(),
+            userName: auth()->user()->name,
+            extra: ['project_id' => $id, 'order_ids' => $request->input('order_ids'), 'count' => $updated]
+        );
+
         return response()->json(['success' => true, 'updated' => $updated]);
     }
 
@@ -2284,6 +2800,16 @@ class ProyectoController extends Controller
                 'material_arrived_by' => null,
                 'updated_at'          => now(),
             ]);
+
+        app(\App\Services\LogKrsftService::class)->log(
+            module: 'proyectoskrsft',
+            action: 'materiales_marcados_no_llegados',
+            message: "Materiales marcados como NO recibidos para proyecto #{$id}",
+            level: 'warning',
+            userId: auth()->id(),
+            userName: auth()->user()->name,
+            extra: ['project_id' => $id, 'order_ids' => $request->input('order_ids'), 'count' => $updated]
+        );
 
         return response()->json(['success' => true, 'updated' => $updated]);
     }
@@ -2451,5 +2977,207 @@ class ProyectoController extends Controller
 
             return response()->json(['success' => true, 'message' => 'Reporte resuelto. Materiales marcados como recibidos.']);
         });
+    }
+
+    /**
+     * Get planner data for a project.
+     * GET /api/proyectoskrsft/{projectId}/planner
+     */
+    public function getPlanner($projectId)
+    {
+        $planner = DB::table('project_planners')->where('project_id', $projectId)->first();
+        if (!$planner) {
+            return response()->json(['success' => false, 'message' => 'Planner not found'], 404);
+        }
+
+        $stages = DB::table('project_planner_stages')
+            ->where('project_planner_id', $planner->id)
+            ->orderBy('sort_order')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'planner' => $planner,
+                'stages' => $stages
+            ]
+        ]);
+    }
+
+    /**
+     * Save (create or update) planner data for a project.
+     * POST/PUT /api/proyectoskrsft/{projectId}/planner
+     */
+    public function savePlanner($projectId, Request $request)
+    {
+        $planner = DB::table('project_planners')->where('project_id', $projectId)->first();
+
+        $data = [
+            'start_date' => $request->start_date,
+            'end_date' => $request->end_date,
+            'planning_started' => $request->planning_started ?? false,
+            'is_generated' => $request->is_generated ?? false,
+            'updated_at' => now()
+        ];
+
+        if (!$planner) {
+            $data['project_id'] = $projectId;
+            $data['created_at'] = now();
+            $id = DB::table('project_planners')->insertGetId($data);
+            $planner = DB::table('project_planners')->where('id', $id)->first();
+        } else {
+            DB::table('project_planners')->where('id', $planner->id)->update($data);
+        }
+
+        return response()->json(['success' => true, 'data' => $planner]);
+    }
+
+    /**
+     * Add a stage to the project planner.
+     * POST /api/proyectoskrsft/{projectId}/planner/stages
+     */
+    public function addStage($projectId, Request $request)
+    {
+        $planner = DB::table('project_planners')->where('project_id', $projectId)->first();
+        if (!$planner) {
+            return response()->json(['success' => false, 'message' => 'Create planner first'], 400);
+        }
+
+        // Get max sort_order
+        $maxOrder = DB::table('project_planner_stages')
+            ->where('project_planner_id', $planner->id)
+            ->max('sort_order') ?? 0;
+
+        // Calculate start_date based on previous stage
+        $lastStage = null;
+        if ($maxOrder > 0) {
+            $lastStage = DB::table('project_planner_stages')
+                ->where('project_planner_id', $planner->id)
+                ->orderBy('sort_order', 'desc')
+                ->first();
+        }
+
+        $startDate = $lastStage
+            ? date('Y-m-d', strtotime($lastStage->end_date . ' +1 day'))
+            : $planner->start_date;
+
+        $days = $request->days ?? 0;
+        $endDate = date('Y-m-d', strtotime($startDate . ' +' . ($days - 1) . ' days'));
+
+        $stageId = DB::table('project_planner_stages')->insertGetId([
+            'project_planner_id' => $planner->id,
+            'name' => $request->name,
+            'days' => $days,
+            'color_index' => $request->color_index ?? 0,
+            'sort_order' => $maxOrder + 1,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'porcentaje' => $request->porcentaje ?? 0,
+            'tracking' => $request->has('tracking') ? json_encode($request->tracking) : null,
+            'created_at' => now(),
+            'updated_at' => now()
+        ]);
+
+        $stage = DB::table('project_planner_stages')->where('id', $stageId)->first();
+
+        return response()->json(['success' => true, 'data' => $stage]);
+    }
+
+    /**
+     * Update a stage in the project planner.
+     * PUT /api/proyectoskrsft/{projectId}/planner/stages/{stageId}
+     */
+    public function updateStage($projectId, $stageId, Request $request)
+    {
+        $stage = DB::table('project_planner_stages')->find($stageId);
+        if (!$stage) {
+            return response()->json(['success' => false, 'message' => 'Stage not found'], 404);
+        }
+
+        $update = ['updated_at' => now()];
+        if ($request->has('name')) $update['name'] = $request->name;
+        if ($request->has('days')) {
+            $update['days'] = $request->days;
+            // Recalculate end_date
+            $endDate = date('Y-m-d', strtotime($stage->start_date . ' +' . ($request->days - 1) . ' days'));
+            $update['end_date'] = $endDate;
+        }
+        if ($request->has('color_index')) $update['color_index'] = $request->color_index;
+        if ($request->has('tracking')) $update['tracking'] = is_array($request->tracking) ? json_encode($request->tracking) : $request->tracking;
+        if ($request->has('porcentaje')) $update['porcentaje'] = $request->porcentaje;
+
+        DB::table('project_planner_stages')->where('id', $stageId)->update($update);
+
+        $updated = DB::table('project_planner_stages')->where('id', $stageId)->first();
+        return response()->json(['success' => true, 'data' => $updated]);
+    }
+
+    /**
+     * Delete a stage from the project planner.
+     * DELETE /api/proyectoskrsft/{projectId}/planner/stages/{stageId}
+     */
+    public function deleteStage($projectId, $stageId)
+    {
+        $stage = DB::table('project_planner_stages')->find($stageId);
+        if (!$stage) {
+            return response()->json(['success' => false, 'message' => 'Stage not found'], 404);
+        }
+
+        DB::table('project_planner_stages')->where('id', $stageId)->delete();
+
+        // Reorder remaining stages
+        $remaining = DB::table('project_planner_stages')
+            ->where('project_planner_id', $stage->project_planner_id)
+            ->orderBy('sort_order')
+            ->get();
+
+        $order = 1;
+        foreach ($remaining as $s) {
+            DB::table('project_planner_stages')->where('id', $s->id)->update(['sort_order' => $order++]);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Reset the project planner (delete all stages and reset flags).
+     * DELETE /api/proyectoskrsft/{projectId}/planner/reset
+     */
+    public function resetPlanner($projectId)
+    {
+        $planner = DB::table('project_planners')->where('project_id', $projectId)->first();
+        if (!$planner) {
+            return response()->json(['success' => false, 'message' => 'Planner not found'], 404);
+        }
+
+        DB::table('project_planner_stages')->where('project_planner_id', $planner->id)->delete();
+
+        DB::table('project_planners')->where('id', $planner->id)->update([
+            'planning_started' => false,
+            'is_generated' => false,
+            'updated_at' => now()
+        ]);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Generate the project planner (mark as generated).
+     * POST /api/proyectoskrsft/{projectId}/planner/generate
+     */
+    public function generatePlanner($projectId)
+    {
+        $planner = DB::table('project_planners')->where('project_id', $projectId)->first();
+        if (!$planner) {
+            return response()->json(['success' => false, 'message' => 'Planner not found'], 404);
+        }
+
+        DB::table('project_planners')->where('id', $planner->id)->update([
+            'is_generated' => true,
+            'updated_at' => now()
+        ]);
+
+        $updated = DB::table('project_planners')->where('id', $planner->id)->first();
+        return response()->json(['success' => true, 'data' => $updated]);
     }
 }

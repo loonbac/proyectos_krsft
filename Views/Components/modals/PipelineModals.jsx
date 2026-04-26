@@ -25,7 +25,7 @@ import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
-import { getCurrencySymbol } from '../../utils';
+import { getCurrencySymbol, API_BASE } from '../../utils';
 
 // ── Datos geográficos Perú ───────────────────────────────────────────────
 const PERU_UBIGEO = {
@@ -93,7 +93,7 @@ export const CreateLeadModal = memo(function CreateLeadModal({
       onClose={onClose}
       title="Nuevo Proyecto — Pipeline"
       titleIcon={<PlusIcon className="size-5 text-primary" />}
-      size="lg"
+      size="xl"
       footer={
         <>
           <Button variant="danger" onClick={onClose}>Cancelar</Button>
@@ -171,7 +171,10 @@ export const CreateLeadModal = memo(function CreateLeadModal({
               className="w-full rounded-md border border-gray-300 pl-8 pr-3 py-1.5 text-xs shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
-          <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 max-h-40 overflow-y-auto border border-gray-200 rounded-md p-2">
+          <div
+            className="grid grid-cols-1 gap-1.5 rounded-md border border-gray-200 p-2 sm:grid-cols-2"
+            style={{ maxHeight: '260px', overflowY: 'auto' }}
+          >
             {workers
               .filter(w => {
                 const q = workerSearch.trim().toLowerCase();
@@ -185,13 +188,13 @@ export const CreateLeadModal = memo(function CreateLeadModal({
                 const selected = (form.team_ids || []).includes(w.id);
                 return (
                   <button key={w.id} type="button" onClick={() => toggleWorker(w.id)}
-                    className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors ${selected ? 'bg-primary-50 text-primary-800 ring-1 ring-primary-300' : 'hover:bg-gray-50 text-gray-700'}`}
+                    className={`flex items-center gap-2 rounded-md border px-2.5 py-2 text-left text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 ${selected ? 'border-primary/30 bg-primary/10 text-primary/80' : 'border-transparent text-gray-700 hover:bg-gray-50'}`}
                   >
                     <span className={`inline-flex size-5 items-center justify-center rounded-full text-[10px] font-bold text-white ${selected ? 'bg-primary' : 'bg-gray-300'}`}>
                       {selected ? <CheckIcon className="size-3" /> : w.nombre_completo?.charAt(0)?.toUpperCase()}
                     </span>
                     <span className="truncate">{w.nombre_completo}</span>
-                    <span className="text-[10px] text-gray-400 truncate ml-auto">{w.cargo}</span>
+                    <span className="ml-auto truncate text-[11px] text-gray-400">{w.cargo}</span>
                   </button>
                 );
               })
@@ -229,17 +232,22 @@ export const CommunicationModal = memo(function CommunicationModal({
     <Modal
       open={open}
       onClose={onClose}
+      showCloseButton={false}
       title="Registrar Comunicación"
-      titleIcon={<PhoneIcon className="size-5 text-blue-500" />}
+      titleIcon={<PhoneIcon className="size-5 text-blue-600" />}
       footer={
         <>
-          <Button variant="danger" onClick={onClose}>Cancelar</Button>
-          <Button variant="primary" onClick={handleSubmit} disabled={saving || !form.resumen.trim()} loading={saving}>Registrar</Button>
+          <Button variant="danger" size="sm" onClick={onClose} className="rounded-lg">Cancelar</Button>
+          <Button variant="primary" size="sm" onClick={handleSubmit} disabled={saving || !form.resumen.trim()} loading={saving} className="rounded-lg px-5">Registrar</Button>
         </>
       }
     >
       <div className="space-y-4">
-        <Select label="Tipo de comunicación" required value={form.tipo} onChange={e => setForm({ ...form, tipo: e.target.value })}
+        <Select 
+          label="Tipo de comunicación" 
+          required 
+          value={form.tipo} 
+          onChange={e => setForm({ ...form, tipo: e.target.value })}
           options={[
             { value: 'llamada', label: 'Llamada telefónica' },
             { value: 'email', label: 'Email' },
@@ -247,14 +255,34 @@ export const CommunicationModal = memo(function CommunicationModal({
             { value: 'presencial', label: 'Presencial' },
             { value: 'otro', label: 'Otro' },
           ]}
+          className="text-[13px]"
         />
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Resumen <span className="text-red-500">*</span></label>
-          <textarea rows={3} value={form.resumen} onChange={e => setForm({ ...form, resumen: e.target.value })} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary focus:ring-primary" placeholder="Describe la comunicación..." />
+          <label className="block text-[13px] font-medium text-gray-700 mb-1.5">
+            Resumen <span className="text-red-500">*</span>
+          </label>
+          <textarea 
+            rows={3} 
+            value={form.resumen} 
+            onChange={e => setForm({ ...form, resumen: e.target.value })} 
+            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[13px] text-gray-800 shadow-sm transition-all focus:border-primary focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary resize-none placeholder-gray-400" 
+            placeholder="Describe la comunicación..." 
+          />
         </div>
-        <Input label="Nombre del contacto" value={form.contacto_nombre} onChange={e => setForm({ ...form, contacto_nombre: e.target.value.replace(/[^A-Za-z\u00C0-\u00FF\s]/g, '') })} placeholder="¿Con quién hablaste?" />
-        <label className="flex items-center gap-2 text-sm text-gray-700">
-          <input type="checkbox" checked={form.contacto_exitoso} onChange={e => setForm({ ...form, contacto_exitoso: e.target.checked })} className="rounded border-gray-300 text-primary" />
+        <Input 
+          label="Nombre del contacto" 
+          value={form.contacto_nombre} 
+          onChange={e => setForm({ ...form, contacto_nombre: e.target.value.replace(/[^A-Za-z\u00C0-\u00FF\s]/g, '') })} 
+          placeholder="¿Con quién hablaste?" 
+          className="text-[13px]"
+        />
+        <label className="flex items-center gap-2 text-[13px] text-gray-700">
+          <input 
+            type="checkbox" 
+            checked={form.contacto_exitoso} 
+            onChange={e => setForm({ ...form, contacto_exitoso: e.target.checked })} 
+            className="rounded border-gray-300 text-primary focus:ring-primary" 
+          />
           Comunicación exitosa (se logró contactar al encargado)
         </label>
       </div>
@@ -267,78 +295,79 @@ export const CommunicationModal = memo(function CommunicationModal({
 export const VisitModal = memo(function VisitModal({
   open, onClose, onSubmit, leadId, workers,
 }) {
-  const [datetime, setDatetime] = useState(null);
+  const [fechaStr, setFechaStr] = useState('');
   const [fields, setFields] = useState({ direccion: '', observaciones: '', asignado_a: '' });
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = useCallback(async () => {
-    if (!datetime?.isValid()) return;
+    if (!fechaStr) return;
     setSaving(true);
     const ok = await onSubmit(leadId, {
-      fecha_programada: datetime.format('YYYY-MM-DDTHH:mm'),
+      fecha_programada: fechaStr,
       ...fields,
     });
     setSaving(false);
     if (ok) {
-      setDatetime(null);
+      setFechaStr('');
       setFields({ direccion: '', observaciones: '', asignado_a: '' });
       onClose();
     }
-  }, [datetime, fields, leadId, onSubmit, onClose]);
+  }, [fechaStr, fields, leadId, onSubmit, onClose]);
 
   return (
     <Modal
       open={open}
       onClose={onClose}
+      showCloseButton={false}
       title="Programar Visita"
-      titleIcon={<MapPinIcon className="size-5 text-purple-500" />}
+      titleIcon={<MapPinIcon className="size-5 text-indigo-600" />}
       footer={
         <>
-          <Button variant="danger" onClick={onClose}>Cancelar</Button>
-          <Button variant="primary" onClick={handleSubmit} disabled={saving || !datetime?.isValid()} loading={saving}>Programar</Button>
+          <Button variant="danger" size="sm" onClick={onClose} className="rounded-lg">Cancelar</Button>
+          <Button variant="primary" size="sm" onClick={handleSubmit} disabled={saving || !fechaStr} loading={saving} className="rounded-lg px-5">Programar</Button>
         </>
       }
     >
       <div className="space-y-4">
-        <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
-          <DateTimePicker
-            label="Fecha y hora programada"
-            value={datetime}
-            onChange={(newValue) => setDatetime(newValue)}
-            views={['year', 'month', 'day', 'hours', 'minutes']}
-            slotProps={{
-              textField: {
-                fullWidth: true,
-                size: 'small',
-                required: true,
-              },
-            }}
-            sx={{
-              width: '100%',
-              '& .MuiOutlinedInput-root': {
-                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#0AA4A4' },
-              },
-              '& .MuiInputLabel-root.Mui-focused': { color: '#0AA4A4' },
-              '& .MuiPickersDay-root.Mui-selected': {
-                backgroundColor: '#0AA4A4',
-                '&:hover': { backgroundColor: '#08C6B6' },
-              },
-              '& .MuiClock-pin, & .MuiClockPointer-root': { backgroundColor: '#0AA4A4' },
-              '& .MuiClockPointer-thumb': { borderColor: '#0AA4A4' },
-              '& .MuiMultiSectionDigitalClockSection-item.Mui-selected': {
-                backgroundColor: '#0AA4A4',
-              },
-            }}
+        <div>
+          <label className="block text-[13px] font-medium text-gray-700 mb-1.5">
+            Fecha y hora programada <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="datetime-local"
+            required
+            value={fechaStr}
+            onChange={(e) => setFechaStr(e.target.value)}
+            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[13px] text-gray-800 shadow-sm transition-all focus:border-primary focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-60 hover:[&::-webkit-calendar-picker-indicator]:opacity-100"
           />
-        </LocalizationProvider>
-        <Input label="Dirección" value={fields.direccion} onChange={e => setFields(f => ({ ...f, direccion: e.target.value }))} placeholder="Dirección de la visita" />
-        <Select label="Asignar a" value={fields.asignado_a} onChange={e => setFields(f => ({ ...f, asignado_a: e.target.value }))}
+        </div>
+        
+        <Input 
+          label="Dirección" 
+          value={fields.direccion} 
+          onChange={e => setFields(f => ({ ...f, direccion: e.target.value }))} 
+          placeholder="Dirección de la visita"
+          className="text-[13px]"
+        />
+        
+        <Select 
+          label="Asignar a" 
+          value={fields.asignado_a} 
+          onChange={e => setFields(f => ({ ...f, asignado_a: e.target.value }))}
           options={workers.map(w => ({ value: w.trabajador_id ?? w.id, label: `${w.nombre_completo} — ${w.cargo}` }))}
           placeholder="Seleccionar responsable..."
+          className="text-[13px]"
         />
+        
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
-          <textarea rows={2} value={fields.observaciones} onChange={e => setFields(f => ({ ...f, observaciones: e.target.value }))} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary focus:ring-primary" placeholder="Notas sobre la visita..." />
+          <label className="block text-[13px] font-medium text-gray-700 mb-1.5">Observaciones</label>
+          <textarea 
+            rows={2} 
+            value={fields.observaciones} 
+            onChange={e => setFields(f => ({ ...f, observaciones: e.target.value }))} 
+            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-[13px] text-gray-800 shadow-sm transition-all focus:border-primary focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary resize-none placeholder-gray-400" 
+            placeholder="Notas sobre la visita..." 
+          />
         </div>
       </div>
     </Modal>
@@ -373,39 +402,66 @@ export const BudgetModal = memo(function BudgetModal({
     <Modal
       open={open}
       onClose={onClose}
+      showCloseButton={false}
       title="Crear Presupuesto"
-      titleIcon={<CurrencyDollarIcon className="size-5 text-amber-500" />}
+      titleIcon={<CurrencyDollarIcon className="size-5 text-amber-600" />}
       footer={
         <>
-          <Button variant="danger" onClick={onClose}>Cancelar</Button>
-          <Button variant="primary" onClick={handleSubmit} disabled={saving || montoBase <= 0} loading={saving}>Crear Presupuesto</Button>
+          <Button variant="danger" size="sm" onClick={onClose} className="rounded-lg">Cancelar</Button>
+          <Button variant="primary" size="sm" onClick={handleSubmit} disabled={saving || montoBase <= 0} loading={saving} className="rounded-lg px-5">Crear Presupuesto</Button>
         </>
       }
     >
       <div className="space-y-4">
-        <Input label={`Monto base (${getCurrencySymbol(currency)})`} required inputMode="decimal" value={form.monto_base} onChange={e => setForm({ ...form, monto_base: e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1') })} placeholder="0.00" />
+        <Input 
+          label={`Monto base (${getCurrencySymbol(currency)})`} 
+          required 
+          inputMode="decimal" 
+          value={form.monto_base} 
+          onChange={e => setForm({ ...form, monto_base: e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1') })} 
+          placeholder="0.00" 
+          className="text-[13px]"
+        />
         <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input type="checkbox" checked={form.igv_incluido} onChange={e => setForm({ ...form, igv_incluido: e.target.checked })} className="rounded border-gray-300 text-primary" />
+          <label className="flex items-center gap-2 text-[13px] text-gray-700">
+            <input 
+              type="checkbox" 
+              checked={form.igv_incluido} 
+              onChange={e => setForm({ ...form, igv_incluido: e.target.checked })} 
+              className="rounded border-gray-300 text-primary focus:ring-primary" 
+            />
             Incluir IGV
           </label>
           {form.igv_incluido && (
-            <div className="flex items-center gap-1 text-sm">
+            <div className="flex items-center gap-1 text-[13px]">
               <span className="text-gray-500">Tasa:</span>
-              <input type="number" min="0" max="100" value={form.igv_rate} onChange={e => { const v = Math.min(100, Math.max(0, parseInt(e.target.value) || 0)); setForm({ ...form, igv_rate: v }); }} className="w-16 rounded border border-gray-300 px-2 py-1 text-sm shadow-sm" />
+              <input 
+                type="number" 
+                min="0" 
+                max="100" 
+                value={form.igv_rate} 
+                onChange={e => { const v = Math.min(100, Math.max(0, parseInt(e.target.value) || 0)); setForm({ ...form, igv_rate: v }); }} 
+                className="w-16 rounded-md border border-gray-300 px-2 py-1 text-[13px] shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" 
+              />
               <span className="text-gray-500">%</span>
             </div>
           )}
         </div>
         {montoBase > 0 && (
-          <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-sm">
+          <div className="rounded-lg bg-amber-50/50 border border-amber-200/50 p-3 text-[13px]">
             <span className="text-amber-700">Monto total: </span>
             <span className="font-mono font-bold text-amber-900">{getCurrencySymbol(currency)} {montoTotal.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
         )}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Detalle / Alcance</label>
-          <textarea rows={3} value={form.detalle} onChange={e => setForm({ ...form, detalle: e.target.value })} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary focus:ring-primary" placeholder="Descripción del alcance del presupuesto..." />
+          <label className="block text-[13px] font-medium text-gray-700 mb-1.5">Detalle / Alcance</label>
+          <textarea 
+            rows={3} 
+            value={form.detalle} 
+            onChange={e => setForm({ ...form, detalle: e.target.value })} 
+            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[13px] text-gray-800 shadow-sm transition-all focus:border-primary focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary resize-none placeholder-gray-400" 
+            placeholder="Descripción del alcance del presupuesto..." 
+          />
         </div>
       </div>
     </Modal>
@@ -437,17 +493,22 @@ export const NegotiationModal = memo(function NegotiationModal({
     <Modal
       open={open}
       onClose={onClose}
+      showCloseButton={false}
       title="Registrar Negociación"
-      titleIcon={<ChatBubbleLeftRightIcon className="size-5 text-cyan-500" />}
+      titleIcon={<ChatBubbleLeftRightIcon className="size-5 text-cyan-600" />}
       footer={
         <>
-          <Button variant="danger" onClick={onClose}>Cancelar</Button>
-          <Button variant="primary" onClick={handleSubmit} disabled={saving || !form.nota.trim()} loading={saving}>Registrar</Button>
+          <Button variant="danger" size="sm" onClick={onClose} className="rounded-lg">Cancelar</Button>
+          <Button variant="primary" size="sm" onClick={handleSubmit} disabled={saving || !form.nota.trim()} loading={saving} className="rounded-lg px-5">Registrar</Button>
         </>
       }
     >
       <div className="space-y-4">
-        <Select label="Tipo de registro" required value={form.tipo} onChange={e => setForm({ ...form, tipo: e.target.value })}
+        <Select 
+          label="Tipo de registro" 
+          required 
+          value={form.tipo} 
+          onChange={e => setForm({ ...form, tipo: e.target.value })}
           options={[
             { value: 'observacion', label: 'Observación' },
             { value: 'contraoferta', label: 'Contraoferta del cliente' },
@@ -455,13 +516,27 @@ export const NegotiationModal = memo(function NegotiationModal({
             { value: 'rechazo', label: 'Rechazo / Objeción' },
             { value: 'otro', label: 'Otro' },
           ]}
+          className="text-[13px]"
         />
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Nota <span className="text-red-500">*</span></label>
-          <textarea rows={3} value={form.nota} onChange={e => setForm({ ...form, nota: e.target.value })} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary focus:ring-primary" placeholder="Detalles de la negociación..." />
+          <label className="block text-[13px] font-medium text-gray-700 mb-1.5">Nota / Detalle <span className="text-red-500">*</span></label>
+          <textarea 
+            rows={3} 
+            value={form.nota} 
+            onChange={e => setForm({ ...form, nota: e.target.value })} 
+            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[13px] text-gray-800 shadow-sm transition-all focus:border-primary focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary resize-none placeholder-gray-400" 
+            placeholder="Detalles de la negociación..." 
+          />
         </div>
         {(form.tipo === 'contraoferta' || form.tipo === 'acuerdo') && (
-          <Input label={`Monto propuesto (${getCurrencySymbol(currency)})`} inputMode="decimal" value={form.monto_propuesto} onChange={e => setForm({ ...form, monto_propuesto: e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1') })} placeholder="0.00" />
+          <Input 
+            label={`Monto propuesto (${getCurrencySymbol(currency)})`} 
+            inputMode="decimal" 
+            value={form.monto_propuesto} 
+            onChange={e => setForm({ ...form, monto_propuesto: e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1') })} 
+            placeholder="0.00" 
+            className="text-[13px]"
+          />
         )}
       </div>
     </Modal>
@@ -523,7 +598,7 @@ export const TeamModal = memo(function TeamModal({
             const selected = selectedIds.includes(w.id);
             return (
               <button key={w.id} type="button" onClick={() => toggleWorker(w.id)}
-                className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors ${selected ? 'bg-primary-50 text-primary-800 ring-1 ring-primary-300' : 'hover:bg-gray-50 text-gray-700'}`}
+                className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors ${selected ? 'bg-primary/10 text-primary/80 ring-1 ring-primary/30' : 'hover:bg-gray-50 text-gray-700'}`}
               >
                 <span className={`inline-flex size-5 items-center justify-center rounded-full text-[10px] font-bold text-white ${selected ? 'bg-primary' : 'bg-gray-300'}`}>
                   {selected ? <CheckIcon className="size-3" /> : w.nombre_completo?.charAt(0)?.toUpperCase()}
@@ -558,6 +633,13 @@ export const CreateProjectFromLeadModal = memo(function CreateProjectFromLeadMod
   const [pdrDropdownOpen, setPdrDropdownOpen] = useState(false);
   const pdrComboRef = useRef(null);
 
+  // Enroll states
+  const [enrollMode, setEnrollMode] = useState('new'); // 'new' | 'existing'
+  const [validCecos, setValidCecos] = useState([]);
+  const [loadingCecos, setLoadingCecos] = useState(false);
+  const [cecosError, setCecosError] = useState(null);
+  const [selectedExistingCecoId, setSelectedExistingCecoId] = useState('');
+
   useEffect(() => {
     if (open) {
       setForm({ abbreviation: '', ceco_id: '', supervisor_id: '', supervisor_pdr_id: '' });
@@ -565,6 +647,15 @@ export const CreateProjectFromLeadModal = memo(function CreateProjectFromLeadMod
       setDropdownOpen(false);
       setPdrSearch('');
       setPdrDropdownOpen(false);
+      setEnrollMode('new');
+      setValidCecos([]);
+      setCecosError(null);
+      setSelectedExistingCecoId('');
+      setLoadingCecos(false);
+      // Fetch valid CECOs if lead has cliente_empresa
+      if (lead?.cliente_empresa?.trim()) {
+        fetchValidCecos(lead.id);
+      }
     }
   }, [open]);
 
@@ -580,6 +671,33 @@ export const CreateProjectFromLeadModal = memo(function CreateProjectFromLeadMod
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Fetch valid CECOs for existing enrollment
+  const fetchValidCecos = useCallback(async (leadId) => {
+    setLoadingCecos(true);
+    setCecosError(null);
+    try {
+      const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+      const res = await fetch(`${API_BASE}/pipeline/${leadId}/valid-cecos`, {
+        headers: {
+          Accept: 'application/json',
+          'X-CSRF-TOKEN': token,
+        },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setValidCecos(data.data || []);
+      } else {
+        setCecosError(data.message || 'Error al cargar CECOs válidos');
+        setValidCecos([]);
+      }
+    } catch {
+      setCecosError('Error de red al buscar CECOs');
+      setValidCecos([]);
+    } finally {
+      setLoadingCecos(false);
+    }
   }, []);
 
   const selectedWorker = workers.find(w => w.id === form.supervisor_id) || null;
@@ -628,15 +746,28 @@ export const CreateProjectFromLeadModal = memo(function CreateProjectFromLeadMod
       alert('La abreviatura es requerida');
       return;
     }
-    if (!form.ceco_id) {
-      alert('Debes seleccionar un CECO');
-      return;
+    if (enrollMode === 'new') {
+      if (!form.ceco_id) {
+        alert('Debes seleccionar un CECO');
+        return;
+      }
+    } else {
+      if (!selectedExistingCecoId) {
+        alert('Debes seleccionar un CECO existente');
+        return;
+      }
     }
     if (!form.supervisor_id) {
       alert('Debes seleccionar un supervisor');
       return;
     }
-    onCreate(lead.id, form);
+    // Build payload based on enroll mode
+    if (enrollMode === 'existing') {
+      const { ceco_id, ...formWithoutCeco } = form;
+      onCreate(lead.id, { ...formWithoutCeco, enroll_existing_ceco_id: selectedExistingCecoId });
+    } else {
+      onCreate(lead.id, form);
+    }
   };
 
   if (!lead) return null;
@@ -659,7 +790,7 @@ export const CreateProjectFromLeadModal = memo(function CreateProjectFromLeadMod
           <Button
             variant="primary"
             onClick={handleCreate}
-            disabled={saving || !form.abbreviation.trim() || !form.ceco_id || !form.supervisor_id}
+            disabled={saving || !form.abbreviation.trim() || (enrollMode === 'new' ? !form.ceco_id : !selectedExistingCecoId) || !form.supervisor_id}
             loading={saving}
           >
             {saving ? 'Creando...' : 'Proyecto a ejecutar'}
@@ -811,27 +942,108 @@ export const CreateProjectFromLeadModal = memo(function CreateProjectFromLeadMod
           )}
         </div>
 
-        {/* CECO - select con jerarquía */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Columna de CECO dependiente <span className="text-red-500">*</span>
-          </label>
-          <select
-            value={form.ceco_id || ''}
-            onChange={e => setForm({ ...form, ceco_id: parseInt(e.target.value) || '' })}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary focus:ring-primary"
-          >
-            <option value="">Selecciona un CECO...</option>
-            {(cecos || []).map(ceco => (
-              <option
-                key={ceco.id}
-                value={ceco.id}
-              >
-                {ceco.codigo} – {ceco.nombre}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* Enroll mode toggle + Existing CECO selector — only if validCecos available */}
+        {validCecos.length > 0 && (
+          <div>
+            {/* Toggle buttons */}
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Tipo de enrolamiento
+              </label>
+              <div className="inline-flex rounded-sm border border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setEnrollMode('new')}
+                  className={`rounded-s-sm px-3 py-1.5 text-sm font-medium transition-colors focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                    enrollMode === 'new'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  Crear CECO Nuevo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEnrollMode('existing')}
+                  className={`-ms-px rounded-e-sm border-l border-gray-200 px-3 py-1.5 text-sm font-medium transition-colors focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                    enrollMode === 'existing'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  Usar CECO Existente
+                </button>
+              </div>
+            </div>
+
+            {/* Existing CECO dropdown */}
+            {enrollMode === 'existing' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  CECO Existente <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedExistingCecoId}
+                  onChange={e => setSelectedExistingCecoId(parseInt(e.target.value) || '')}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary focus:ring-primary"
+                >
+                  <option value="">Selecciona un CECO...</option>
+                  {validCecos.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.codigo} – {c.nombre}{c.razon_social ? ` (${c.razon_social})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Loading CECOs */}
+        {loadingCecos && (
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <div className="size-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600"></div>
+            <span>Buscando CECOs disponibles...</span>
+          </div>
+        )}
+
+        {/* CECOs error */}
+        {cecosError && (
+          <div className="rounded-sm bg-red-50 p-3 text-sm text-red-700">
+            <p>{cecosError}</p>
+          </div>
+        )}
+
+        {/* Empty state — no valid CECOs for this company */}
+        {!loadingCecos && !cecosError && validCecos.length === 0 && lead?.cliente_empresa?.trim() && (
+          <p className="text-sm text-gray-500 italic">
+            No se encontraron CECOs válidos para esta empresa. Se creará un CECO nuevo automáticamente.
+          </p>
+        )}
+
+        {/* CECO - select con jerarquía (solo modo 'new' y si no hay selección automática) */}
+        {enrollMode === 'new' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Columna de CECO dependiente <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={form.ceco_id || ''}
+              onChange={e => setForm({ ...form, ceco_id: parseInt(e.target.value) || '' })}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary focus:ring-primary"
+            >
+              <option value="">Selecciona un CECO...</option>
+              {(cecos || []).map(ceco => (
+                <option
+                  key={ceco.id}
+                  value={ceco.id}
+                >
+                  {ceco.codigo} – {ceco.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
     </Modal>
   );

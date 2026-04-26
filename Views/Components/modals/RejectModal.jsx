@@ -39,7 +39,7 @@ function RejectModal({
                     autoFocus
                     value={notes}
                     onChange={(e) => onNotesChange(e.target.value)}
-                    className="w-full resize-none rounded-lg border border-gray-300 p-2 text-sm text-gray-900 focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                    className="w-full resize-none rounded-lg border border-gray-300 p-2 text-sm text-gray-900 focus:border-primary/50 focus:ring-1 focus:ring-primary/50"
                     rows={3}
                     placeholder="Escriba aquí sus observaciones..."
                     disabled={processing}

@@ -2,8 +2,9 @@ import clsx from 'clsx';
 
 /* ── Mapas de estilos HyperUI ── */
 const SOLID = {
-    primary:  'bg-primary-50 text-primary-700',
+    primary:  'bg-primary/10 text-primary/80',
     blue:     'bg-blue-100 text-blue-700',
+    orange:   'bg-orange-100 text-orange-700',
     purple:   'bg-purple-100 text-purple-700',
     green:    'bg-green-100 text-green-700',
     gray:     'bg-gray-100 text-gray-700',
@@ -18,8 +19,9 @@ const SOLID = {
 };
 
 const BORDER = {
-    primary:  'border border-primary text-primary-700',
+    primary:  'border border-primary/50 text-primary/80',
     blue:     'border border-blue-500 text-blue-700',
+    orange:   'border border-orange-500 text-orange-700',
     purple:   'border border-purple-500 text-purple-700',
     green:    'border border-green-500 text-green-700',
     gray:     'border border-gray-500 text-gray-700',
@@ -36,6 +38,7 @@ const BORDER = {
 const DOT = {
     primary:  'bg-primary',
     blue:     'bg-blue-500',
+    orange:   'bg-orange-500',
     purple:   'bg-purple-500',
     green:    'bg-green-500',
     gray:     'bg-gray-500',

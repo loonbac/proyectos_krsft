@@ -4,10 +4,14 @@ import {
   ChartBarIcon,
   CurrencyDollarIcon,
   CreditCardIcon,
+  DocumentDuplicateIcon,
   DocumentTextIcon,
   FunnelIcon,
   RocketLaunchIcon,
   ArrowLeftIcon,
+  UserGroupIcon,
+  ClipboardDocumentListIcon,
+  CalendarIcon,
 } from '@heroicons/react/24/outline';
 
 import useProyectosData from './hooks/useProyectosData';
@@ -51,6 +55,8 @@ import ArrivalReportDetailModal from './Components/modals/ArrivalReportDetailMod
 import RecuentoSobrantesPanel from './Components/RecuentoSobrantesPanel';
 import AdminRecuentoPanel from './Components/AdminRecuentoPanel';
 import ArrivalReportsSection from './Components/ArrivalReportsSection';
+import PlannerSection from './Components/PlannerSection';
+import LeadFilesSection from './Components/LeadFilesSection';
 
 /* ============================================
    ORCHESTRATOR — Proyectos Module
@@ -81,6 +87,7 @@ export default function ProyectosIndex({ permissions, trabajadorId }) {
 
   // Navigation: 'pipeline' | 'projects' | 'project-detail' | 'lead-detail' | 'empty'
   const [activeTab, setActiveTab] = useState(getInitialTab);
+  const [projectDetailTab, setProjectDetailTab] = useState('materials-services');
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [loadingProjectDetail, setLoadingProjectDetail] = useState(false);
 
@@ -90,10 +97,11 @@ export default function ProyectosIndex({ permissions, trabajadorId }) {
   const selectProject = async (p) => {
     setLoadingProjectDetail(true);
     setActiveTab('project-detail');
+    setProjectDetailTab('materials-services');
     await d.selectProject(p);
     setLoadingProjectDetail(false);
   };
-  const backFromDetail = () => { d.setSelectedProject(null); setActiveTab('projects'); };
+  const backFromDetail = () => { d.setSelectedProject(null); setActiveTab('projects'); setProjectDetailTab('materials-services'); };
   const selectLead = (lead) => { pipe.setSelectedLead(lead); setActiveTab('lead-detail'); };
   const backFromLead = () => { pipe.setSelectedLead(null); setActiveTab('pipeline'); };
 
@@ -107,12 +115,19 @@ export default function ProyectosIndex({ permissions, trabajadorId }) {
     }
   }, [activeTab, d.selectedProject, pipe.selectedLead, loadingProjectDetail]);
 
+  // ── Load planner when project changes ──
+  useEffect(() => {
+    if (d.selectedProject) {
+      d.loadProjectPlanner(d.selectedProject.id);
+    }
+  }, [d.selectedProject]);
+
   // ── Render view ──
   const renderView = () => {
     // ─── Empty: solo tiene access ───
     if (activeTab === 'empty') {
       return (
-        <div className="rounded-lg border-2 border-gray-200 bg-white p-12 text-center shadow-sm">
+        <div className="flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-white p-12 text-center shadow-sm">
           <FolderIcon className="mx-auto size-16 text-gray-300" />
           <h3 className="mt-4 text-lg font-semibold text-gray-900">Bienvenido al modulo de Proyectos</h3>
           <p className="mt-2 text-sm text-gray-500">
@@ -169,7 +184,7 @@ export default function ProyectosIndex({ permissions, trabajadorId }) {
       const showAdminApproval = permissions.approve_surplus && d.selectedProject.status === 'pendiente_recuento' && d.completionRequest?.status === 'pending';
 
       return (
-        <div className="space-y-6">
+        <div className="flex flex-col gap-6">
           <DetailHeader
             project={d.selectedProject}
             onBack={backFromDetail}
@@ -202,80 +217,178 @@ export default function ProyectosIndex({ permissions, trabajadorId }) {
               projectName={d.selectedProject?.name || ''}
             />
           )}
-          {!isProjectReadOnly && (
-            <MaterialForm
-              materialForm={d.materialForm}
-              onFormChange={d.setMaterialForm}
-              nextItemNumber={d.nextItemNumber}
-              savingOrder={d.savingOrder}
-              onCreateOrder={d.createOrder}
-              importingFile={d.importingFile}
-              onDownloadTemplate={d.downloadTemplate}
-              onImportExcel={d.importExcel}
-            />
-          )}
-          <OrdersSection
-            ordersGroupedByFile={d.ordersGroupedByFile}
-            expandedFiles={d.expandedFiles}
-            selectedProject={d.selectedProject}
-            canApprove={permissions.approve}
-            readOnly={isProjectReadOnly}
-            onToggleFile={d.toggleFileSection}
-            onApproveAll={d.approveAllInGroup}
-            onApproveSelected={d.approveSelectedInGroup}
-            onApproveMaterial={d.approveMaterial}
-            onRejectMaterial={d.rejectMaterial}
-            isOrderSelected={d.isOrderSelected}
-            toggleOrderSelection={d.toggleOrderSelection}
-            getSelectedCount={d.getSelectedCount}
-            getGroupKey={d.getGroupKey}
-            getGroupDraftOrders={d.getGroupDraftOrders}
-            onMarkArrived={d.markMaterialArrived}
-            onMarkNotArrived={d.markMaterialNotArrived}
-          />
-          <ArrivalReportsSection
-            arrivalReports={d.arrivalReports}
-            purchasedNotArrivedOrders={d.purchasedNotArrivedOrders}
-            onOpenCreate={() => d.setShowCreateArrivalReportModal(true)}
-            onOpenDetail={d.openArrivalReportDetail}
-          />
-          {!isProjectReadOnly && (
-            <ServiceForm
-              serviceForm={d.serviceForm}
-              onFormChange={d.setServiceForm}
-              savingService={d.savingService}
-              onCreateService={d.createService}
-            />
-          )}
-          <ServicesSection
-            serviceOrders={d.serviceOrders}
-            selectedServices={d.selectedServices}
-            canApprove={permissions.approve}
-            readOnly={isProjectReadOnly}
-            onApproveAll={() => d.approveServicesBulk(d.serviceOrders.filter(o => o.status === 'draft').map(o => o.id), 'Aprobar todos los servicios')}
-            onApproveSelected={() => d.approveServicesBulk(d.selectedServices, 'Aprobar servicios seleccionados')}
-            onApproveService={d.approveService}
-            onRejectService={d.rejectService}
-            isServiceSelected={d.isServiceSelected}
-            toggleServiceSelection={d.toggleServiceSelection}
-            getSelectedServiceCount={d.getSelectedServiceCount}
-          />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <WorkersSection
-              projectWorkers={d.projectWorkers}
-              readOnly
-            />
-            {permissions.field_workers && (
-              <FieldWorkersSection
-                projectFieldWorkers={d.projectFieldWorkers}
-                availableFieldWorkersFiltered={d.availableFieldWorkersFiltered}
-                selectedFieldWorkerId={d.selectedFieldWorkerId}
-                onWorkerChange={v => d.setSelectedFieldWorkerId(v)}
-                onAdd={d.addFieldWorkerToProject}
-                onRemove={d.removeFieldWorkerFromProject}
-              />
-            )}
+
+          <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-1.5">
+            <div role="tablist" className="flex flex-wrap gap-1.5">
+              <button
+                role="tab"
+                aria-selected={projectDetailTab === 'materials-services'}
+                onClick={() => setProjectDetailTab('materials-services')}
+                className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
+                  projectDetailTab === 'materials-services'
+                    ? 'border-primary/20 bg-white text-primary shadow-sm'
+                    : 'border-transparent bg-transparent text-gray-600 hover:border-gray-200 hover:bg-white/70 hover:text-gray-700'
+                }`}
+              >
+                <ClipboardDocumentListIcon className="size-4" />
+                MATERIALES Y SERVICIOS
+              </button>
+              <button
+                role="tab"
+                aria-selected={projectDetailTab === 'workers-supervisors'}
+                onClick={() => setProjectDetailTab('workers-supervisors')}
+                className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
+                  projectDetailTab === 'workers-supervisors'
+                    ? 'border-primary/20 bg-white text-primary shadow-sm'
+                    : 'border-transparent bg-transparent text-gray-600 hover:border-gray-200 hover:bg-white/70 hover:text-gray-700'
+                }`}
+              >
+                <UserGroupIcon className="size-4" />
+                TRABAJADORES Y SUPERVISORES
+              </button>
+              <button
+                role="tab"
+                aria-selected={projectDetailTab === 'project-files'}
+                onClick={() => setProjectDetailTab('project-files')}
+                className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
+                  projectDetailTab === 'project-files'
+                    ? 'border-primary/20 bg-white text-primary shadow-sm'
+                    : 'border-transparent bg-transparent text-gray-600 hover:border-gray-200 hover:bg-white/70 hover:text-gray-700'
+                }`}
+              >
+                <DocumentTextIcon className="size-4" />
+                ARCHIVOS DEL PROYECTO
+              </button>
+              <button
+                role="tab"
+                aria-selected={projectDetailTab === 'planner'}
+                onClick={() => setProjectDetailTab('planner')}
+                className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
+                  projectDetailTab === 'planner'
+                    ? 'border-primary/20 bg-white text-primary shadow-sm'
+                    : 'border-transparent bg-transparent text-gray-600 hover:border-gray-200 hover:bg-white/70 hover:text-gray-700'
+                }`}
+              >
+                <CalendarIcon className="size-4" />
+                PLANIFICADOR
+              </button>
+            </div>
           </div>
+
+          {projectDetailTab === 'materials-services' && (
+            <div className="flex flex-col gap-6 pt-1">
+              {!isProjectReadOnly && (
+                <MaterialForm
+                  materialForm={d.materialForm}
+                  onFormChange={d.setMaterialForm}
+                  nextItemNumber={d.nextItemNumber}
+                  savingOrder={d.savingOrder}
+                  onCreateOrder={d.createOrder}
+                  importingFile={d.importingFile}
+                  onDownloadTemplate={d.downloadTemplate}
+                  onImportExcel={d.importExcel}
+                  lastImportMetadata={d.showImportPreview ? d.importPreviewMetadata : null}
+                />
+              )}
+              <OrdersSection
+                ordersGroupedByFile={d.ordersGroupedByFile}
+                expandedFiles={d.expandedFiles}
+                selectedProject={d.selectedProject}
+                canApprove={permissions.approve}
+                readOnly={isProjectReadOnly}
+                onToggleFile={d.toggleFileSection}
+                onApproveAll={d.approveAllInGroup}
+                onApproveSelected={d.approveSelectedInGroup}
+                onExportMaterials={() => d.exportMaterialsXlsx(d.selectedProject?.id)}
+                onApproveMaterial={d.approveMaterial}
+                onRejectMaterial={d.rejectMaterial}
+                isOrderSelected={d.isOrderSelected}
+                toggleOrderSelection={d.toggleOrderSelection}
+                getSelectedCount={d.getSelectedCount}
+                getGroupKey={d.getGroupKey}
+                getGroupDraftOrders={d.getGroupDraftOrders}
+                onMarkArrived={d.markMaterialArrived}
+                onMarkNotArrived={d.markMaterialNotArrived}
+              />
+              <ArrivalReportsSection
+                arrivalReports={d.arrivalReports}
+                purchasedNotArrivedOrders={d.purchasedNotArrivedOrders}
+                onOpenCreate={() => d.setShowCreateArrivalReportModal(true)}
+                onOpenDetail={d.openArrivalReportDetail}
+              />
+              {!isProjectReadOnly && (
+                <ServiceForm
+                  serviceForm={d.serviceForm}
+                  onFormChange={d.setServiceForm}
+                  savingService={d.savingService}
+                  onCreateService={d.createService}
+                />
+              )}
+              <ServicesSection
+                serviceOrders={d.serviceOrders}
+                selectedServices={d.selectedServices}
+                canApprove={permissions.approve}
+                readOnly={isProjectReadOnly}
+                onApproveAll={() => d.approveServicesBulk(d.serviceOrders.filter(o => o.status === 'draft').map(o => o.id), 'Aprobar todos los servicios')}
+                onApproveSelected={() => d.approveServicesBulk(d.selectedServices, 'Aprobar servicios seleccionados')}
+                onApproveService={d.approveService}
+                onRejectService={d.rejectService}
+                isServiceSelected={d.isServiceSelected}
+                toggleServiceSelection={d.toggleServiceSelection}
+                getSelectedServiceCount={d.getSelectedServiceCount}
+              />
+            </div>
+          )}
+
+          {projectDetailTab === 'workers-supervisors' && (
+            <div className="grid grid-cols-1 items-start gap-5 pt-1 md:grid-cols-2">
+              <WorkersSection
+                projectWorkers={d.projectWorkers}
+                availableWorkersFiltered={d.availableWorkersFiltered}
+                selectedWorkerId={d.selectedWorkerId}
+                onWorkerChange={d.setSelectedWorkerId}
+                onAdd={d.addWorkerToProject}
+                onRemove={d.removeWorkerFromProject}
+                readOnly={isProjectReadOnly}
+              />
+              {permissions.field_workers && (
+                <FieldWorkersSection
+                  projectFieldWorkers={d.projectFieldWorkers}
+                  availableFieldWorkersFiltered={d.availableFieldWorkersFiltered}
+                  selectedFieldWorkerId={d.selectedFieldWorkerId}
+                  onWorkerChange={v => d.setSelectedFieldWorkerId(v)}
+                  onAdd={d.addFieldWorkerToProject}
+                  onRemove={d.removeFieldWorkerFromProject}
+                  readOnly={isProjectReadOnly}
+                />
+              )}
+            </div>
+          )}
+
+          {projectDetailTab === 'project-files' && (
+            <div className="pt-2">
+              <LeadFilesSection
+                files={d.projectFiles}
+                onUpload={(files, cat) => d.uploadProjectFiles(d.selectedProject?.pipeline_id, files, cat)}
+                onDelete={d.deleteProjectFile}
+                getDownloadUrl={d.getProjectFileDownloadUrl}
+                readOnly={isProjectReadOnly}
+              />
+            </div>
+          )}
+
+          {projectDetailTab === 'planner' && (
+            <PlannerSection
+              key={d.selectedProject.id}
+              project={d.selectedProject}
+              initialPlanner={d.plannerData}
+              initialStages={d.plannerStages}
+              onSavePlanner={(data) => d.saveProjectPlanner(d.selectedProject.id, data)}
+              onAddStage={(data) => d.addProjectStage(d.selectedProject.id, data)}
+              onUpdateStage={(stageId, data) => d.updateProjectStage(d.selectedProject.id, stageId, data)}
+              onRemoveStage={(stageId) => d.deleteProjectStage(d.selectedProject.id, stageId)}
+            />
+          )}
         </div>
       );
     }
@@ -296,12 +409,13 @@ export default function ProyectosIndex({ permissions, trabajadorId }) {
 
     // ─── Projects List ───
     return (
-      <div className="space-y-5">
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatsCard title="Total" value={d.stats.total_projects} icon={<FolderIcon className="size-8" />} iconBg="bg-amber-100" iconColor="text-amber-600" />
-          <StatsCard title="Activos" value={d.stats.active_projects} icon={<ChartBarIcon className="size-8" />} iconBg="bg-emerald-100" iconColor="text-emerald-600" />
-          <StatsCard title="Presupuesto" value={`S/ ${formatNumber(d.stats.total_budget)}`} icon={<CurrencyDollarIcon className="size-8" />} iconBg="bg-blue-100" iconColor="text-blue-600" />
-          <StatsCard title="Gastado" value={`S/ ${formatNumber(d.stats.total_spent)}`} icon={<CreditCardIcon className="size-8" />} iconBg="bg-purple-100" iconColor="text-purple-600" />
+      <div className="flex flex-col gap-6">
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <StatsCard title="Total" value={d.stats.total_projects} icon={<FolderIcon className="size-5" />} iconBg="bg-amber-100" iconColor="text-amber-600" />
+          <StatsCard title="Activos" value={d.stats.active_projects} icon={<ChartBarIcon className="size-5" />} iconBg="bg-emerald-100" iconColor="text-emerald-600" />
+          <StatsCard title="Presupuesto" value={`S/ ${formatNumber(d.stats.total_budget)}`} icon={<CurrencyDollarIcon className="size-5" />} iconBg="bg-blue-100" iconColor="text-blue-600" />
+          <StatsCard title="Gastado" value={`S/ ${formatNumber(d.stats.total_spent)}`} icon={<CreditCardIcon className="size-5" />} iconBg="bg-cyan-100" iconColor="text-cyan-700" />
+          <StatsCard title="Presupuestado" value={`S/ ${formatNumber(d.stats.total_budgeted || 0)}`} icon={<DocumentDuplicateIcon className="size-5" />} iconBg="bg-indigo-100" iconColor="text-indigo-600" />
         </section>
 
         <FilterBar
@@ -328,7 +442,7 @@ export default function ProyectosIndex({ permissions, trabajadorId }) {
             <p className="mt-4 text-sm text-gray-500">Cargando proyectos...</p>
           </div>
         ) : d.filteredProjects.length === 0 ? (
-          <div className="rounded-lg border-2 border-gray-200 bg-white p-12 text-center shadow-sm">
+          <div className="flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-white p-12 text-center shadow-sm">
             <DocumentTextIcon className="mx-auto size-16 text-gray-300" />
             <h3 className="mt-4 text-lg font-semibold text-gray-900">
               {!permissions.started_projects_total ? 'No tienes proyectos asignados' : 'No hay proyectos iniciados'}
@@ -340,7 +454,7 @@ export default function ProyectosIndex({ permissions, trabajadorId }) {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {d.filteredProjects.map(p => (
               <ProjectCard key={p.id} project={p} onSelect={selectProject} />
             ))}
@@ -352,18 +466,18 @@ export default function ProyectosIndex({ permissions, trabajadorId }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="w-full px-12 py-4">
+      <div className="w-full px-12 py-8">
         {/* ── Page Header ── (oculto en vistas de detalle) */}
         {activeTab !== 'project-detail' && activeTab !== 'lead-detail' && (
-          <header className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-4 mb-6">
+          <header className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-6">
             <div className="flex items-center gap-4">
               <Button variant="primary" size="md" onClick={d.goBack} className="gap-2">
                 <ArrowLeftIcon className="size-4" />
                 Volver
               </Button>
-              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-                <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
-                  <FolderIcon className="size-7" />
+              <h1 className="flex items-center gap-3 text-2xl font-bold text-gray-900">
+                <span className="flex size-11 items-center justify-center rounded-xl bg-primary text-white">
+                  <FolderIcon className="size-6" />
                 </span>
                 GESTIÓN DE PROYECTOS
               </h1>
@@ -373,15 +487,16 @@ export default function ProyectosIndex({ permissions, trabajadorId }) {
 
         {/* ── Tabs (solo si el usuario tiene ambas secciones, y solo en vistas principales) ── */}
         {hasBothTabs && (activeTab === 'pipeline' || activeTab === 'projects') && (
-          <div className="border-b border-gray-200 mb-6">
-            <div role="tablist" className="flex gap-1">
+          <div className="mb-6 border-b border-gray-200">
+            <div role="tablist" className="flex min-w-max gap-6" aria-label="Secciones">
               <button
                 role="tab"
                 aria-selected={activeTab === 'pipeline'}
                 onClick={goToPipeline}
-                className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === 'pipeline'
+                className={`inline-flex items-center gap-2 px-1 py-3 text-xs font-semibold tracking-wide transition-colors border-b-2 -mb-[1px] whitespace-nowrap ${
+                  activeTab === 'pipeline'
                   ? 'border-primary text-primary'
-                  : 'border-transparent text-gray-600 hover:text-gray-700 hover:border-gray-300'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}
               >
                 <FunnelIcon className="size-4" />
@@ -396,9 +511,10 @@ export default function ProyectosIndex({ permissions, trabajadorId }) {
                 role="tab"
                 aria-selected={activeTab === 'projects'}
                 onClick={goToProjects}
-                className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === 'projects'
+                className={`inline-flex items-center gap-2 px-1 py-3 text-xs font-semibold tracking-wide transition-colors border-b-2 -mb-[1px] whitespace-nowrap ${
+                  activeTab === 'projects'
                   ? 'border-primary text-primary'
-                  : 'border-transparent text-gray-600 hover:text-gray-700 hover:border-gray-300'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}
               >
                 <RocketLaunchIcon className="size-4" />
@@ -433,6 +549,7 @@ export default function ProyectosIndex({ permissions, trabajadorId }) {
         open={d.showImportPreview}
         onClose={() => d.setShowImportPreview(false)}
         items={d.importPreviewItems}
+        metadata={d.importPreviewMetadata}
         importing={d.importingFile}
         onConfirm={d.confirmImport}
       />

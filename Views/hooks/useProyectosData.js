@@ -20,12 +20,13 @@ let didInit = false;
 export default function useProyectosData({ permissions }) {
   /* -------- STATE -------- */
   const [projects, setProjects] = useState(() => loadFromCache('projects') || []);
-  const [stats, setStats] = useState(() => loadFromCache('stats') || { total_projects: 0, active_projects: 0, total_budget: 0, total_spent: 0, total_remaining: 0 });
+  const [stats, setStats] = useState(() => loadFromCache('stats') || { total_projects: 0, active_projects: 0, total_budget: 0, total_spent: 0, total_budgeted: 0, total_remaining: 0 });
   const [selectedProject, setSelectedProject] = useState(null);
   const [projectWorkers, setProjectWorkers] = useState([]);
   const [projectFieldWorkers, setProjectFieldWorkers] = useState([]);
   const [projectOrders, setProjectOrders] = useState([]);
   const [projectSummary, setProjectSummary] = useState({});
+  const [projectFiles, setProjectFiles] = useState([]);
   const [supervisors, setSupervisors] = useState([]);
   const [allWorkers, setAllWorkers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -47,6 +48,7 @@ export default function useProyectosData({ permissions }) {
   const [duplicateData, setDuplicateData] = useState(null);
   const [showImportPreview, setShowImportPreview] = useState(false);
   const [importPreviewItems, setImportPreviewItems] = useState([]);
+  const [importPreviewMetadata, setImportPreviewMetadata] = useState({});
   const pendingImportFile = useRef(null);
 
   const [paidOrders, setPaidOrders] = useState([]);
@@ -90,6 +92,11 @@ export default function useProyectosData({ permissions }) {
   const [showArrivalReportDetailModal, setShowArrivalReportDetailModal] = useState(false);
   const [selectedArrivalReport, setSelectedArrivalReport] = useState(null);
 
+  // Project Planner state
+  const [plannerData, setPlannerData] = useState(null);
+  const [plannerStages, setPlannerStages] = useState([]);
+  const [plannerLoading, setPlannerLoading] = useState(false);
+
   const dateFromInputRef = useRef(null);
   const dateToInputRef = useRef(null);
   const dateFromPickerRef = useRef(null);
@@ -123,6 +130,27 @@ export default function useProyectosData({ permissions }) {
   }, [projects, statusFilter, dateFrom, dateTo]);
 
   const ordersGroupedByFile = useMemo(() => {
+    const extractGroupMetadata = (orders) => {
+      const pickFirst = (field) => {
+        const found = orders.find((o) => {
+          const value = o?.[field];
+          return value !== null && value !== undefined && String(value).trim() !== '';
+        });
+        return found ? found[field] : null;
+      };
+
+      return {
+        area_solicitante: pickFirst('area_solicitante'),
+        proyecto_obra: pickFirst('proyecto_obra'),
+        numero_solicitud: pickFirst('numero_solicitud'),
+        fecha_solicitud: pickFirst('fecha_solicitud'),
+        fecha_requerida: pickFirst('fecha_requerida'),
+        prioridad: pickFirst('prioridad'),
+        solicitado_por: pickFirst('solicitado_por'),
+        cargo: pickFirst('cargo'),
+      };
+    };
+
     const groups = {};
     const manual = [];
     const inventory = [];
@@ -135,6 +163,7 @@ export default function useProyectosData({ permissions }) {
           groups[o.source_filename] = {
             filename: o.source_filename, orders: [], imported_at: o.imported_at,
             allPaid: true, allDelivered: true, paidCount: 0, deliveredCount: 0, totalCount: 0,
+            metadata: null,
           };
         }
         const g = groups[o.source_filename]; g.orders.push(o); g.totalCount++;
@@ -142,7 +171,9 @@ export default function useProyectosData({ permissions }) {
         if (o.delivery_confirmed) g.deliveredCount++; else g.allDelivered = false;
       } else { manual.push(o); }
     });
-    const result = Object.values(groups).sort((a, b) => new Date(a.imported_at) - new Date(b.imported_at));
+    const result = Object.values(groups)
+      .map((g) => ({ ...g, metadata: extractGroupMetadata(g.orders) }))
+      .sort((a, b) => new Date(a.imported_at) - new Date(b.imported_at));
     const output = [];
     if (manual.length > 0) {
       let mp = 0, md = 0;
@@ -310,6 +341,10 @@ export default function useProyectosData({ permissions }) {
   }, []);
 
   const selectProject = useCallback(async (project) => {
+    // ─── CLEAR PLANNER SYNC IMMEDIATELY ───
+    setPlannerData(null);
+    setPlannerStages([]);
+    
     try {
       const id = typeof project === 'object' ? project.id : project;
       const res = await fetch(`${API_BASE}/${id}`);
@@ -320,6 +355,8 @@ export default function useProyectosData({ permissions }) {
         setProjectFieldWorkers(data.field_workers || []);
         setProjectOrders(data.orders || []);
         setProjectSummary(data.summary || {});
+        setProjectFiles(data.files || []);
+
         setEditForm({ name: data.project.name, spending_threshold: data.project.spending_threshold, supervisor_id: data.project.supervisor_id, supervisor_pdr_id: data.project.supervisor_pdr_id });
         // Fetch secondary data in parallel (non-blocking)
         if (data.project.status === 'active' || data.project.status === 'pendiente_recuento') {
@@ -417,6 +454,166 @@ export default function useProyectosData({ permissions }) {
     setShowArrivalReportDetailModal(true);
   }, []);
 
+  // ── Project Planner ─────────────────────────────────────────────────
+  // Transform stage from backend format (name/days/start_date) to frontend format (nombre/dias/startDate)
+  const transformStageFromBackend = (s) => ({
+    id: s.id,
+    nombre: s.name,
+    dias: s.days,
+    colorIndex: s.color_index,
+    startDate: s.start_date || null,
+    endDate: s.end_date || null,
+    porcentaje: s.porcentaje || 0,
+    tracking: typeof s.tracking === 'string' ? JSON.parse(s.tracking) : (s.tracking || {}),
+    sortOrder: s.sort_order,
+  });
+
+  const loadProjectPlanner = useCallback(async (projectId) => {
+    const pid = projectId || selectedProjectRef.current?.id;
+    if (!pid) return;
+    
+    setPlannerData(null);
+    setPlannerStages([]);
+    setPlannerLoading(true);
+    try {
+      const res = await fetchWithCsrf(`${API_BASE}/${pid}/planner`);
+      const json = await res.json();
+      if (json.success) {
+        setPlannerData(json.data.planner);
+        // Transform stages from backend format to frontend format
+        setPlannerStages((json.data.stages || []).map(transformStageFromBackend));
+      }
+    } catch (e) {
+      console.error('Error loading planner:', e);
+    } finally {
+      setPlannerLoading(false);
+    }
+  }, []);
+
+  // Transform stage from frontend format (nombre/dias/startDate) to backend format (name/days/start_date)
+  const transformStageToBackend = (stage) => ({
+    name: stage.nombre,
+    days: stage.dias,
+    color_index: stage.colorIndex || 0,
+    start_date: stage.startDate || null,
+    end_date: stage.endDate || null,
+    porcentaje: stage.porcentaje || 0,
+    tracking: stage.tracking || {},
+  });
+
+  const saveProjectPlanner = useCallback(async (projectId, plannerPayload) => {
+    const pid = projectId || selectedProjectRef.current?.id;
+    if (!pid) return;
+    try {
+      const res = await fetchWithCsrf(`${API_BASE}/${pid}/planner`, {
+        method: 'POST',
+        body: JSON.stringify(plannerPayload),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setPlannerData(json.data);
+        showToastMsg('Planificador guardado');
+      } else {
+        showToastMsg(json.message || 'Error al guardar', 'error');
+      }
+      return json;
+    } catch (e) {
+      console.error('Error saving planner:', e);
+      showToastMsg('Error de conexión', 'error');
+    }
+  }, [showToastMsg]);
+
+  const addProjectStage = useCallback(async (projectId, stagePayload) => {
+    const pid = projectId || selectedProjectRef.current?.id;
+    if (!pid) return;
+    // Transform from frontend format to backend format
+    const backendPayload = transformStageToBackend(stagePayload);
+    try {
+      const res = await fetchWithCsrf(`${API_BASE}/${pid}/planner/stages`, {
+        method: 'POST',
+        body: JSON.stringify(backendPayload),
+      });
+      const json = await res.json();
+      if (json.success) {
+        // Transform response from backend format to frontend format
+        setPlannerStages(prev => [...prev, transformStageFromBackend(json.data)]);
+        showToastMsg('Etapa agregada');
+      } else {
+        showToastMsg(json.message || 'Error al agregar etapa', 'error');
+      }
+      return json;
+    } catch (e) {
+      console.error('Error adding stage:', e);
+      showToastMsg('Error de conexión', 'error');
+    }
+  }, [showToastMsg]);
+
+  const updateProjectStage = useCallback(async (projectId, stageId, stagePayload) => {
+    const pid = projectId || selectedProjectRef.current?.id;
+    if (!pid) return;
+    // Transform from frontend format to backend format
+    const backendPayload = transformStageToBackend(stagePayload);
+    try {
+      const res = await fetchWithCsrf(`${API_BASE}/${pid}/planner/stages/${stageId}`, {
+        method: 'PUT',
+        body: JSON.stringify(backendPayload),
+      });
+      const json = await res.json();
+      if (json.success) {
+        // Transform response from backend format to frontend format
+        setPlannerStages(prev => prev.map(s => s.id === stageId ? transformStageFromBackend(json.data) : s));
+        showToastMsg('Etapa actualizada');
+      } else {
+        showToastMsg(json.message || 'Error al actualizar', 'error');
+      }
+      return json;
+    } catch (e) {
+      console.error('Error updating stage:', e);
+      showToastMsg('Error de conexión', 'error');
+    }
+  }, [showToastMsg]);
+
+  const deleteProjectStage = useCallback(async (projectId, stageId) => {
+    const pid = projectId || selectedProjectRef.current?.id;
+    if (!pid) return;
+    try {
+      const res = await fetchWithCsrf(`${API_BASE}/${pid}/planner/stages/${stageId}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (json.success) {
+        setPlannerStages(prev => prev.filter(s => s.id !== stageId));
+        showToastMsg('Etapa eliminada');
+      } else {
+        showToastMsg(json.message || 'Error al eliminar', 'error');
+      }
+    } catch (e) {
+      console.error('Error deleting stage:', e);
+      showToastMsg('Error de conexión', 'error');
+    }
+  }, [showToastMsg]);
+
+  const resetProjectPlanner = useCallback(async (projectId) => {
+    const pid = projectId || selectedProjectRef.current?.id;
+    if (!pid) return;
+    try {
+      const res = await fetchWithCsrf(`${API_BASE}/${pid}/planner/reset`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (json.success) {
+        setPlannerData(null);
+        setPlannerStages([]);
+        showToastMsg('Planificador reiniciado');
+      } else {
+        showToastMsg(json.message || 'Error al reiniciar', 'error');
+      }
+    } catch (e) {
+      console.error('Error resetting planner:', e);
+      showToastMsg('Error de conexión', 'error');
+    }
+  }, [showToastMsg]);
+
   const purchasedNotArrivedOrders = useMemo(() => {
     return projectOrders.filter(o =>
       (o.type || 'material') !== 'service' &&
@@ -438,6 +635,7 @@ export default function useProyectosData({ permissions }) {
         setProjectFieldWorkers(prev => arraysEqual(prev, nfw) ? prev : nfw);
         setProjectOrders(prev => arraysEqual(prev, no) ? prev : no);
         setProjectSummary(prev => JSON.stringify(prev) === JSON.stringify(ns) ? prev : ns);
+        setProjectFiles(prev => arraysEqual(prev, data.files || []) ? prev : (data.files || []));
         if (np) setEditForm({ name: np.name, spending_threshold: np.spending_threshold, supervisor_id: np.supervisor_id, supervisor_pdr_id: np.supervisor_pdr_id });
         loadPaidOrders(np.id);
         // Refresh completion request and materials for pendiente_recuento projects
@@ -849,6 +1047,26 @@ export default function useProyectosData({ permissions }) {
 
   const downloadTemplate = useCallback(() => { window.location.href = `${API_BASE}/material-template`; }, []);
 
+  const exportMaterialsXlsx = useCallback(async (projectId) => {
+    try {
+      const res = await fetch(`${API_BASE}/${projectId}/export-materials`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      });
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Proyecto_${projectId}_Materiales_Servicios_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+    } catch (e) {
+      console.error('Export error:', e);
+      showToastMsg('Error al exportar', 'error');
+    }
+  }, [showToastMsg]);
+
   const importExcel = useCallback(async (e) => {
     const file = e.target.files[0];
     if (!file || !selectedProjectRef.current) return;
@@ -858,7 +1076,11 @@ export default function useProyectosData({ permissions }) {
       const res = await fetch(`${API_BASE}/${selectedProjectRef.current.id}/import-materials`, { method: 'POST', headers: { 'X-CSRF-TOKEN': getCsrfToken() }, body: fd });
       const data = await res.json();
       if (data.duplicate) { setDuplicateData({ originalFilename: data.originalFilename, proposedFilename: data.proposedFilename, existingId: data.existingId, file, skipDuplicate: false }); setShowDuplicateModal(true); }
-      else if (data.preview) { setImportPreviewItems(data.preview.items.map((it, i) => ({ number: i + 1, quantity: it.quantity || 1, unit: it.unit || 'UND', description: it.description || '', diameter: it.diameter || '', series: it.series || '', material_type: it.material_type || '' }))); pendingImportFile.current = file; setShowImportPreview(true); }
+      else if (data.preview) {
+        setImportPreviewItems(data.preview.items.map((it, i) => ({ number: i + 1, quantity: it.quantity || 1, unit: it.unit || 'UND', description: it.description || '', diameter: it.diameter || '', series: it.series || '', material_type: it.material_type || '' })));
+        setImportPreviewMetadata(data.preview.metadata || {});
+        pendingImportFile.current = file; setShowImportPreview(true);
+      }
       else if (data.success) { showToastMsg(data.message); await selectProject(selectedProjectRef.current.id); }
       else showToastMsg(data.message || 'Error al procesar archivo', 'error');
     } catch (err) { showToastMsg('Error al importar: ' + err.message, 'error'); }
@@ -899,6 +1121,7 @@ export default function useProyectosData({ permissions }) {
       if (data.preview) {
         // Show preview with the renamed file before final import
         setImportPreviewItems(data.preview.items.map((it, i) => ({ number: i + 1, quantity: it.quantity || 1, unit: it.unit || 'UND', description: it.description || '', diameter: it.diameter || '', series: it.series || '', material_type: it.material_type || '' })));
+        setImportPreviewMetadata(data.preview.metadata || {});
         pendingImportFile.current = duplicateData.file;
         // Store the renamed filename so confirmImport uses it
         pendingImportFile.renamedFilename = data.filename || duplicateData.proposedFilename;
@@ -951,6 +1174,57 @@ export default function useProyectosData({ permissions }) {
       }
     });
   }, [openConfirmModal, loadProjects, loadStats, showToastMsg]);
+  
+  // ── Project Files ──────────────────────────────────────────────────
+  const uploadProjectFiles = useCallback(async (pipelineId, files, category = 'general') => {
+    if (!pipelineId) return false;
+    const formData = new FormData();
+    files.forEach((file) => {
+        formData.append('files[]', file);
+        if (file.sub_type) formData.append('sub_types[]', file.sub_type);
+    });
+    formData.append('category', category);
+
+    try {
+      const res = await fetch(`${API_BASE}/pipeline/${pipelineId}/files`, {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': getCsrfToken() },
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToastMsg(data.message);
+        await refreshSelectedProject();
+        return true;
+      }
+      showToastMsg(data.message || 'Error al subir archivos', 'error');
+      return false;
+    } catch {
+      showToastMsg('Error de red', 'error');
+      return false;
+    }
+  }, [refreshSelectedProject, showToastMsg]);
+
+  const deleteProjectFile = useCallback(async (fileId) => {
+    try {
+      const res = await fetchWithCsrf(`${API_BASE}/pipeline/files/${fileId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        showToastMsg('Archivo eliminado');
+        await refreshSelectedProject();
+        return true;
+      }
+      showToastMsg(data.message || 'Error al eliminar', 'error');
+      return false;
+    } catch {
+      showToastMsg('Error de red', 'error');
+      return false;
+    }
+  }, [refreshSelectedProject, showToastMsg]);
+
+  const getProjectFileDownloadUrl = useCallback((fileId) => {
+    return `${API_BASE}/pipeline/files/${fileId}/download`;
+  }, []);
 
   /* -------- LIFECYCLE -------- */
   const canSeeProjects = permissions.started_projects_personal;
@@ -979,7 +1253,7 @@ export default function useProyectosData({ permissions }) {
   return {
     // State
     projects, stats, loading, selectedProject, setSelectedProject,
-    projectWorkers, projectOrders, projectSummary, supervisors,
+    projectWorkers, projectOrders, projectSummary, projectFiles, supervisors,
     saving, savingOrder, toast, setToast,
     statusFilter, setStatusFilter, dateFrom, dateTo,
     dateFromDisplay, dateToDisplay,
@@ -994,7 +1268,7 @@ export default function useProyectosData({ permissions }) {
     // Modals
     showCreateModal, setShowCreateModal,
     showConfirmModal, confirmTitle, confirmMessage, confirmActionLabel, confirmActionVariant, confirmProcessing,
-    showImportPreview, setShowImportPreview, importPreviewItems,
+    showImportPreview, setShowImportPreview, importPreviewItems, importPreviewMetadata,
     showDuplicateModal, setShowDuplicateModal, duplicateData,
     showRejectModal, setShowRejectModal, rejectNotes, setRejectNotes, rejectingOrder, rejectType,
     // Derived
@@ -1008,7 +1282,7 @@ export default function useProyectosData({ permissions }) {
     confirmDeleteProject,
     addWorkerToProject, removeWorkerFromProject,
     addFieldWorkerToProject, removeFieldWorkerFromProject,
-    createOrder, createService, downloadTemplate, importExcel,
+    createOrder, createService, downloadTemplate, importExcel, exportMaterialsXlsx,
     approveMaterial, rejectMaterial,
     approveAllInGroup, approveSelectedInGroup,
     isOrderSelected, toggleOrderSelection, getSelectedCount,
@@ -1031,6 +1305,13 @@ export default function useProyectosData({ permissions }) {
     markMaterialArrived, markMaterialNotArrived,
     createArrivalReport, resolveArrivalReport, loadArrivalReports,
     openArrivalReportDetail, purchasedNotArrivedOrders,
+    // Planner
+    plannerData, plannerStages, plannerLoading,
+    loadProjectPlanner, saveProjectPlanner,
+    addProjectStage, updateProjectStage, deleteProjectStage,
+    resetProjectPlanner,
+    // Files
+    uploadProjectFiles, deleteProjectFile, getProjectFileDownloadUrl,
     // Refs (for flatpickr)
     dateFromInputRef, dateToInputRef,
     openDateFromPicker, openDateToPicker, clearDateFilters,

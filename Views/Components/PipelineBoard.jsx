@@ -25,13 +25,13 @@ import { formatNumber, formatDate, getCurrencySymbol } from '../utils';
 // ── Configuración visual por etapa ──────────────────────────────────────
 
 const STAGE_CONFIG = {
-  ingresado: { color: 'bg-slate-500', lightBg: 'bg-slate-50', border: 'border-slate-200', badge: 'gray', icon: PlusIcon },
-  contactado: { color: 'bg-blue-500', lightBg: 'bg-blue-50', border: 'border-blue-200', badge: 'blue', icon: PhoneIcon },
-  visitado: { color: 'bg-purple-500', lightBg: 'bg-purple-50', border: 'border-purple-200', badge: 'purple', icon: MapPinIcon },
-  presupuestado: { color: 'bg-amber-500', lightBg: 'bg-amber-50', border: 'border-amber-200', badge: 'amber', icon: CurrencyDollarIcon },
-  negociacion: { color: 'bg-cyan-500', lightBg: 'bg-cyan-50', border: 'border-cyan-200', badge: 'cyan', icon: ChatBubbleLeftRightIcon },
-  cerrado_ganado: { color: 'bg-emerald-500', lightBg: 'bg-emerald-50', border: 'border-emerald-200', badge: 'emerald', icon: CheckCircleIcon },
-  cerrado_perdido: { color: 'bg-red-500', lightBg: 'bg-red-50', border: 'border-red-200', badge: 'red', icon: XCircleIcon },
+  ingresado:      { color: 'bg-slate-500',   accentColor: '#64748b', lightBg: 'bg-slate-50',   borderColor: '#cbd5e1', badge: 'gray',    icon: PlusIcon },
+  contactado:     { color: 'bg-blue-500',    accentColor: '#3b82f6', lightBg: 'bg-blue-50',    borderColor: '#bfdbfe', badge: 'blue',    icon: PhoneIcon },
+  visitado:       { color: 'bg-indigo-500',  accentColor: '#6366f1', lightBg: 'bg-indigo-50',  borderColor: '#c7d2fe', badge: 'blue',    icon: MapPinIcon },
+  presupuestado:  { color: 'bg-amber-500',   accentColor: '#f59e0b', lightBg: 'bg-amber-50',   borderColor: '#fde68a', badge: 'amber',   icon: CurrencyDollarIcon },
+  negociacion:    { color: 'bg-cyan-500',    accentColor: '#06b6d4', lightBg: 'bg-cyan-50',    borderColor: '#a5f3fc', badge: 'cyan',    icon: ChatBubbleLeftRightIcon },
+  cerrado_ganado: { color: 'bg-emerald-500', accentColor: '#10b981', lightBg: 'bg-emerald-50', borderColor: '#a7f3d0', badge: 'emerald', icon: CheckCircleIcon },
+  cerrado_perdido:{ color: 'bg-red-500',     accentColor: '#ef4444', lightBg: 'bg-red-50',     borderColor: '#fecaca', badge: 'red',     icon: XCircleIcon },
 };
 
 const STAGE_LABELS = {
@@ -46,10 +46,10 @@ const STAGE_LABELS = {
 
 // Fases consolidadas
 const PHASES = [
-  { label: 'Fase Inicial', stages: ['ingresado', 'contactado', 'visitado'], color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
-  { label: 'Propuesta', stages: ['presupuestado'], color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
-  { label: 'Negociación', stages: ['negociacion'], color: 'text-cyan-700', bg: 'bg-cyan-50', border: 'border-cyan-200' },
-  { label: 'Resultado', stages: ['cerrado_ganado', 'cerrado_perdido'], color: 'text-gray-700', bg: 'bg-gray-50', border: 'border-gray-200' },
+  { label: 'Fase Inicial', stages: ['ingresado', 'contactado', 'visitado'], color: 'text-blue-700', bg: 'bg-blue-50', borderColor: '#bfdbfe' },
+  { label: 'Propuesta', stages: ['presupuestado'], color: 'text-amber-700', bg: 'bg-amber-50', borderColor: '#fde68a' },
+  { label: 'Negociación', stages: ['negociacion'], color: 'text-cyan-700', bg: 'bg-cyan-50', borderColor: '#a5f3fc' },
+  { label: 'Resultado', stages: ['cerrado_ganado', 'cerrado_perdido'], color: 'text-gray-700', bg: 'bg-gray-50', borderColor: '#e5e7eb' },
 ];
 
 // ── Proyecto Card ───────────────────────────────────────────────────────
@@ -59,44 +59,42 @@ function LeadCard({ lead, onSelect }) {
 
   return (
     <div
-      className={clsx(
-        'cursor-pointer rounded-lg border-2 bg-white p-3 shadow-sm transition-all hover:shadow-md',
-        config.border,
-      )}
+      className="cursor-pointer rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
+      style={{ borderLeftColor: config.accentColor, borderLeftWidth: '4px' }}
       onClick={() => onSelect(lead)}
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-3">
         <h4 className="text-sm font-semibold text-gray-900 line-clamp-1">{lead.nombre_proyecto}</h4>
-        <ChevronRightIcon className="size-4 shrink-0 text-gray-400" />
+        <ChevronRightIcon className="size-4 shrink-0 text-gray-400 mt-0.5" />
       </div>
 
-      <div className="mt-1.5 flex items-center gap-2">
-        <BuildingOfficeIcon className="size-3.5 text-gray-400" />
-        <span className="text-xs text-gray-600 truncate">{lead.cliente_nombre}</span>
+      <div className="mt-1.5 flex items-center gap-1.5">
+        <BuildingOfficeIcon className="size-3.5 shrink-0 text-gray-400" />
+        <span className="text-xs font-medium text-gray-700 truncate">{lead.cliente_nombre}</span>
       </div>
 
       {lead.cliente_empresa && (
-        <p className="mt-0.5 text-[10px] text-gray-400 truncate">{lead.cliente_empresa}</p>
+        <p className="mt-0.5 text-[11px] text-gray-400 truncate">{lead.cliente_empresa}</p>
       )}
 
-      <div className="mt-2 flex items-center justify-between">
+      <div className="mt-3 flex items-center justify-between">
         {lead.presupuesto_estimado > 0 ? (
-          <span className="font-mono text-xs font-semibold text-gray-700">
+          <span className="font-mono text-xs font-bold text-gray-800">
             {getCurrencySymbol(lead.moneda)} {formatNumber(lead.presupuesto_estimado)}
           </span>
         ) : (
-          <span className="text-[10px] text-gray-400">Sin presupuesto</span>
+          <span className="text-[11px] text-gray-400">Sin presupuesto</span>
         )}
 
         {lead.team && lead.team.length > 0 && (
           <div className="flex items-center gap-1">
             <UserGroupIcon className="size-3.5 text-gray-400" />
-            <span className="text-[10px] text-gray-500">{lead.team.length}</span>
+            <span className="text-[11px] text-gray-500">{lead.team.length}</span>
           </div>
         )}
       </div>
 
-      <p className="mt-1.5 text-[10px] text-gray-400">{formatDate(lead.created_at)}</p>
+      <p className="mt-2 text-[11px] text-gray-400">{formatDate(lead.created_at)}</p>
     </div>
   );
 }
@@ -108,8 +106,8 @@ function StageColumn({ stage, leads, onSelectLead }) {
   const Icon = config.icon;
 
   return (
-    <div className={clsx('flex flex-col rounded-lg border', config.border, config.lightBg)}>
-      <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-200/50">
+    <div className={clsx('flex flex-col rounded-lg border', config.lightBg)} style={{ borderColor: config.borderColor }}>
+      <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2.5">
         <div className="flex items-center gap-2">
           <span className={clsx('inline-flex size-6 items-center justify-center rounded-full text-white', config.color)}>
             <Icon className="size-3.5" />
@@ -120,7 +118,7 @@ function StageColumn({ stage, leads, onSelectLead }) {
         </div>
         <Badge variant={config.badge} className="text-[10px]">{leads.length}</Badge>
       </div>
-      <div className="flex-1 space-y-2 p-2 overflow-y-auto max-h-[50vh]">
+      <div className="flex-1 space-y-3 p-3 overflow-y-auto max-h-[50vh]">
         {leads.length === 0 ? (
           <p className="py-4 text-center text-xs text-gray-400">Sin proyectos</p>
         ) : (
@@ -238,9 +236,9 @@ function PipelineBoard({ leadsByStage, counts, pipelineStats, loading, onSelectL
               className={clsx(
                 'flex w-full items-center justify-between rounded-md px-3 py-1.5 border transition-all duration-150',
                 phase.bg,
-                phase.border,
-                'hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-offset-1',
+                'hover:brightness-95 focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-primary/25 focus-visible:ring-offset-0',
               )}
+              style={{ borderColor: phase.borderColor }}
             >
               <div className="flex items-center gap-2">
                 <ChevronDownIcon

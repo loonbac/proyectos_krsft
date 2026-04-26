@@ -49,7 +49,7 @@ function CreateProjectModal({
                 onClick={() => onFormChange({ ...form, currency: c })}
                 className={`flex-1 rounded border px-3 py-2 text-sm font-medium transition-colors ${
                   form.currency === c
-                    ? 'border-primary bg-primary-50 text-primary-700'
+                    ? 'border-primary/50 bg-primary/10 text-primary/80'
                     : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
                 }`}
               >

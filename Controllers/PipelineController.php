@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Modulos_ERP\CecosKrsft\Models\Ceco;
 use Modulos_ERP\CecosKrsft\Services\CecoHierarchyService;
 
 /**
@@ -52,14 +53,19 @@ class PipelineController extends Controller
 
     /**
      * Verificar acceso al pipeline via permisos del módulo.
+     * @param string|null $permissionSuffix Sufijo del permiso (default: pre_projects)
      */
-    protected function checkPipelineAccess(): bool
+    protected function checkPipelineAccess(?string $permissionSuffix = null): bool
     {
         $user = auth()->user();
         if (!$user) return false;
         if ($user->isAdmin()) return true;
 
-        return $user->hasPermission("module.{$this->moduleSlug}.pre_projects");
+        $permission = $permissionSuffix
+            ? "module.{$this->moduleSlug}.{$permissionSuffix}"
+            : "module.{$this->moduleSlug}.pre_projects";
+
+        return $user->hasPermission($permission);
     }
 
     protected function denyAccess()
@@ -186,10 +192,27 @@ class PipelineController extends Controller
 
             DB::commit();
 
+            app(\App\Services\LogKrsftService::class)->log(
+                module: 'proyectoskrsft',
+                action: 'create_lead',
+                message: "Lead creado: {$request->nombre_proyecto} (Cliente: {$request->cliente_nombre})",
+                level: 'info',
+                userId: auth()->id(),
+                userName: auth()->user()?->name,
+                extra: ['lead_id' => $pipelineId, 'nombre_proyecto' => $request->nombre_proyecto]
+            );
+
             return response()->json(['success' => true, 'message' => 'Lead creado correctamente', 'id' => $pipelineId]);
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Error creando lead pipeline', ['error' => $e->getMessage()]);
+            
+            app(\App\Services\LogKrsftService::class)->logError(
+                module: 'proyectoskrsft',
+                action: 'create_lead_error',
+                message: "Error al crear lead pipeline {$request->nombre_proyecto}: " . $e->getMessage()
+            );
+
             return response()->json(['success' => false, 'message' => 'Error al crear el lead'], 500);
         }
     }
@@ -294,6 +317,16 @@ class PipelineController extends Controller
             ['updated_at' => now()]
         ));
 
+        app(\App\Services\LogKrsftService::class)->log(
+            module: 'proyectoskrsft',
+            action: 'update_lead',
+            message: "Lead actualizado: {$lead->nombre_proyecto} (ID: {$id})",
+            level: 'info',
+            userId: auth()->id(),
+            userName: auth()->user()?->name,
+            extra: ['lead_id' => $id]
+        );
+
         return response()->json(['success' => true, 'message' => 'Lead actualizado']);
     }
 
@@ -312,6 +345,16 @@ class PipelineController extends Controller
         }
 
         DB::table($this->pipelineTable)->where('id', $id)->delete();
+
+        app(\App\Services\LogKrsftService::class)->log(
+            module: 'proyectoskrsft',
+            action: 'delete_lead',
+            message: "Lead eliminado: {$lead->nombre_proyecto} (ID: {$id})",
+            level: 'warning',
+            userId: auth()->id(),
+            userName: auth()->user()?->name,
+            extra: ['lead_id' => $id]
+        );
 
         return response()->json(['success' => true, 'message' => 'Lead eliminado']);
     }
@@ -346,21 +389,24 @@ class PipelineController extends Controller
             return response()->json(['success' => false, 'message' => $error], 422);
         }
 
+        // Si se cierra como ganado directamente (sin modal), retornar requiere modal
+        // El modal es necesario para confirmar abreviatura y CECO
+        if ($newStage === 'cerrado_ganado') {
+            return response()->json([
+                'success' => true,
+                'requires_modal' => true,
+                'message' => 'Se requiere confirmar la creación del proyecto',
+            ]);
+        }
+
         DB::beginTransaction();
         try {
-            // Si se cierra como ganado, crear automáticamente el proyecto
             $projectId = null;
-            if ($newStage === 'cerrado_ganado') {
-                $projectId = $this->createProjectFromLead($lead);
-            }
 
             $updateData = [
                 'etapa'      => $newStage,
                 'updated_at' => now(),
             ];
-            if ($projectId) {
-                $updateData['project_id'] = $projectId;
-            }
 
             DB::table($this->pipelineTable)->where('id', $id)->update($updateData);
 
@@ -376,6 +422,16 @@ class PipelineController extends Controller
 
             DB::commit();
 
+            app(\App\Services\LogKrsftService::class)->log(
+                module: 'proyectoskrsft',
+                action: 'change_lead_stage',
+                message: "Lead {$id} cambió de '{$oldStage}' a '{$newStage}'",
+                level: 'info',
+                userId: auth()->id(),
+                userName: auth()->user()?->name,
+                extra: ['lead_id' => $id, 'old_stage' => $oldStage, 'new_stage' => $newStage, 'project_id' => $projectId]
+            );
+
             $msg = 'Etapa actualizada a: ' . self::STAGE_LABELS[$newStage];
             if ($projectId) {
                 $msg .= '. Se creó automáticamente el proyecto #' . $projectId;
@@ -385,6 +441,14 @@ class PipelineController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Error cambiando etapa pipeline', ['error' => $e->getMessage()]);
+            
+            app(\App\Services\LogKrsftService::class)->logError(
+                module: 'proyectoskrsft',
+                action: 'change_lead_stage_error',
+                message: "Error al cambiar etapa de lead {$id} a {$newStage}: " . $e->getMessage(),
+                extra: ['lead_id' => $id]
+            );
+
             return response()->json(['success' => false, 'message' => 'Error al cambiar la etapa'], 500);
         }
     }
@@ -415,45 +479,79 @@ class PipelineController extends Controller
         }
 
         $request->validate([
-            'abbreviation'      => 'required|string|max:50',
-            'ceco_id'           => 'required|integer|exists:cecos,id',
-            'supervisor_id'     => 'required|integer|exists:trabajadores,id',
-            'supervisor_pdr_id' => 'nullable|integer|exists:trabajadores,id',
+            'abbreviation'         => 'required|string|max:50',
+            'ceco_id'              => 'required_without:enroll_existing_ceco_id|nullable|integer|exists:cecos,id',
+            'supervisor_id'        => 'required|integer|exists:trabajadores,id',
+            'supervisor_pdr_id'    => 'nullable|integer|exists:trabajadores,id',
+            'enroll_existing_ceco_id' => 'nullable|integer|exists:cecos,id',
         ]);
 
         DB::beginTransaction();
         try {
-            // Obtener el CECO padre seleccionado
-            $parentCeco = DB::table('cecos')->find($request->ceco_id);
-            if (!$parentCeco || $parentCeco->nivel != 0 || $parentCeco->parent_id !== null) {
-                throw new \Exception('El CECO seleccionado debe ser un CECO padre válido');
-            }
-
             // Crear el proyecto con el supervisor seleccionado
             $projectId = $this->createProjectFromLead($lead, $request->input('supervisor_id'), $request->input('supervisor_pdr_id'));
 
-            // Crear CECO automático usando la abreviatura del proyecto como nombre
-            /** @var CecoHierarchyService $cecoHierarchyService */
-            $cecoHierarchyService = app(CecoHierarchyService::class);
-            $cecoResult = $cecoHierarchyService->createWithSubcuentas([
-                'nombre' => $request->abbreviation, // Usar abreviatura como nombre
-                'razon_social' => $lead->cliente_empresa ?? null,
-                'descripcion' => $lead->descripcion ?? null,
-                'tipo_cliente' => $parentCeco->codigo, // Usar código del CECO padre
-                'estado' => true,
-            ], auth()->id());
+            // Si se especifica enrol_existing_ceco_id, enrolar en CECO existente
+            $enrollCecoId = $request->input('enroll_existing_ceco_id');
+            if ($enrollCecoId && $enrollCecoId > 0) {
+                $ceco = Ceco::findOrFail($enrollCecoId);
 
-            $createdCecoId = $cecoResult['cliente']->id;
-            $createdCecoCode = $cecoResult['codigo_generado'] ?? null;
+                // Validar que sea nivel 1 (centro de costo cliente)
+                if ($ceco->nivel !== 1) {
+                    throw new \Exception('El CECO seleccionado no es un centro de costo de cliente válido');
+                }
 
-            // Actualizar proyecto con abreviatura y ceco_id
-            DB::table('projects')
-                ->where('id', $projectId)
-                ->update([
-                    'abbreviation' => $request->abbreviation,
-                    'ceco_id'      => $createdCecoId,
-                    'updated_at'   => now(),
-                ]);
+                // Validar que coincida la empresa
+                if (trim(mb_strtolower($ceco->razon_social ?? '')) !== trim(mb_strtolower($lead->cliente_empresa ?? ''))) {
+                    throw new \Exception('El CECO no pertenece a la misma empresa');
+                }
+
+                // Validar que tenga proyectos activos
+                if (!$ceco->hasActiveProjects()) {
+                    throw new \Exception('El CECO seleccionado no tiene proyectos activos');
+                }
+
+                // Asignar proyecto al CECO existente (NO crear nuevo CECO)
+                DB::table('projects')
+                    ->where('id', $projectId)
+                    ->update([
+                        'abbreviation' => $request->abbreviation,
+                        'ceco_id'      => $ceco->id,
+                        'updated_at'   => now(),
+                    ]);
+
+                $createdCecoId = $ceco->id;
+                $createdCecoCode = $ceco->codigo;
+            } else {
+                // Obtener el CECO padre SOLO para crear nuevo CECO
+                $parentCeco = DB::table('cecos')->find($request->ceco_id);
+                if (!$parentCeco || $parentCeco->nivel != 0 || $parentCeco->parent_id !== null) {
+                    throw new \Exception('El CECO seleccionado debe ser un CECO padre válido');
+                }
+
+                // Comportamiento original: crear nuevo CECO con subcuentas
+                /** @var CecoHierarchyService $cecoHierarchyService */
+                $cecoHierarchyService = app(CecoHierarchyService::class);
+                $cecoResult = $cecoHierarchyService->createWithSubcuentas([
+                    'nombre' => $request->abbreviation,
+                    'razon_social' => $lead->cliente_empresa ?? null,
+                    'descripcion' => $lead->descripcion ?? null,
+                    'tipo_cliente' => $parentCeco->codigo,
+                    'estado' => true,
+                ], auth()->id());
+
+                $createdCecoId = $cecoResult['cliente']->id;
+                $createdCecoCode = $cecoResult['codigo_generado'] ?? null;
+
+                // Actualizar proyecto con abreviatura y ceco_id
+                DB::table('projects')
+                    ->where('id', $projectId)
+                    ->update([
+                        'abbreviation' => $request->abbreviation,
+                        'ceco_id'      => $createdCecoId,
+                        'updated_at'   => now(),
+                    ]);
+            }
 
             // Actualizar lead a cerrado_ganado
             DB::table($this->pipelineTable)
@@ -477,6 +575,16 @@ class PipelineController extends Controller
 
             DB::commit();
 
+            app(\App\Services\LogKrsftService::class)->log(
+                module: 'proyectoskrsft',
+                action: 'convert_lead_to_project',
+                message: "Lead {$id} convertido a proyecto {$request->abbreviation} (#{$projectId})",
+                level: 'info',
+                userId: auth()->id(),
+                userName: auth()->user()?->name,
+                extra: ['lead_id' => $id, 'project_id' => $projectId, 'ceco_id' => $createdCecoId]
+            );
+
             return response()->json([
                 'success'    => true,
                 'message'    => 'Proyecto creado exitosamente con CECO automático',
@@ -487,6 +595,14 @@ class PipelineController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Error creando proyecto desde lead', ['error' => $e->getMessage()]);
+            
+            app(\App\Services\LogKrsftService::class)->logError(
+                module: 'proyectoskrsft',
+                action: 'convert_lead_error',
+                message: "Error al convertir lead {$id}: " . $e->getMessage(),
+                extra: ['lead_id' => $id]
+            );
+
             return response()->json(['success' => false, 'message' => 'Error al crear el proyecto'], 500);
         }
     }
@@ -729,6 +845,16 @@ class PipelineController extends Controller
             $msg .= '. Etapa avanzada automáticamente a ' . $stageChanged['label'];
         }
 
+        app(\App\Services\LogKrsftService::class)->log(
+            module: 'proyectoskrsft',
+            action: 'add_communication',
+            message: "Comunicación ({$request->tipo}) registrada para lead {$id}",
+            level: 'info',
+            userId: auth()->id(),
+            userName: auth()->user()?->name,
+            extra: ['lead_id' => $id, 'tipo' => $request->tipo, 'exitoso' => $request->boolean('contacto_exitoso')]
+        );
+
         return response()->json([
             'success'       => true,
             'message'       => $msg,
@@ -745,23 +871,35 @@ class PipelineController extends Controller
         $lead = DB::table($this->pipelineTable)->find($id);
         if (!$lead) return response()->json(['success' => false, 'message' => 'Lead no encontrado'], 404);
 
-        $request->validate([
+        $validated = $request->validate([
             'fecha_programada' => 'required|date',
             'direccion'        => 'nullable|string|max:500',
             'observaciones'    => 'nullable|string|max:2000',
             'asignado_a'       => 'nullable|integer',
         ]);
 
-        DB::table($this->visitsTable)->insert([
-            'pipeline_id'      => $id,
-            'fecha_programada' => $request->fecha_programada,
-            'direccion'        => $request->direccion,
-            'observaciones'    => $request->observaciones,
-            'asignado_a'       => $request->asignado_a,
+        $visitData = [
+            'pipeline_id'       => $id,
+            'fecha_programada'  => $validated['fecha_programada'],
+            'direccion'        => $validated['direccion'] ?? null,
+            'observaciones'    => $validated['observaciones'] ?? null,
+            'asignado_a'       => $validated['asignado_a'] ?? null,
             'estado'           => 'programada',
             'created_at'       => now(),
             'updated_at'       => now(),
-        ]);
+        ];
+
+        DB::table($this->visitsTable)->insert($visitData);
+
+        app(\App\Services\LogKrsftService::class)->log(
+            module: 'proyectoskrsft',
+            action: 'schedule_visit',
+            message: "Visita programada para lead {$id} en fecha {$request->fecha_programada}",
+            level: 'info',
+            userId: auth()->id(),
+            userName: auth()->user()?->name,
+            extra: ['lead_id' => $id, 'fecha' => $request->fecha_programada]
+        );
 
         return response()->json(['success' => true, 'message' => 'Visita programada']);
     }
@@ -791,6 +929,16 @@ class PipelineController extends Controller
         if ($stageChanged) {
             $msg .= '. Etapa avanzada automáticamente a ' . $stageChanged['label'];
         }
+
+        app(\App\Services\LogKrsftService::class)->log(
+            module: 'proyectoskrsft',
+            action: 'complete_visit',
+            message: "Visita #{$visitId} completada para lead {$visit->pipeline_id}",
+            level: 'info',
+            userId: auth()->id(),
+            userName: auth()->user()?->name,
+            extra: ['lead_id' => $visit->pipeline_id, 'visit_id' => $visitId]
+        );
 
         return response()->json([
             'success'       => true,
@@ -983,12 +1131,44 @@ class PipelineController extends Controller
         } catch (\Exception $e) {
             Log::error('Error en getCecos', ['error' => $e->getMessage()]);
             return response()->json([
-                'success' => false, 
-                'cecos' => [], 
-                'hierarchical' => [], 
+                'success' => false,
+                'cecos' => [],
+                'hierarchical' => [],
                 'message' => 'Error interno'
             ]);
         }
+    }
+
+    /**
+     * Obtener CECOs válidos para enrolamiento de un lead del pipeline.
+     * Un CECO es válido si: nivel=1, sin parent_id, sin tipo_subcuenta,
+     * con razon_social matching y al menos un proyecto activo.
+     */
+    public function getValidCecosForPipeline($id)
+    {
+        if (!$this->checkPipelineAccess()) return $this->denyAccess();
+
+        $lead = DB::table($this->pipelineTable)->find($id);
+        if (!$lead) return response()->json(['success' => false, 'message' => 'Lead no encontrado'], 404);
+
+        $clienteEmpresa = trim($lead->cliente_empresa ?? '');
+
+        if (empty($clienteEmpresa)) {
+            return response()->json(['success' => true, 'data' => []]);
+        }
+
+        $cecos = \Modulos_ERP\CecosKrsft\Models\Ceco::validForEnrollment($clienteEmpresa)
+            ->get(['id', 'codigo', 'nombre', 'razon_social']);
+
+        return response()->json([
+            'success' => true,
+            'data' => $cecos->map(fn($c) => [
+                'id' => $c->id,
+                'codigo' => $c->codigo,
+                'nombre' => $c->nombre,
+                'razon_social' => $c->razon_social,
+            ]),
+        ]);
     }
 
     /**
@@ -1105,10 +1285,11 @@ class PipelineController extends Controller
         }
 
         $category = $request->input('category', 'general');
+        $subTypes = $request->input('sub_types', []);
         $uploaded = [];
 
         try {
-            foreach ($request->file('files') as $file) {
+            foreach ($request->file('files') as $idx => $file) {
                 $originalName = $file->getClientOriginalName();
                 $extension = $file->getClientOriginalExtension();
                 $storedName = Str::uuid() . '.' . $extension;
@@ -1125,6 +1306,7 @@ class PipelineController extends Controller
                     'mime_type'     => $mimeType,
                     'size'          => $size,
                     'category'      => $category,
+                    'sub_type'      => $subTypes[$idx] ?? 'comercial',
                     'uploaded_by'   => auth()->id(),
                     'created_at'    => now(),
                     'updated_at'    => now(),

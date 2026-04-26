@@ -15,7 +15,9 @@ function PageHeader({ isSupervisor, onBack, onNewProject, children }) {
           Volver
         </Button>
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-          <FolderIcon className="size-8 text-primary" />
+          <span className="flex size-11 items-center justify-center rounded-xl bg-primary text-white">
+            <FolderIcon className="size-6" />
+          </span>
           {isSupervisor ? 'MIS PROYECTOS ASIGNADOS' : 'GESTIÓN DE PROYECTOS'}
         </h1>
         {isSupervisor && (

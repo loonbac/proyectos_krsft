@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react';
 import { CheckCircleIcon, ClockIcon, ClipboardDocumentListIcon } from '@heroicons/react/24/outline';
-import { PieChart, pieArcLabelClasses, pieArcClasses } from '@mui/x-charts/PieChart';
+import { PieChart, pieClasses } from '@mui/x-charts/PieChart';
 import { useDrawingArea } from '@mui/x-charts/hooks';
 import { styled } from '@mui/material/styles';
 import Badge from './ui/Badge';
@@ -31,7 +31,7 @@ function PieCenterLabel({ percent }) {
   return (
     <>
       <StyledText x={cx} y={cy - 8}>{percent}%</StyledText>
-      <StyledSubText x={cx} y={cy + 9}>USADO</StyledSubText>
+      <StyledSubText x={cx} y={cy + 9}>PRESUP.</StyledSubText>
     </>
   );
 }
@@ -52,14 +52,46 @@ function StatsPanel({
   const isCompleted = stateClass === 'completed';
   const isPendingRecount = stateClass === 'pending-recount';
   const total = parseFloat(project.total_amount || 0);
+  const availableBase = parseFloat(project.available_amount || 0);
   const projectColor = getProjectColor(project.id);
 
+  const budgetedAmount = useMemo(() => {
+    if (!ordersGroupedByFile || ordersGroupedByFile.length === 0) return 0;
+
+    const projectCurrency = project.currency ?? 'PEN';
+
+    return ordersGroupedByFile.reduce((groupAcc, group) => {
+      const orders = group?.orders || [];
+      const groupTotal = orders.reduce((acc, order) => {
+        if (order.status !== 'pending') return acc;
+
+        const totalPen = parseFloat(order.total_with_igv ?? order.amount_pen ?? order.amount ?? 0);
+        if (projectCurrency === 'USD') {
+          const rate = parseFloat(order.exchange_rate ?? 0);
+          return acc + (rate > 0 ? totalPen / rate : 0);
+        }
+        return acc + totalPen;
+      }, 0);
+
+      return groupAcc + groupTotal;
+    }, 0);
+  }, [ordersGroupedByFile, project.currency]);
+
+  const budgetUsagePercent = availableBase > 0
+    ? Math.min(100, (budgetedAmount / availableBase) * 100)
+    : 0;
+
+  const spentWithinBudgetPercent = budgetedAmount > 0
+    ? Math.min(100, (parseFloat(projectSummary.spent || 0) / budgetedAmount) * 100)
+    : 0;
+
   const rows = [
-    { label: 'Monto Adjudicado', value: formatNumber(project.total_amount), color: 'text-amber-600', isCurrency: true },
-    { label: 'Retenido', value: formatNumber(project.retained_amount), color: 'text-gray-400', isCurrency: true },
-    { label: 'Real Disponible', value: formatNumber(parseFloat(project.total_amount || 0) - parseFloat(project.retained_amount || 0)), color: 'text-emerald-600', isCurrency: true },
-    { label: 'Gastado', value: formatNumber(projectSummary.spent), color: 'text-amber-500', isCurrency: true },
-    { label: 'Disponible Actual', value: formatNumber(projectSummary.remaining || project.available_amount), color: 'text-blue-600', isCurrency: true },
+    { label: 'Monto Adjudicado', value: formatNumber(project.total_amount), isCurrency: true, valueClass: 'text-amber-600' },
+    { label: 'Retenido',         value: formatNumber(project.retained_amount), isCurrency: true, valueClass: 'text-slate-400' },
+    { label: 'Real Disponible', value: formatNumber(parseFloat(project.total_amount || 0) - parseFloat(project.retained_amount || 0)), isCurrency: true, valueClass: 'text-emerald-600' },
+    { label: 'Gastado',         value: formatNumber(projectSummary.spent), isCurrency: true, valueClass: 'text-amber-500' },
+    { label: 'Presupuestado',   value: formatNumber(budgetedAmount), isCurrency: true, valueClass: 'text-blue-600' },
+    { label: 'Disponible Actual', value: formatNumber(projectSummary.remaining || project.available_amount), isCurrency: true, valueClass: 'text-blue-600' },
     ...(project.ceco_codigo ? [{ 
       label: 'CECOs', 
       value: `${project.abbreviation || project.ceco_nombre} – ${project.ceco_codigo}`, 
@@ -104,32 +136,30 @@ function StatsPanel({
   }, [ordersGroupedByFile]);
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
       {/* Left: stat rows */}
-      <div className="lg:col-span-2 rounded-lg border-2 border-gray-200 bg-white p-6 shadow-sm">
+      <article className="lg:col-span-2 flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         {/* Título con icono de hoja de papel */}
-        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
-          <svg xmlns="http://www.w3.org/2000/svg" className="size-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <div className="mb-2 flex items-center gap-2 border-b border-gray-100 pb-3">
+          <span className="rounded-full bg-gray-100 p-1.5"><svg xmlns="http://www.w3.org/2000/svg" className="size-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-          </svg>
-          <h3 className="text-sm font-bold tracking-wide text-gray-700 uppercase">Datos del Proyecto</h3>
+          </svg></span>
+          <h3 className="text-xs font-bold tracking-wide text-gray-900">DATOS DEL PROYECTO</h3>
         </div>
 
         <div className="space-y-3">
           {rows.map((row, i) => (
-            <div key={i} className="flex items-center justify-between border-b border-gray-50 pb-2 last:border-0">
-              <span className="text-sm text-gray-500">{row.label}</span>
+            <div key={i} className="flex items-center justify-between gap-3">
+              <span className="text-xs font-medium text-gray-500">{row.label}</span>
               {row.isPill ? (
                 <span 
-                  className="inline-flex items-center rounded-full px-4 py-1.5 text-xs font-semibold text-white"
-                  style={{ 
-                    backgroundColor: row.pillColor
-                  }}
+                  className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold text-white"
+                  style={{ backgroundColor: row.pillColor }}
                 >
                   {row.value}
                 </span>
               ) : (
-                <span className={`text-sm font-semibold ${row.color}`}>
+                <span className={`text-sm font-bold ${row.valueClass || 'text-gray-900'}`}>
                   {row.isCurrency !== false ? cur + ' ' : ''}{row.value}
                 </span>
               )}
@@ -137,15 +167,15 @@ function StatsPanel({
           ))}
 
           {/* ESTADO DEL PROYECTO */}
-          <div className="flex items-center justify-between border-b border-gray-50 pb-2">
+          <div className="flex items-center justify-between pt-1">
             <span className="text-sm font-semibold text-gray-500 uppercase">Estado del Proyecto</span>
             <button
               className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
                 isCompleted
-                  ? 'bg-blue-100 text-blue-700'
-                  : isPendingRecount
-                    ? 'bg-amber-100 text-amber-700'
-                    : 'bg-primary-100 text-primary-700 hover:bg-primary-200 cursor-pointer'
+? 'bg-blue-100 text-blue-700'
+                    : isPendingRecount
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-primary/20 text-primary/80 hover:bg-primary/30 cursor-pointer'
               }`}
               onClick={() => canFinalizeProject(project) && onStateClick(project)}
               title={
@@ -195,17 +225,43 @@ function StatsPanel({
           <div className="flex items-center justify-between pt-2">
             <span className="text-sm font-medium text-gray-700">Umbral ({project.spending_threshold || 75}%)</span>
             <div className="text-right">
-              <span className="text-sm font-bold text-gray-900">{usagePercent}% usado</span>
+              <span className="text-sm font-bold text-gray-900">{budgetUsagePercent.toFixed(1)}% presupuestado</span>
               <span className="ml-2 text-xs text-gray-400">
                 {cur} {formatNumber((parseFloat(project.total_amount || 0) * (project.spending_threshold || 75)) / 100)}
               </span>
             </div>
           </div>
+
+          <div className="rounded-lg bg-gray-50/80 px-3 py-2.5">
+            <div className="text-xs font-semibold text-gray-600">Presupuestado vs Disponible</div>
+            <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-gray-200">
+              <div
+                className="h-full rounded-full bg-blue-500"
+                style={{ width: `${budgetUsagePercent}%`, minWidth: budgetUsagePercent > 0 ? '8px' : '0px' }}
+              />
+            </div>
+            <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
+              <span>{cur} {formatNumber(budgetedAmount)} presupuestado</span>
+              <span>{cur} {formatNumber(availableBase)} base disponible</span>
+            </div>
+
+            <div className="mt-2 text-xs font-semibold text-gray-600">Gastado dentro de Presupuestado</div>
+            <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-gray-200">
+              <div
+                className="h-full rounded-full bg-emerald-500"
+                style={{ width: `${spentWithinBudgetPercent}%`, minWidth: spentWithinBudgetPercent > 0 ? '8px' : '0px' }}
+              />
+            </div>
+            <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
+              <span>{cur} {formatNumber(projectSummary.spent || 0)} pagado</span>
+              <span>Falta cubrir: {cur} {formatNumber(Math.max(budgetedAmount - parseFloat(projectSummary.spent || 0), 0))}</span>
+            </div>
+          </div>
         </div>
-      </div>
+      </article>
 
       {/* Right: MUI Pie chart */}
-      <div className="flex flex-col items-center justify-center rounded-lg border-2 border-gray-200 bg-white p-6 shadow-sm gap-2">
+      <article className="flex flex-col items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <PieChart
           series={[
             {
@@ -233,28 +289,24 @@ function StatsPanel({
             }] : []),
           ]}
           sx={{
-            [`& .${pieArcLabelClasses.root}`]: {
+            [`& .${pieClasses.arcLabel}`]: {
               fontSize: '10px',
               fontWeight: '600',
               fill: 'white',
             },
-            [`& .${pieArcClasses.root}`]: {
+            [`& .${pieClasses.arc}`]: {
               opacity: 0.49,
               transition: 'opacity 0.2s ease',
             },
-            [`& .${pieArcClasses.highlighted}`]: {
-              opacity: 1,
-            },
-            [`& .${pieArcClasses.faded}`]: {
-              opacity: 0.15,
-            },
+            // Note: highlighted/faded opacity is hardcoded in MUI x-charts v9
+            // (faded uses opacity:0.3, highlighted uses brightness(120%) filter)
           }}
           width={240}
           height={240}
           hideLegend
           margin={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <PieCenterLabel percent={usagePercent} />
+          <PieCenterLabel percent={budgetUsagePercent.toFixed(1)} />
         </PieChart>
         <div className="flex flex-col gap-1.5 text-xs w-full">
           {pieData.map(d => (
@@ -265,7 +317,7 @@ function StatsPanel({
             </div>
           ))}
         </div>
-      </div>
+      </article>
     </div>
   );
 }

@@ -22,15 +22,19 @@ function ServiceForm({ serviceForm, onFormChange, savingService, onCreateService
     const canSubmit = serviceForm.description.trim() && serviceForm.time_value > 0 && serviceForm.location.trim();
 
     return (
-        <section className="rounded-lg border-2 border-gray-200 bg-white p-6 shadow-sm">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900 mb-4">
-                <WrenchScrewdriverIcon className="size-5 text-primary" />
-                Especificación de Servicio
-            </h3>
-            <div className="space-y-3">
-                <div className="grid grid-cols-3 gap-3">
+        <section className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div className="border-b border-gray-100 px-6 py-3 bg-gray-50/50">
+                <h3 className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-wider text-gray-900">
+                    <span className="flex size-5 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                        <WrenchScrewdriverIcon className="size-[15.54px] text-primary" />
+                    </span>
+                    Especificación de Servicio
+                </h3>
+            </div>
+            <div className="p-5 flex flex-col gap-3">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {/* Descripción — ocupa 2 columnas */}
-                    <div className="col-span-2">
+                    <div className="md:col-span-2">
                         <Input
                             label="Descripción del Servicio"
                             placeholder="Descripción del servicio requerido..."
@@ -47,7 +51,7 @@ function ServiceForm({ serviceForm, onFormChange, savingService, onCreateService
                     />
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 items-end">
+                <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {/* Tiempo: número + unidad */}
                     <div>
                         <label className="mb-1 block text-xs font-medium text-gray-700">Tiempo</label>
@@ -57,12 +61,12 @@ function ServiceForm({ serviceForm, onFormChange, savingService, onCreateService
                                 min="1"
                                 value={serviceForm.time_value}
                                 onChange={handleChange('time_value')}
-                                className="w-20 rounded border border-gray-300 px-2 py-[7px] text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                                className="w-20 rounded-lg border border-gray-300 px-2 py-[7px] text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
                             />
                             <select
                                 value={serviceForm.time_unit}
                                 onChange={handleChange('time_unit')}
-                                className="flex-1 rounded border border-gray-300 px-2 py-[7px] text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                                className="flex-1 rounded-lg border border-gray-300 px-2 py-[7px] text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
                             >
                                 {TIME_UNITS.map((u) => (
                                     <option key={u} value={u}>{u}</option>
@@ -78,9 +82,9 @@ function ServiceForm({ serviceForm, onFormChange, savingService, onCreateService
                         onClick={onCreateService}
                         disabled={savingService || !canSubmit}
                         loading={savingService}
-                        className="gap-2"
+                        className="gap-2 h-8 text-[11px] px-5 rounded-lg"
                     >
-                        <PlusIcon className="size-4" />
+                        <PlusIcon className="size-3.5" />
                         {savingService ? 'Enviando...' : 'Agregar Servicio'}
                     </Button>
                 </div>

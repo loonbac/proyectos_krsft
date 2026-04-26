@@ -45,7 +45,7 @@ const CATEGORY_BADGE = {
   plano:        'blue',
   presupuesto:  'amber',
   contrato:     'emerald',
-  foto:         'purple',
+  foto:         'cyan',
   otro:         'cyan',
 };
 
@@ -66,7 +66,7 @@ const getFileIcon = (mimeType) => {
 
 const getFileIconColor = (mimeType) => {
   if (!mimeType) return 'text-gray-400 bg-gray-100';
-  if (mimeType.startsWith('image/')) return 'text-purple-500 bg-purple-50';
+  if (mimeType.startsWith('image/')) return 'text-cyan-600 bg-cyan-50';
   if (mimeType.includes('pdf')) return 'text-red-500 bg-red-50';
   if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) return 'text-emerald-500 bg-emerald-50';
   if (mimeType.includes('document') || mimeType.includes('word')) return 'text-blue-500 bg-blue-50';
@@ -106,16 +106,26 @@ function LeadFilesSection({ files = [], isClosed = false, onUpload, onDelete, ge
       alert(`Los siguientes archivos exceden el límite de 10 MB:\n${fileList}`);
       return;
     }
-    setPreviewFiles((prev) => [...prev, ...filesArray]);
+    setPreviewFiles((prev) => [...prev, ...filesArray.map(f => ({ file: f, subType: null }))]);
     if (inputRef.current) inputRef.current.value = '';
+  }, []);
+
+  const updatePreviewSubType = useCallback((index, type) => {
+    setPreviewFiles(prev => prev.map((item, i) => i === index ? { ...item, subType: type } : item));
   }, []);
 
   const handleConfirmUpload = useCallback(async () => {
     if (previewFiles.length === 0) return;
     setUploading(true);
-    await onUpload(previewFiles, category);
+    // Agregamos la propiedad sub_type a cada archivo para que el backend lo reciba
+    const filesWithMeta = previewFiles.map(p => {
+      // Inyectamos la propiedad en el objeto File (JS permite esto aunque no es estándar de File)
+      p.file.sub_type = p.subType;
+      return p.file;
+    });
+    const success = await onUpload(filesWithMeta, category);
     setUploading(false);
-    setPreviewFiles([]);
+    if (success) setPreviewFiles([]);
   }, [previewFiles, category, onUpload]);
 
   const removePreviewFile = useCallback((index) => {
@@ -149,12 +159,16 @@ function LeadFilesSection({ files = [], isClosed = false, onUpload, onDelete, ge
 
   return (
     <div className="rounded-lg border-2 border-gray-200 bg-white shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <PaperClipIcon className="size-4 text-gray-500" />
-          <h3 className="text-sm font-bold text-gray-700">Archivos Adjuntos</h3>
-          <Badge variant="gray" className="text-[10px]">{files.length + previewFiles.length}</Badge>
-        </div>
+      <div className="flex items-center justify-between border-b border-gray-100 px-6 py-3 bg-gray-50/50">
+        <h3 className="flex items-center gap-2 text-[11.11px] font-bold uppercase tracking-wider text-gray-900">
+          <span className="flex size-5 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+            <PaperClipIcon className="size-[14.2px] text-primary" />
+          </span>
+          Archivos Adjuntos
+        </h3>
+        <span className="inline-flex items-center justify-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-700 whitespace-nowrap min-w-[20px]">
+          {files.length + previewFiles.length}
+        </span>
       </div>
 
       <div className="p-4 space-y-4">
@@ -222,31 +236,72 @@ function LeadFilesSection({ files = [], isClosed = false, onUpload, onDelete, ge
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-xs font-bold text-amber-900">Pendientes de subida ({previewFiles.length})</h4>
-              <button onClick={clearAllPreviews} className="text-xs font-medium text-amber-700 hover:text-amber-900">Limpiar</button>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mb-3">
-              {previewFiles.map((file, idx) => {
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
+              {previewFiles.map((item, idx) => {
+                const { file, subType } = item;
+                const isSelected = subType !== null;
                 const preview = getFilePreview(file);
                 const Icon = getFileIcon(file.type);
                 const iconColor = getFileIconColor(file.type);
                 return (
-                  <div key={idx} className="relative rounded-lg border border-amber-200 bg-white overflow-hidden group aspect-square">
-                    {preview ? (
-                      <img src={preview} alt={file.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className={clsx('w-full h-full flex items-center justify-center', iconColor)}>
-                        <Icon className="size-6" />
+                  <div key={idx} className="flex flex-col gap-1.5">
+                    <p className="text-[10px] font-bold text-gray-500 truncate text-center px-1" title={file.name}>
+                      {file.name}
+                    </p>
+                    <div className={clsx(
+                      "relative rounded-xl border-2 overflow-hidden group aspect-square shadow-md transition-all",
+                      isSelected ? "border-amber-400" : "border-red-300 border-dashed animate-pulse"
+                    )}>
+                      {preview ? (
+                        <img src={preview} alt={file.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className={clsx('w-full h-full flex items-center justify-center bg-gray-50', iconColor)}>
+                          <Icon className="size-8" />
+                        </div>
+                      )}
+                      
+                      {!isSelected && (
+                        <div className="absolute inset-0 bg-white/20 backdrop-blur-[1px] flex items-center justify-center pointer-events-none">
+                          <span className="bg-white/90 text-red-600 text-[10px] font-black px-2 py-1 rounded-full shadow-sm">SELECCIONAR TIPO</span>
+                        </div>
+                      )}
+                      
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
+                        <p className="text-[9px] font-medium text-white px-2 truncate text-center w-full">{file.name}</p>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); removePreviewFile(idx); }}
+                          className="rounded bg-red-600 hover:bg-red-700 text-white transition-colors size-6 flex items-center justify-center shadow-lg"
+                          title="Eliminar"
+                        >
+                          <XMarkIcon className="size-4" />
+                        </button>
                       </div>
-                    )}
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
-                      <p className="text-xs font-medium text-white px-1 truncate text-center">{file.name}</p>
-                      <button
-                        onClick={() => removePreviewFile(idx)}
-                        className="rounded-full p-1 bg-red-500/80 hover:bg-red-600 text-white transition-colors"
-                      >
-                        <XMarkIcon className="size-3" />
-                      </button>
+                    </div>
+
+                    {/* Comercial / Alcance Selection below card */}
+                    <div className="flex flex-col gap-1 mt-1">
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); updatePreviewSubType(idx, 'comercial'); }}
+                          className={clsx(
+                            "flex-1 py-1.5 rounded-lg text-[11px] font-black uppercase transition-all shadow-sm border-2",
+                            subType === 'comercial' 
+                              ? 'bg-blue-600 border-blue-600 text-white' 
+                              : 'bg-white border-gray-100 text-gray-400 hover:border-blue-200 hover:text-blue-600'
+                          )}
+                        >COM</button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); updatePreviewSubType(idx, 'alcance'); }}
+                          className={clsx(
+                            "flex-1 py-1.5 rounded-lg text-[11px] font-black uppercase transition-all shadow-sm border-2",
+                            subType === 'alcance' 
+                              ? 'bg-orange-600 border-orange-600 text-white' 
+                              : 'bg-white border-gray-100 text-gray-400 hover:border-orange-200 hover:text-orange-600'
+                          )}
+                        >ALC</button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -254,13 +309,19 @@ function LeadFilesSection({ files = [], isClosed = false, onUpload, onDelete, ge
             </div>
 
             <div className="flex items-center gap-2">
-              <Button variant="primary" size="sm" onClick={handleConfirmUpload} disabled={uploading}>
+              <Button 
+                variant="primary" 
+                size="sm" 
+                onClick={handleConfirmUpload} 
+                disabled={uploading || previewFiles.some(p => p.subType === null)}
+                className="font-black uppercase tracking-wider"
+              >
                 Confirmar subida ({previewFiles.length})
               </Button>
               <button
                 onClick={clearAllPreviews}
                 disabled={uploading}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg border border-red-600 bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors shadow-sm"
               >
                 Cancelar
               </button>
@@ -280,7 +341,7 @@ function LeadFilesSection({ files = [], isClosed = false, onUpload, onDelete, ge
 
               return (
                 <div key={file.id} className="flex items-center gap-3 rounded-md border border-gray-100 bg-gray-50 px-3 py-2.5 group hover:bg-gray-100/80">
-                  {file.mime_type?.startsWith('image/') ? (
+                  {file.mime_type?.startsWith('image/') && typeof getDownloadUrl === 'function' ? (
                     <img src={getDownloadUrl(file.id)} alt={file.original_name} className="size-9 rounded-lg object-cover shrink-0" />
                   ) : (
                     <span className={clsx('inline-flex size-9 items-center justify-center rounded-lg shrink-0', iconColor)}>
@@ -294,6 +355,11 @@ function LeadFilesSection({ files = [], isClosed = false, onUpload, onDelete, ge
                       <Badge variant={CATEGORY_BADGE[file.category] || 'gray'} className="text-[10px] shrink-0">
                         {FILE_CATEGORIES.find(c => c.value === file.category)?.label || file.category}
                       </Badge>
+                      {file.sub_type && (
+                        <Badge variant={file.sub_type === 'alcance' ? 'orange' : 'blue'} className="text-[10px] shrink-0 uppercase font-bold">
+                          {file.sub_type}
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 mt-0.5 text-[10px] text-gray-400">
                       <span>{formatFileSize(file.size)}</span>
@@ -305,14 +371,16 @@ function LeadFilesSection({ files = [], isClosed = false, onUpload, onDelete, ge
                   <div className="flex items-center gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={() => setViewingFile(fileObj)}
-                      className="rounded p-1.5 bg-purple-500 hover:bg-purple-600 text-white transition-colors"
+                      className="rounded p-1.5 bg-cyan-600 text-white transition-colors hover:bg-cyan-700"
                       title="Ver archivo"
                     >
                       <EyeIcon className="size-4" />
                     </button>
-                    <a href={getDownloadUrl(file.id)} className="rounded p-1.5 bg-blue-500 hover:bg-blue-600 text-white transition-colors" title="Descargar">
-                      <ArrowDownTrayIcon className="size-4" />
-                    </a>
+                    {typeof getDownloadUrl === 'function' && (
+                      <a href={getDownloadUrl(file.id)} className="rounded p-1.5 bg-blue-500 hover:bg-blue-600 text-white transition-colors" title="Descargar">
+                        <ArrowDownTrayIcon className="size-4" />
+                      </a>
+                    )}
                     <button
                         onClick={() => handleDeleteFile(file.id)}
                         disabled={isDeleting}

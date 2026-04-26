@@ -4,9 +4,6 @@
  */
 import { memo, useState } from 'react';
 import clsx from 'clsx';
-import { ProgressIndicator, ProgressStep } from '@carbon/react';
-import '@carbon/styles/css/styles.css';
-import './PipelineDetailProgress.css';
 import {
   ArrowLeftIcon,
   UserGroupIcon,
@@ -43,7 +40,7 @@ const STAGE_LABELS = {
 const STAGE_ORDER = ['ingresado', 'contactado', 'visitado', 'presupuestado', 'negociacion', 'cerrado_ganado', 'cerrado_perdido'];
 
 const STAGE_BADGE = {
-  ingresado: 'gray', contactado: 'blue', visitado: 'purple',
+  ingresado: 'gray', contactado: 'blue', visitado: 'blue',
   presupuestado: 'amber', negociacion: 'cyan',
   cerrado_ganado: 'emerald', cerrado_perdido: 'red',
 };
@@ -76,7 +73,7 @@ const STAGE_PROGRESS_META = {
   },
   visitado: {
     icon: MapPinIcon,
-    iconClass: 'text-purple-600',
+    iconClass: 'text-indigo-600',
   },
   presupuestado: {
     icon: CurrencyDollarIcon,
@@ -100,30 +97,54 @@ function StageProgressBar({ currentStage }) {
   const currentIdx = isLost ? 0 : Math.max(mainStages.indexOf(currentStage), 0);
 
   return (
-    <div className="w-full rounded-xl border border-primary-100 bg-white px-4 py-4 shadow-sm">
-      <ProgressIndicator currentIndex={currentIdx} spaceEqually className="pipeline-progress-indicator">
+    <div className="w-full mb-6 relative">
+      {/* Línea base estática: evita el uso de márgenes negativos y bugs de overflow */}
+      <div className="absolute bottom-0 left-0 right-0 h-px bg-gray-200" />
+      
+      <h2 className="sr-only">Etapas del Lead</h2>
+      <nav 
+        className="relative z-10 flex w-full overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]" 
+        aria-label="Etapas del Lead"
+      >
         {mainStages.map((stage, idx) => {
           const meta = STAGE_PROGRESS_META[stage];
           const Icon = meta.icon;
+          const isComplete = !isLost && idx < currentIdx;
+          const isCurrent = !isLost && idx === currentIdx;
+          const isInvalid = isLost && idx === mainStages.length - 1;
+
+          let tabClass = 'border-transparent text-gray-400 hover:text-gray-500 hover:border-gray-300';
+          let iconClassObj = 'text-gray-400 group-hover:text-gray-500';
+
+          if (isCurrent || isComplete) {
+            tabClass = `border-current font-bold ${meta.iconClass}`;
+            iconClassObj = 'text-current';
+          } else if (isInvalid) {
+            tabClass = 'border-red-500 text-red-600 font-bold';
+            iconClassObj = 'text-red-500';
+          }
 
           return (
-            <ProgressStep
+            <div
               key={stage}
-              complete={!isLost && idx < currentIdx}
-              current={!isLost && idx === currentIdx}
-              invalid={isLost && idx === mainStages.length - 1}
-              label={(
-                <span className="pipeline-step-label">
-                  <Icon className={clsx('pipeline-step-icon size-3.5', meta.iconClass)} />
-                  <span className="pipeline-step-label-text">{STAGE_LABELS[stage]}</span>
+              className={clsx(
+                "group inline-flex flex-1 min-w-max sm:min-w-0 items-center justify-center gap-1.5 border-b-2 py-3 px-3 transition-colors whitespace-nowrap",
+                tabClass
+              )}
+            >
+              <Icon className={clsx("size-3.5 shrink-0", iconClassObj)} />
+              <span className="uppercase tracking-wider text-[10px] transition-colors">
+                {STAGE_LABELS[stage]}
+              </span>
+              {isInvalid && (
+                <span className="ml-1 text-[9px] bg-red-100 text-red-600 px-1 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                  Perdido
                 </span>
               )}
-              secondaryLabel={isLost && idx === mainStages.length - 1 ? STAGE_LABELS.cerrado_perdido : undefined}
-              description={`Etapa ${idx + 1}: ${STAGE_LABELS[stage]}`}
-            />
+            </div>
           );
         })}
-      </ProgressIndicator>
+      </nav>
     </div>
   );
 }
@@ -132,17 +153,17 @@ function StageProgressBar({ currentStage }) {
 
 function Section({ title, icon: Icon, badge, children, actions }) {
   return (
-    <div className="rounded-lg border-2 border-gray-200 bg-white shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-4 py-3">
+    <article className="rounded-lg border border-gray-100 bg-white shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between border-b border-gray-100 bg-white px-4 py-3">
         <div className="flex items-center gap-2">
-          {Icon && <Icon className="size-4 text-gray-500" />}
-          <h3 className="text-sm font-bold text-gray-700">{title}</h3>
+          {Icon && <span className="rounded-full bg-gray-100 p-1.5"><Icon className="size-4 text-gray-600" /></span>}
+          <h3 className="text-sm font-bold text-gray-900">{title}</h3>
           {badge}
         </div>
         {actions && <div className="flex items-center gap-2">{actions}</div>}
       </div>
-      <div className="p-4">{children}</div>
-    </div>
+      <div className="p-5">{children}</div>
+    </article>
   );
 }
 
@@ -267,14 +288,15 @@ function PipelineDetail({
       </div>
 
       {/* ── Stage Progress ── */}
-      <div className="overflow-x-auto pb-1">
-        <StageProgressBar currentStage={lead.etapa} />
-      </div>
+      <StageProgressBar currentStage={lead.etapa} />
 
       {/* ── Info general ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="rounded-lg border-2 border-gray-200 bg-white p-4 shadow-sm">
-          <h4 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-3">Información del Lead</h4>
+        <article className="rounded-lg border border-gray-100 bg-white p-5 shadow-sm">
+          <h4 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-4 flex items-center gap-2">
+            <span className="rounded-full bg-gray-100 p-1.5"><DocumentTextIcon className="size-4 text-gray-600" /></span>
+            Información del Lead
+          </h4>
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between"><dt className="text-gray-500">Cliente</dt><dd className="font-medium text-gray-900">{lead.cliente_nombre}</dd></div>
             {lead.cliente_empresa && <div className="flex justify-between"><dt className="text-gray-500">Empresa</dt><dd className="font-medium text-gray-900">{lead.cliente_empresa}</dd></div>}
@@ -286,12 +308,12 @@ function PipelineDetail({
             {lead.creator_name && <div className="flex justify-between"><dt className="text-gray-500">Iniciado por</dt><dd className="font-medium text-gray-900">{lead.creator_name}</dd></div>}
           </dl>
           {lead.descripcion && (
-            <div className="mt-3 border-t border-gray-100 pt-3">
+            <div className="mt-4 border-t border-gray-100 pt-4">
               <p className="text-xs text-gray-500 font-medium mb-1">Descripción:</p>
-              <p className="text-sm text-gray-700">{lead.descripcion}</p>
+              <p className="text-sm text-gray-700 content-start">{lead.descripcion}</p>
             </div>
           )}
-        </div>
+        </article>
 
         {/* Equipo */}
         <Section
@@ -387,7 +409,7 @@ function PipelineDetail({
       <Section
         title="Programación de Visitas"
         icon={MapPinIcon}
-        badge={<Badge variant="purple" className="text-[10px]">{(lead.visits || []).length}</Badge>}
+        badge={<Badge variant="blue" className="text-[10px]">{(lead.visits || []).length}</Badge>}
         actions={canScheduleVisit && (
           <Button variant="primary" size="sm" onClick={onOpenVisitModal} className="gap-1 text-xs">
             <PlusIcon className="size-3" />
@@ -402,7 +424,7 @@ function PipelineDetail({
             {lead.visits.map((visit) => (
               <div key={visit.id} className="flex items-start justify-between gap-3 rounded-md border border-gray-100 bg-gray-50 px-3 py-2.5">
                 <div className="flex items-start gap-3">
-                  <span className="mt-0.5 inline-flex size-7 items-center justify-center rounded-full bg-purple-100 text-purple-600">
+                  <span className="mt-0.5 inline-flex size-7 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
                     <CalendarDaysIcon className="size-3.5" />
                   </span>
                   <div>

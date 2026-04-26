@@ -30,6 +30,7 @@ Route::get('/{id}/paid-orders', "{$ctrl}@getPaidOrders")->where('id', '[0-9]+');
 // Material import/export
 Route::get('/material-template', "{$ctrl}@downloadMaterialTemplate");
 Route::post('/{id}/import-materials', "{$ctrl}@importMaterials")->where('id', '[0-9]+');
+Route::get('/{projectId}/export-materials', "{$ctrl}@exportMaterialsExcel")->where('projectId', '[0-9]+');
 
 // Finalizar proyecto (liberar materiales apartados → disponible)
 Route::post('/{id}/finalize', "{$ctrl}@finalizeProject")->where('id', '[0-9]+');
@@ -45,6 +46,16 @@ Route::post('/{id}/approve-completion', "{$ctrl}@approveCompletion")->where('id'
 Route::post('/{id}/mark-material-arrived', "{$ctrl}@markMaterialArrived")->where('id', '[0-9]+');
 Route::post('/{id}/mark-material-not-arrived', "{$ctrl}@markMaterialNotArrived")->where('id', '[0-9]+');
 
+// Project Planner
+Route::get('/{projectId}/planner', "{$ctrl}@getPlanner")->where('projectId', '[0-9]+');
+Route::post('/{projectId}/planner', "{$ctrl}@savePlanner")->where('projectId', '[0-9]+');
+Route::put('/{projectId}/planner', "{$ctrl}@savePlanner")->where('projectId', '[0-9]+');
+Route::post('/{projectId}/planner/stages', "{$ctrl}@addStage")->where('projectId', '[0-9]+');
+Route::put('/{projectId}/planner/stages/{stageId}', "{$ctrl}@updateStage")->where(['projectId' => '[0-9]+', 'stageId' => '[0-9]+']);
+Route::delete('/{projectId}/planner/stages/{stageId}', "{$ctrl}@deleteStage")->where(['projectId' => '[0-9]+', 'stageId' => '[0-9]+']);
+Route::delete('/{projectId}/planner/reset', "{$ctrl}@resetPlanner")->where('projectId', '[0-9]+');
+Route::post('/{projectId}/planner/generate', "{$ctrl}@generatePlanner")->where('projectId', '[0-9]+');
+
 // Reportes de materiales faltantes (supervisor → inventario)
 Route::get('/{id}/arrival-reports', "{$ctrl}@listArrivalReports")->where('id', '[0-9]+');
 Route::post('/{id}/arrival-reports', "{$ctrl}@createArrivalReport")->where('id', '[0-9]+');
@@ -58,6 +69,7 @@ Route::prefix('pipeline')->group(function () use ($pipeCtrl) {
     Route::get('/workers', "{$pipeCtrl}@getWorkers");
     Route::get('/cecos/list', "{$pipeCtrl}@getCecos");
     Route::post('/', "{$pipeCtrl}@store");
+    Route::get('/{id}/valid-cecos', "{$pipeCtrl}@getValidCecosForPipeline")->where('id', '[0-9]+');
     Route::get('/{id}', "{$pipeCtrl}@show")->where('id', '[0-9]+');
     Route::put('/{id}', "{$pipeCtrl}@update")->where('id', '[0-9]+');
     Route::delete('/{id}', "{$pipeCtrl}@destroy")->where('id', '[0-9]+');
