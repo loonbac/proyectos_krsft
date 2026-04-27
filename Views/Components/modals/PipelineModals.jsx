@@ -64,6 +64,8 @@ export const CreateLeadModal = memo(function CreateLeadModal({
   const [departamento, setDepartamento] = useState('');
   const [distrito, setDistrito] = useState('');
   const [workerSearch, setWorkerSearch] = useState('');
+  const [companySuggestions, setCompanySuggestions] = useState([]);
+  const [showCompanyDropdown, setShowCompanyDropdown] = useState(false);
   const departamentos = Object.keys(PERU_UBIGEO).sort();
   const distritos = departamento ? PERU_UBIGEO[departamento] : [];
 
@@ -74,10 +76,22 @@ export const CreateLeadModal = memo(function CreateLeadModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [departamento, distrito]);
 
-  // Reset geo when modal closes
-  useEffect(() => {
-    if (!open) { setDepartamento(''); setDistrito(''); setWorkerSearch(''); }
-  }, [open]);
+  // Fetch company suggestions for autocomplete
+  const fetchCompanies = useCallback(async (query) => {
+    try {
+      const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+      const res = await fetch(`${API_BASE}/pipeline/companies?q=${encodeURIComponent(query)}`, {
+        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': token },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCompanySuggestions(data.data || []);
+        setShowCompanyDropdown(true);
+      }
+    } catch {
+      // Silently fail — no suggestions
+    }
+  }, []);
 
   const toggleWorker = (id) => {
     const ids = form.team_ids || [];
@@ -86,6 +100,11 @@ export const CreateLeadModal = memo(function CreateLeadModal({
       team_ids: ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id],
     });
   };
+
+  // Reset states when modal closes
+  useEffect(() => {
+    if (!open) { setDepartamento(''); setDistrito(''); setWorkerSearch(''); setCompanySuggestions([]); setShowCompanyDropdown(false); }
+  }, [open]);
 
   return (
     <Modal
@@ -113,7 +132,55 @@ export const CreateLeadModal = memo(function CreateLeadModal({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Input label="Teléfono" value={form.cliente_telefono} onChange={e => onFormChange({ ...form, cliente_telefono: e.target.value.replace(/\D/g, '').slice(0, 9) })} placeholder="999 999 999" inputMode="numeric" maxLength={9} />
           <Input label="Email" type="email" value={form.cliente_email} onChange={e => onFormChange({ ...form, cliente_email: e.target.value })} placeholder="cliente@empresa.com" />
-          <Input label="Empresa" value={form.cliente_empresa} onChange={e => onFormChange({ ...form, cliente_empresa: e.target.value })} placeholder="Empresa S.A.C." />
+          {/* Empresa con autocomplete */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Empresa</label>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Empresa S.A.C."
+                value={form.cliente_empresa}
+                onChange={e => {
+                  onFormChange({ ...form, cliente_empresa: e.target.value });
+                  if (e.target.value.trim().length >= 2) {
+                    fetchCompanies(e.target.value.trim());
+                  } else {
+                    setCompanySuggestions([]);
+                    setShowCompanyDropdown(false);
+                  }
+                }}
+                onFocus={() => {
+                  if (form.cliente_empresa.trim().length >= 2) {
+                    fetchCompanies(form.cliente_empresa.trim());
+                  }
+                }}
+                onBlur={() => {
+                  // Delay to allow click on dropdown item
+                  setTimeout(() => setShowCompanyDropdown(false), 200);
+                }}
+                className="mt-1.5 w-full rounded-lg border bg-white px-3 py-2.5 text-[13px] shadow-sm transition-all focus:outline-none focus:ring-2 border-gray-300 focus:border-primary/50 focus:ring-primary/20"
+              />
+
+              {/* Dropdown de sugerencias */}
+              {showCompanyDropdown && companySuggestions.length > 0 && (
+                <ul className="absolute z-50 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg max-h-48 overflow-auto">
+                  {companySuggestions.map((company, idx) => (
+                    <li
+                      key={idx}
+                      onMouseDown={() => {
+                        onFormChange({ ...form, cliente_empresa: company.value });
+                        setShowCompanyDropdown(false);
+                        setCompanySuggestions([]);
+                      }}
+                      className="cursor-pointer px-3 py-2 text-sm text-gray-700 hover:bg-primary/10 hover:text-gray-900"
+                    >
+                      {company.label}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
           <Input label="Cargo del cliente" value={form.cargo_cliente || ''} onChange={e => onFormChange({ ...form, cargo_cliente: e.target.value })} placeholder="Ej: Gerente de obras" />
         </div>
         {/* Fila 3: Ubicación (Departamento, Distrito) */}
@@ -659,6 +726,16 @@ export const CreateProjectFromLeadModal = memo(function CreateProjectFromLeadMod
     }
   }, [open]);
 
+  // Auto-asignar abreviatura desde el CECO existente seleccionado
+  useEffect(() => {
+    if (enrollMode === 'existing' && selectedExistingCecoId) {
+      const selectedCeco = validCecos.find(c => c.id === selectedExistingCecoId);
+      if (selectedCeco) {
+        setForm(f => ({ ...f, abbreviation: selectedCeco.nombre }));
+      }
+    }
+  }, [enrollMode, selectedExistingCecoId, validCecos]);
+
   // Cerrar dropdown al hacer click fuera
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -828,15 +905,17 @@ export const CreateProjectFromLeadModal = memo(function CreateProjectFromLeadMod
           />
         </div>
 
-        {/* Abreviatura - editable */}
-        <Input
-          label="Abreviatura del nombre del proyecto"
-          required
-          placeholder=""
-          value={form.abbreviation}
-          onChange={e => setForm({ ...form, abbreviation: e.target.value.replace(/[^A-Za-zÀ-ÿ\s]/g, '') })}
-          maxLength={50}
-        />
+        {/* Abreviatura - editable (solo en modo 'new') */}
+        {enrollMode === 'new' && (
+          <Input
+            label="Abreviatura del nombre del proyecto"
+            required
+            placeholder=""
+            value={form.abbreviation}
+            onChange={e => setForm({ ...form, abbreviation: e.target.value.replace(/[^A-Za-zÀ-ÿ\s]/g, '') })}
+            maxLength={50}
+          />
+        )}
 
         {/* Supervisor del proyecto - combobox con búsqueda */}
         <div ref={comboRef} className="relative">

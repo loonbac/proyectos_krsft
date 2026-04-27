@@ -489,7 +489,7 @@ class PipelineController extends Controller
         }
 
         $request->validate([
-            'abbreviation'         => 'required|string|max:50',
+            'abbreviation'         => 'required_without:enroll_existing_ceco_id|string|max:50',
             'ceco_id'              => 'required_without:enroll_existing_ceco_id|nullable|integer|exists:cecos,id',
             'supervisor_id'        => 'required|integer|exists:trabajadores,id',
             'supervisor_pdr_id'    => 'nullable|integer|exists:trabajadores,id',
@@ -506,14 +506,38 @@ class PipelineController extends Controller
             if ($enrollCecoId && $enrollCecoId > 0) {
                 $ceco = Ceco::findOrFail($enrollCecoId);
 
+                // Si no viene abbreviation, usar el nombre del CECO
+                $abbreviation = $request->filled('abbreviation') ? $request->abbreviation : $ceco->nombre;
+
                 // Validar que sea nivel 1 (centro de costo cliente)
                 if ($ceco->nivel !== 1) {
                     throw new \Exception('El CECO seleccionado no es un centro de costo de cliente válido');
                 }
 
-                // Validar que coincida la empresa
-                if (trim(mb_strtolower($ceco->razon_social ?? '')) !== trim(mb_strtolower($lead->cliente_empresa ?? ''))) {
-                    throw new \Exception('El CECO no pertenece a la misma empresa');
+                // Normalizar para comparación con acentos (misma lógica que scopeValidForEnrollment)
+                $normalizarEmpresa = function($texto) {
+                    $t = trim($texto ?? '');
+                    $t = mb_strtolower($t, 'UTF-8');
+                    $t = strtr($t, ['á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','ü'=>'u','ñ'=>'n']);
+                    $t = preg_replace('/\s+/', ' ', $t);
+                    return trim($t);
+                };
+
+                $cecoEmpresa = $normalizarEmpresa($ceco->razon_social ?? '');
+                $pipelineEmpresa = $normalizarEmpresa($lead->cliente_empresa ?? '');
+
+                if ($cecoEmpresa !== $pipelineEmpresa) {
+                    // Fallback: comparar sin espacios (como estrategia #4 del scope)
+                    $cecoCompact = str_replace(' ', '', $cecoEmpresa);
+                    $pipeCompact = str_replace(' ', '', $pipelineEmpresa);
+
+                    // Fallback final: uno contiene al otro (para PUNTOELASTIC vs PUNTO ELASTIC S.A.C)
+                    if ($cecoCompact !== $pipeCompact) {
+                        $contains = str_contains($cecoCompact, $pipeCompact) || str_contains($pipeCompact, $cecoCompact);
+                        if (!$contains) {
+                            throw new \Exception('El CECO no pertenece a la misma empresa');
+                        }
+                    }
                 }
 
                 // Validar que tenga proyectos activos
@@ -525,7 +549,7 @@ class PipelineController extends Controller
                 DB::table('projects')
                     ->where('id', $projectId)
                     ->update([
-                        'abbreviation' => $request->abbreviation,
+                        'abbreviation' => $abbreviation,
                         'ceco_id'      => $ceco->id,
                         'updated_at'   => now(),
                     ]);
@@ -1147,6 +1171,70 @@ class PipelineController extends Controller
                 'message' => 'Error interno'
             ]);
         }
+    }
+
+    /**
+     * Buscar empresas existentes para autocompletado.
+     * Busca en pipeline leads y en CECOs creados.
+     */
+    public function searchCompanies(Request $request)
+    {
+        if (!$this->checkPipelineAccess()) return $this->denyAccess();
+
+        $query = trim($request->get('q', ''));
+
+        $companies = collect();
+
+        // Buscar en pipeline (cliente_empresa de leads existentes)
+        $pipelineCompanies = DB::table($this->pipelineTable)
+            ->select('cliente_empresa')
+            ->whereNotNull('cliente_empresa')
+            ->where('cliente_empresa', '!=', '')
+            ->when($query, fn($q) => $q->where('cliente_empresa', 'like', '%' . $query . '%'))
+            ->distinct()
+            ->orderBy('cliente_empresa')
+            ->limit(10)
+            ->pluck('cliente_empresa');
+
+        // Buscar en CECOs (razon_social y nombre)
+        $cecoCompanies = DB::table('cecos')
+            ->select('razon_social', 'nombre')
+            ->where('nivel', 1)
+            ->where(function($q) {
+                $q->whereNotNull('razon_social')->where('razon_social', '!=', '')
+                  ->orWhereNotNull('nombre')->where('nombre', '!=', '');
+            })
+            ->when($query, fn($q) => $q->where(function($sub) use ($query) {
+                $sub->where('razon_social', 'like', '%' . $query . '%')
+                    ->orWhere('nombre', 'like', '%' . $query . '%');
+            }))
+            ->distinct()
+            ->orderBy('razon_social')
+            ->orderBy('nombre')
+            ->limit(10)
+            ->get()
+            ->flatMap(fn($row) => array_filter([
+                $row->razon_social,
+                $row->nombre !== $row->razon_social ? $row->nombre : null,
+            ]))
+            ->unique()
+            ->sort()
+            ->take(10)
+            ->values();
+
+        // Combinar, deduplicar, ordenar y limitar
+        $companies = $pipelineCompanies
+            ->merge($cecoCompanies)
+            ->unique()
+            ->sort()
+            ->take(10)
+            ->values()
+            ->map(fn($name) => ['label' => $name, 'value' => $name]);
+
+        return response()->json([
+            'success' => true,
+            'data' => $companies,
+        ]);
     }
 
     /**

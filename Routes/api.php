@@ -69,6 +69,7 @@ Route::prefix('pipeline')->group(function () use ($pipeCtrl) {
     Route::get('/workers', "{$pipeCtrl}@getWorkers");
     Route::get('/cecos/list', "{$pipeCtrl}@getCecos");
     Route::post('/', "{$pipeCtrl}@store");
+    Route::get('/companies', "{$pipeCtrl}@searchCompanies");
     Route::get('/{id}/valid-cecos', "{$pipeCtrl}@getValidCecosForPipeline")->where('id', '[0-9]+');
     Route::get('/{id}', "{$pipeCtrl}@show")->where('id', '[0-9]+');
     Route::put('/{id}', "{$pipeCtrl}@update")->where('id', '[0-9]+');
