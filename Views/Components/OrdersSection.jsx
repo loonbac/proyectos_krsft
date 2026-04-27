@@ -14,6 +14,7 @@ import {
   TagIcon,
   ClockIcon,
   ExclamationCircleIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
@@ -47,6 +48,8 @@ function OrdersSection({
   getGroupDraftOrders,
   onMarkArrived,
   onMarkNotArrived,
+  canDelete,
+  onDeleteList,
 }) {
   const [infoGroup, setInfoGroup] = useState(null);
 
@@ -129,6 +132,17 @@ function OrdersSection({
                     <strong className="truncate font-medium text-gray-800">{group.isInventoryGroup ? 'Materiales de Inventario' : (group.filename || 'Órdenes Manuales')}</strong>
                   </div>
                   <div className="flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
+                    {canDelete && !group.isInventoryGroup && group.filename && (
+                      <button
+                        type="button"
+                        onClick={() => onDeleteList(group)}
+                        className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600 transition-colors hover:bg-red-100"
+                        title="Eliminar toda la lista"
+                      >
+                        <TrashIcon className="size-3.5" />
+                        Eliminar
+                      </button>
+                    )}
                     {!group.isInventoryGroup && !!group.filename && (
                       <button
                         type="button"

@@ -78,6 +78,7 @@ class ProyectoController extends Controller
             'surplus_count' => $isAdmin || $user->hasPermission("module.{$this->moduleSlug}.surplus_count"),
             'approve_surplus' => $isAdmin || $user->hasPermission("module.{$this->moduleSlug}.approve_surplus"),
             'view_scope_files' => $isAdmin || $user->hasPermission("module.{$this->moduleSlug}.view_scope_files"),
+            'delete_orders' => $user->hasPermission("module.{$this->moduleSlug}.delete_orders"),
         ];
     }
 
@@ -206,7 +207,8 @@ class ProyectoController extends Controller
                      ->where(function ($q) {
                          $q->whereNull('purchase_orders.cancellation_status')
                            ->orWhere('purchase_orders.cancellation_status', '!=', 'anulada');
-                     });
+                     })
+                     ->whereNull('purchase_orders.deleted_at');
             })
             ->leftJoin('trabajadores', 'projects.supervisor_id', '=', 'trabajadores.id')
             ->leftJoin('trabajadores as trab_pdr', 'projects.supervisor_pdr_id', '=', 'trab_pdr.id')
@@ -293,13 +295,14 @@ class ProyectoController extends Controller
             return response()->json(['success' => false, 'message' => 'Proyecto no encontrado'], 404);
         }
 
-        // Get purchase orders (excluir anuladas)
+        // Get purchase orders (excluir anuladas y eliminadas)
         $orders = DB::table('purchase_orders')
             ->where('project_id', $id)
             ->where(function ($q) {
                 $q->whereNull('cancellation_status')
                   ->orWhere('cancellation_status', '!=', 'anulada');
             })
+            ->whereNull('deleted_at')
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($order) {
@@ -803,6 +806,87 @@ class ProyectoController extends Controller
             'success' => true,
             'orders' => $orders,
             'total' => $orders->count()
+        ]);
+    }
+
+    /**
+     * Batch delete orders (soft delete unpaid orders, skip paid orders)
+     * POST /api/proyectoskrsft/orders/batch-delete
+     */
+    public function batchDeleteOrders(Request $request)
+    {
+        $user = auth()->user();
+        if (!$user->hasPermission("module.{$this->moduleSlug}.delete_orders")) {
+            return response()->json(['success' => false, 'message' => 'No tienes permisos para eliminar órdenes'], 403);
+        }
+
+        $orderIds = $request->input('order_ids');
+        $sourceFilename = $request->input('source_filename');
+        $projectId = $request->input('project_id');
+
+        // Build query to find orders
+        $query = DB::table('purchase_orders')->whereNull('deleted_at');
+
+        if ($orderIds) {
+            $query->whereIn('id', $orderIds);
+        } elseif ($sourceFilename && $projectId) {
+            $query->where('source_filename', $sourceFilename)->where('project_id', $projectId);
+        } else {
+            return response()->json(['success' => false, 'message' => 'Se requiere order_ids o source_filename + project_id'], 400);
+        }
+
+        $orders = $query->get();
+
+        if ($orders->isEmpty()) {
+            return response()->json(['success' => true, 'deleted_count' => 0, 'skipped_paid' => [], 'message' => 'No se encontraron órdenes para eliminar']);
+        }
+
+        $paidOrders = [];
+        $unpaidOrders = [];
+
+        foreach ($orders as $order) {
+            if ($order->payment_confirmed) {
+                $paidOrders[] = $order->id;
+            } else {
+                $unpaidOrders[] = $order->id;
+            }
+        }
+
+        $deletedCount = 0;
+        if (!empty($unpaidOrders)) {
+            $deletedCount = DB::table('purchase_orders')
+                ->whereIn('id', $unpaidOrders)
+                ->update(['deleted_at' => now()]);
+        }
+
+        $message = $deletedCount > 0
+            ? "{$deletedCount} orden(es) eliminada(s)"
+            : 'No se eliminó ninguna orden';
+
+        if (count($paidOrders) > 0) {
+            $message .= '. ' . count($paidOrders) . ' orden(es) pagada(s) no se eliminaron';
+        }
+
+        app(\App\Services\LogKrsftService::class)->log(
+            module: 'proyectoskrsft',
+            action: 'orders_batch_deleted',
+            message: "Batch delete: {$deletedCount} eliminados, " . count($paidOrders) . " saltados (pagados)",
+            level: 'warning',
+            userId: auth()->id(),
+            userName: auth()->user()->name,
+            extra: [
+                'deleted_ids' => $unpaidOrders,
+                'skipped_paid_ids' => $paidOrders,
+                'source_filename' => $sourceFilename,
+                'project_id' => $projectId,
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'deleted_count' => $deletedCount,
+            'skipped_paid' => $paidOrders,
+            'message' => $message,
         ]);
     }
 

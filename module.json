@@ -65,6 +65,11 @@
             "action": "view_scope_files",
             "display_name": "Proyectos: Ver Archivos de Alcance",
             "description": "Permite ver los archivos de tipo 'alcance' en el pipeline y en proyectos iniciados. Sin este permiso, los archivos de alcance están ocultos."
+        },
+        {
+            "action": "delete_orders",
+            "display_name": "Proyectos: Eliminar Órdenes",
+            "description": "Muestra el botón 'Eliminar Lista' en los grupos de órdenes de materiales. Permite borrar suavemente listas enteras de órdenes no pagadas, ocultándolas del módulo de Compras."
         }
     ],
     "permission_implies": {
@@ -91,6 +96,7 @@
         "finalize": "configure",
         "cancel-finalization": "configure",
         "create": "configure",
-        "field-workers": "field_workers"
+        "field-workers": "field_workers",
+        "orders/batch-delete": "delete_orders"
     }
 }

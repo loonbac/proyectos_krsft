@@ -1226,6 +1226,35 @@ export default function useProyectosData({ permissions }) {
     return `${API_BASE}/pipeline/files/${fileId}/download`;
   }, []);
 
+  // ── Delete order list (batch soft-delete) ────────────────────────────
+  const deleteOrderList = useCallback(async (sourceFilename, projectId) => {
+    if (!projectId || !sourceFilename) return;
+    openConfirmModal({
+      title: 'Eliminar Lista de Materiales',
+      message: `¿Estás seguro de eliminar toda la lista "${sourceFilename}"? Las órdenes eliminadas no se mostrarán en Compras.`,
+      actionLabel: 'Eliminar',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await fetchWithCsrf(`${API_BASE}/orders/batch-delete`, {
+            method: 'POST',
+            body: JSON.stringify({ source_filename: sourceFilename, project_id: projectId })
+          });
+          const data = await res.json();
+          if (data.success) {
+            showToastMsg(data.message || `Lista eliminada (${data.deleted_count} órdenes)`);
+            if (data.skipped_paid?.length > 0) {
+              showToastMsg(`${data.skipped_paid.length} orden(es) pagada(s) no se eliminaron`, 'warning');
+            }
+            await refreshSelectedProject();
+          } else {
+            showToastMsg(data.message || 'Error al eliminar', 'error');
+          }
+        } catch { showToastMsg('Error de conexión', 'error'); }
+      }
+    });
+  }, [openConfirmModal, showToastMsg, refreshSelectedProject]);
+
   /* -------- LIFECYCLE -------- */
   const canSeeProjects = permissions.started_projects_personal;
 
@@ -1312,6 +1341,8 @@ export default function useProyectosData({ permissions }) {
     resetProjectPlanner,
     // Files
     uploadProjectFiles, deleteProjectFile, getProjectFileDownloadUrl,
+    // Delete order list
+    deleteOrderList,
     // Refs (for flatpickr)
     dateFromInputRef, dateToInputRef,
     openDateFromPicker, openDateToPicker, clearDateFilters,

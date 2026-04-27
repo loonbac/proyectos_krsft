@@ -309,6 +309,8 @@ export default function ProyectosIndex({ permissions, trabajadorId }) {
                 getGroupDraftOrders={d.getGroupDraftOrders}
                 onMarkArrived={d.markMaterialArrived}
                 onMarkNotArrived={d.markMaterialNotArrived}
+                canDelete={permissions.delete_orders}
+                onDeleteList={(group) => d.deleteOrderList(group.filename, d.selectedProject?.id)}
               />
               <ArrivalReportsSection
                 arrivalReports={d.arrivalReports}
