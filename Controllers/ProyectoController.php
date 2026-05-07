@@ -207,8 +207,7 @@ class ProyectoController extends Controller
                      ->where(function ($q) {
                          $q->whereNull('purchase_orders.cancellation_status')
                            ->orWhere('purchase_orders.cancellation_status', '!=', 'anulada');
-                     })
-                     ->whereNull('purchase_orders.deleted_at');
+                     });
             })
             ->leftJoin('trabajadores', 'projects.supervisor_id', '=', 'trabajadores.id')
             ->leftJoin('trabajadores as trab_pdr', 'projects.supervisor_pdr_id', '=', 'trab_pdr.id')

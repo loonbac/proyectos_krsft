@@ -8,7 +8,7 @@ import { Spanish } from 'flatpickr/dist/l10n/es.js';
 
 import {
   POLLING_MS, API_BASE, DEFAULT_MATERIAL_FORM, DEFAULT_SERVICE_FORM, DEFAULT_CREATE_FORM,
-  arraysEqual, saveToCache, loadFromCache, fetchWithCsrf, getCsrfToken,
+  arraysEqual, saveToCache, loadFromCache, fetchWithCsrf, safeJsonParse, getCsrfToken,
   formatIso, formatDisplayFromIso, getStatusLabel, getProjectStateClass,
   canFinalizeProject,
 } from '../utils';
@@ -315,41 +315,49 @@ export default function useProyectosData({ permissions }) {
     if (showLoad) setLoading(true);
     try {
       const res = await fetch(`${API_BASE}/list`);
-      const data = await res.json();
-      if (data.success) {
+      const data = await safeJsonParse(res);
+      if (data?.success) {
         const np = data.projects || [];
         setProjects(prev => { if (arraysEqual(prev, np)) return prev; saveToCache('projects', np); return np; });
       }
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error('Error loading projects:', e); }
     if (showLoad) setLoading(false);
   }, []);
 
   const loadStats = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE}/stats`);
-      const data = await res.json();
-      if (data.success) { setStats(prev => { if (JSON.stringify(prev) === JSON.stringify(data.stats)) return prev; saveToCache('stats', data.stats); return data.stats; }); }
-    } catch (e) { console.error(e); }
+      const data = await safeJsonParse(res);
+      if (data?.success) { setStats(prev => { if (JSON.stringify(prev) === JSON.stringify(data.stats)) return prev; saveToCache('stats', data.stats); return data.stats; }); }
+    } catch (e) { console.error('Error loading stats:', e); }
   }, []);
 
   const loadSupervisors = useCallback(async () => {
-    try { const res = await fetch(`${API_BASE}/supervisors`); const data = await res.json(); if (data.success) setSupervisors(data.supervisors || []); } catch { }
+    try {
+      const res = await fetch(`${API_BASE}/supervisors`);
+      const data = await safeJsonParse(res);
+      if (data?.success) setSupervisors(data.supervisors || []);
+    } catch { }
   }, []);
 
   const loadAllWorkers = useCallback(async () => {
-    try { const res = await fetch(`${API_BASE}/workers`); const data = await res.json(); if (data.success) setAllWorkers((data.workers || []).map(w => ({ ...w, name: w.nombre_completo || w.name }))); } catch { }
+    try {
+      const res = await fetch(`${API_BASE}/workers`);
+      const data = await safeJsonParse(res);
+      if (data?.success) setAllWorkers((data.workers || []).map(w => ({ ...w, name: w.nombre_completo || w.name })));
+    } catch { }
   }, []);
 
   const selectProject = useCallback(async (project) => {
     // ─── CLEAR PLANNER SYNC IMMEDIATELY ───
     setPlannerData(null);
     setPlannerStages([]);
-    
+
     try {
       const id = typeof project === 'object' ? project.id : project;
       const res = await fetch(`${API_BASE}/${id}`);
-      const data = await res.json();
-      if (data.success) {
+      const data = await safeJsonParse(res);
+      if (data?.success) {
         setSelectedProject(data.project);
         setProjectWorkers(data.workers || []);
         setProjectFieldWorkers(data.field_workers || []);
@@ -361,11 +369,11 @@ export default function useProyectosData({ permissions }) {
         // Fetch secondary data in parallel (non-blocking)
         if (data.project.status === 'active' || data.project.status === 'pendiente_recuento') {
           const promises = [
-            fetch(`${API_BASE}/${id}/completion-request`).then(r => r.json()).then(d => setCompletionRequest(d.success ? d.request : null)).catch(() => setCompletionRequest(null)),
+            fetch(`${API_BASE}/${id}/completion-request`).then(r => safeJsonParse(r)).then(d => setCompletionRequest(d?.success ? d.request : null)).catch(() => setCompletionRequest(null)),
           ];
           if (data.project.status === 'pendiente_recuento') {
             promises.push(
-              fetch(`${API_BASE}/${id}/completion-materials`).then(r => r.json()).then(d => setCompletionMaterials(d.success ? d.materials || [] : [])).catch(() => setCompletionMaterials([]))
+              fetch(`${API_BASE}/${id}/completion-materials`).then(r => safeJsonParse(r)).then(d => setCompletionMaterials(d?.success ? d.materials || [] : [])).catch(() => setCompletionMaterials([]))
             );
           }
           Promise.all(promises);
@@ -373,7 +381,7 @@ export default function useProyectosData({ permissions }) {
           setCompletionRequest(null);
         }
       }
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error('Error selecting project:', e); }
   }, []);
 
   const loadPaidOrders = useCallback(async (projId) => {
@@ -382,8 +390,8 @@ export default function useProyectosData({ permissions }) {
     setLoadingPaidOrders(true);
     try {
       const res = await fetch(`${API_BASE}/${pid}/paid-orders`);
-      const data = await res.json();
-      if (data.success) { setPaidOrders(prev => arraysEqual(prev, data.orders) ? prev : data.orders); }
+      const data = await safeJsonParse(res);
+      if (data?.success) { setPaidOrders(prev => arraysEqual(prev, data.orders) ? prev : data.orders); }
     } catch { }
     setLoadingPaidOrders(false);
   }, []);
@@ -394,8 +402,8 @@ export default function useProyectosData({ permissions }) {
     if (!pid) return;
     try {
       const res = await fetch(`${API_BASE}/${pid}/arrival-reports`);
-      const data = await res.json();
-      if (data.success) { setArrivalReports(prev => arraysEqual(prev, data.reports) ? prev : data.reports); }
+      const data = await safeJsonParse(res);
+      if (data?.success) { setArrivalReports(prev => arraysEqual(prev, data.reports) ? prev : data.reports); }
     } catch { }
   }, []);
 
@@ -404,9 +412,9 @@ export default function useProyectosData({ permissions }) {
     if (!pid || !orderIds?.length) return;
     try {
       const res = await fetchWithCsrf(`${API_BASE}/${pid}/mark-material-arrived`, { method: 'POST', body: JSON.stringify({ order_ids: orderIds }) });
-      const data = await res.json();
-      if (data.success) { showToastMsg('Materiales marcados como recibidos'); await refreshSelectedProject(); }
-      else showToastMsg(data.message || 'Error', 'error');
+      const data = await safeJsonParse(res);
+      if (data?.success) { showToastMsg('Materiales marcados como recibidos'); await refreshSelectedProject(); }
+      else showToastMsg(data?.message || 'Error', 'error');
     } catch { showToastMsg('Error de conexión', 'error'); }
   }, [showToastMsg]);
 
@@ -415,9 +423,9 @@ export default function useProyectosData({ permissions }) {
     if (!pid || !orderIds?.length) return;
     try {
       const res = await fetchWithCsrf(`${API_BASE}/${pid}/mark-material-not-arrived`, { method: 'POST', body: JSON.stringify({ order_ids: orderIds }) });
-      const data = await res.json();
-      if (data.success) { showToastMsg('Marca de recepción revertida'); await refreshSelectedProject(); }
-      else showToastMsg(data.message || 'Error', 'error');
+      const data = await safeJsonParse(res);
+      if (data?.success) { showToastMsg('Marca de recepción revertida'); await refreshSelectedProject(); }
+      else showToastMsg(data?.message || 'Error', 'error');
     } catch { showToastMsg('Error de conexión', 'error'); }
   }, [showToastMsg]);
 
@@ -426,8 +434,8 @@ export default function useProyectosData({ permissions }) {
     if (!pid || !orderIds?.length) return;
     try {
       const res = await fetchWithCsrf(`${API_BASE}/${pid}/arrival-reports`, { method: 'POST', body: JSON.stringify({ order_ids: orderIds, notas }) });
-      const data = await res.json();
-      if (data.success) {
+      const data = await safeJsonParse(res);
+      if (data?.success) {
         showToastMsg(data.message || 'Reporte enviado a inventario');
         setShowCreateArrivalReportModal(false);
         await loadArrivalReports(pid);
@@ -438,14 +446,14 @@ export default function useProyectosData({ permissions }) {
   const resolveArrivalReport = useCallback(async (reportId) => {
     try {
       const res = await fetchWithCsrf(`${API_BASE}/arrival-reports/${reportId}/resolve`, { method: 'POST' });
-      const data = await res.json();
-      if (data.success) {
+      const data = await safeJsonParse(res);
+      if (data?.success) {
         showToastMsg(data.message || 'Reporte resuelto');
         setShowArrivalReportDetailModal(false);
         setSelectedArrivalReport(null);
         const pid = selectedProjectRef.current?.id;
         if (pid) { await loadArrivalReports(pid); await refreshSelectedProject(); }
-      } else showToastMsg(data.message || 'Error', 'error');
+      } else showToastMsg(data?.message || 'Error', 'error');
     } catch { showToastMsg('Error de conexión', 'error'); }
   }, [showToastMsg, loadArrivalReports]);
 
@@ -627,8 +635,8 @@ export default function useProyectosData({ permissions }) {
     if (!proj) return;
     try {
       const res = await fetch(`${API_BASE}/${proj.id}`);
-      const data = await res.json();
-      if (data.success) {
+      const data = await safeJsonParse(res);
+      if (data?.success) {
         const np = data.project, nw = data.workers || [], nfw = data.field_workers || [], no = data.orders || [], ns = data.summary || {};
         setSelectedProject(prev => JSON.stringify(prev) === JSON.stringify(np) ? prev : np);
         setProjectWorkers(prev => arraysEqual(prev, nw) ? prev : nw);
@@ -642,18 +650,18 @@ export default function useProyectosData({ permissions }) {
         if (np.status === 'pendiente_recuento' || np.status === 'active') {
           try {
             const crRes = await fetch(`${API_BASE}/${np.id}/completion-request`);
-            const crData = await crRes.json();
+            const crData = await safeJsonParse(crRes);
             setCompletionRequest(prev => {
-              const next = crData.success ? crData.request : null;
+              const next = crData?.success ? crData.request : null;
               return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
             });
           } catch { /* no-op */ }
           if (np.status === 'pendiente_recuento') {
             try {
               const cmRes = await fetch(`${API_BASE}/${np.id}/completion-materials`);
-              const cmData = await cmRes.json();
+              const cmData = await safeJsonParse(cmRes);
               setCompletionMaterials(prev => {
-                const next = cmData.success ? cmData.materials || [] : [];
+                const next = cmData?.success ? cmData.materials || [] : [];
                 return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
               });
             } catch { /* no-op */ }
@@ -702,8 +710,8 @@ export default function useProyectosData({ permissions }) {
   const fetchCompletionMaterials = useCallback(async (projectId) => {
     try {
       const res = await fetch(`${API_BASE}/${projectId}/completion-materials`);
-      const data = await res.json();
-      if (data.success) return data.materials || [];
+      const data = await safeJsonParse(res);
+      if (data?.success) return data.materials || [];
     } catch { /* no-op */ }
     return [];
   }, []);
@@ -711,8 +719,8 @@ export default function useProyectosData({ permissions }) {
   const fetchCompletionRequest = useCallback(async (projectId) => {
     try {
       const res = await fetch(`${API_BASE}/${projectId}/completion-request`);
-      const data = await res.json();
-      if (data.success) return data.request;
+      const data = await safeJsonParse(res);
+      if (data?.success) return data.request;
     } catch { /* no-op */ }
     return null;
   }, []);

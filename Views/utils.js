@@ -68,6 +68,20 @@ export const fetchWithCsrf = (url, opts = {}) => {
   return fetch(url, { ...opts, headers });
 };
 
+/**
+ * Safe JSON parsing for fetch responses.
+ * Checks response.ok before parsing to avoid JSON.parse errors on 500 responses.
+ * Returns null on any error.
+ */
+export const safeJsonParse = async (res) => {
+  if (!res.ok) return null;
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+};
+
 /* ============================================
    FORMAT HELPERS
    ============================================ */
