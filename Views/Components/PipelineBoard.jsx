@@ -2,7 +2,7 @@
  * PipelineBoard — Vista Kanban del pipeline de pre-proyecto.
  * Muestra proyectos agrupados por etapa con estadísticas y acciones rápidas.
  */
-import { memo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import clsx from 'clsx';
 import {
   PlusIcon,
@@ -13,9 +13,11 @@ import {
   ChatBubbleLeftRightIcon,
   CheckCircleIcon,
   XCircleIcon,
-  ChevronRightIcon,
   ChevronDownIcon,
+  ChevronRightIcon,
   BuildingOfficeIcon,
+  MagnifyingGlassIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
@@ -104,6 +106,30 @@ function LeadCard({ lead, onSelect }) {
 function StageColumn({ stage, leads, onSelectLead }) {
   const config = STAGE_CONFIG[stage] || STAGE_CONFIG.ingresado;
   const Icon = config.icon;
+  const [search, setSearch] = useState('');
+  const isBudgetedStage = stage === 'presupuestado';
+  const visibleLeads = useMemo(() => {
+    if (!isBudgetedStage) return leads;
+
+    const term = search.trim().toLowerCase();
+    if (!term) return leads;
+
+    return leads.filter((lead) => {
+      const haystack = [
+        lead.nombre_proyecto,
+        lead.cliente_nombre,
+        lead.cliente_empresa,
+        lead.moneda,
+        lead.presupuesto_estimado,
+        formatNumber(lead.presupuesto_estimado || 0),
+      ]
+        .filter((value) => value !== null && value !== undefined)
+        .join(' ')
+        .toLowerCase();
+
+      return haystack.includes(term);
+    });
+  }, [isBudgetedStage, leads, search]);
 
   return (
     <div className={clsx('flex flex-col rounded-lg border', config.lightBg)} style={{ borderColor: config.borderColor }}>
@@ -116,13 +142,44 @@ function StageColumn({ stage, leads, onSelectLead }) {
             {STAGE_LABELS[stage]}
           </span>
         </div>
-        <Badge variant={config.badge} className="text-[10px]">{leads.length}</Badge>
+        <Badge variant={config.badge} className="text-[10px]">{visibleLeads.length}</Badge>
       </div>
+      {isBudgetedStage && (
+        <div className="border-b border-amber-100 px-3 py-2.5">
+          <label className="relative block">
+            <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Buscar presupuestados..."
+              className="w-full rounded border border-amber-200 bg-white py-2 pl-9 pr-10 text-sm shadow-sm transition-all duration-200 placeholder:text-gray-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
+            />
+            {search.trim() && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-1/2 inline-flex size-7 -translate-y-1/2 items-center justify-center rounded text-gray-400 transition-colors hover:bg-amber-50 hover:text-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-200"
+                aria-label="Limpiar búsqueda"
+              >
+                <XMarkIcon className="size-4" />
+              </button>
+            )}
+          </label>
+          {search.trim() && (
+            <p className="mt-1 text-[11px] text-amber-700">
+              {visibleLeads.length} de {leads.length} presupuestado{leads.length !== 1 ? 's' : ''}
+            </p>
+          )}
+        </div>
+      )}
       <div className="flex-1 space-y-3 p-3 overflow-y-auto max-h-[50vh]">
-        {leads.length === 0 ? (
-          <p className="py-4 text-center text-xs text-gray-400">Sin proyectos</p>
+        {visibleLeads.length === 0 ? (
+          <p className="py-4 text-center text-xs text-gray-400">
+            {search.trim() ? 'Sin resultados' : 'Sin proyectos'}
+          </p>
         ) : (
-          leads.map((lead) => (
+          visibleLeads.map((lead) => (
             <LeadCard key={lead.id} lead={lead} onSelect={onSelectLead} />
           ))
         )}
@@ -289,4 +346,3 @@ function PipelineBoard({ leadsByStage, counts, pipelineStats, loading, onSelectL
 }
 
 export default memo(PipelineBoard);
-
