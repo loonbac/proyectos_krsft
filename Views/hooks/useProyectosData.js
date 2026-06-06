@@ -2,18 +2,13 @@
  * useProyectosData – All state, derived data & callbacks for the Proyectos module.
  */
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import flatpickr from 'flatpickr';
-import 'flatpickr/dist/flatpickr.min.css';
-import { Spanish } from 'flatpickr/dist/l10n/es.js';
 
 import {
   POLLING_MS, API_BASE, DEFAULT_MATERIAL_FORM, DEFAULT_SERVICE_FORM, DEFAULT_CREATE_FORM,
   arraysEqual, saveToCache, loadFromCache, fetchWithCsrf, safeJsonParse, getCsrfToken,
-  formatIso, formatDisplayFromIso, getStatusLabel, getProjectStateClass,
+  formatDisplayFromIso, getStatusLabel, getProjectStateClass,
   canFinalizeProject,
 } from '../utils';
-
-flatpickr.localize(Spanish);
 
 let didInit = false;
 
@@ -95,12 +90,9 @@ export default function useProyectosData({ permissions }) {
   // Project Planner state
   const [plannerData, setPlannerData] = useState(null);
   const [plannerStages, setPlannerStages] = useState([]);
+  const [plannerEncargados, setPlannerEncargados] = useState([]);
   const [plannerLoading, setPlannerLoading] = useState(false);
 
-  const dateFromInputRef = useRef(null);
-  const dateToInputRef = useRef(null);
-  const dateFromPickerRef = useRef(null);
-  const dateToPickerRef = useRef(null);
   const pollingRef = useRef(null);
   const selectedProjectRef = useRef(null);
 
@@ -270,45 +262,20 @@ export default function useProyectosData({ permissions }) {
     setTimeout(() => setToast(prev => ({ ...prev, show: false })), 4000);
   }, []);
 
-  /* -------- FLATPICKR -------- */
-  const initDatePickers = useCallback(() => {
-    if (dateFromPickerRef.current) { dateFromPickerRef.current.destroy(); dateFromPickerRef.current = null; }
-    if (dateToPickerRef.current) { dateToPickerRef.current.destroy(); dateToPickerRef.current = null; }
-    const common = { dateFormat: 'Y-m-d', allowInput: false, disableMobile: true, locale: 'es', clickOpens: true, monthSelectorType: 'static', appendTo: document.body };
-    if (dateFromInputRef.current) {
-      dateFromPickerRef.current = flatpickr(dateFromInputRef.current, { ...common, onChange: (sel) => { const iso = sel[0] ? formatIso(sel[0]) : ''; setDateFrom(iso); setDateFromDisplay(formatDisplayFromIso(iso)); } });
-    }
-    if (dateToInputRef.current) {
-      dateToPickerRef.current = flatpickr(dateToInputRef.current, { ...common, onChange: (sel) => { const iso = sel[0] ? formatIso(sel[0]) : ''; setDateTo(iso); setDateToDisplay(formatDisplayFromIso(iso)); } });
-    }
+  /* -------- DATE FILTERS -------- */
+  const updateDateFrom = useCallback((iso) => {
+    setDateFrom(iso);
+    setDateFromDisplay(formatDisplayFromIso(iso));
   }, []);
 
-  const destroyDatePickers = useCallback(() => {
-    if (dateFromPickerRef.current) { dateFromPickerRef.current.destroy(); dateFromPickerRef.current = null; }
-    if (dateToPickerRef.current) { dateToPickerRef.current.destroy(); dateToPickerRef.current = null; }
+  const updateDateTo = useCallback((iso) => {
+    setDateTo(iso);
+    setDateToDisplay(formatDisplayFromIso(iso));
   }, []);
-
-  const openDateFromPicker = useCallback(() => {
-    if (!dateFromPickerRef.current) initDatePickers();
-    if (dateFromPickerRef.current) dateFromPickerRef.current.open();
-  }, [initDatePickers]);
-
-  const openDateToPicker = useCallback(() => {
-    if (!dateToPickerRef.current) initDatePickers();
-    if (dateToPickerRef.current) dateToPickerRef.current.open();
-  }, [initDatePickers]);
 
   const clearDateFilters = useCallback(() => {
     setDateFrom(''); setDateTo(''); setDateFromDisplay(''); setDateToDisplay('');
-    if (dateFromPickerRef.current) dateFromPickerRef.current.clear();
-    if (dateToPickerRef.current) dateToPickerRef.current.clear();
   }, []);
-
-  useEffect(() => {
-    if (selectedProject) { destroyDatePickers(); return; }
-    const t = setTimeout(() => initDatePickers(), 50);
-    return () => clearTimeout(t);
-  }, [selectedProject, initDatePickers, destroyDatePickers]);
 
   /* -------- DATA LOADING -------- */
   const loadProjects = useCallback(async (showLoad = false) => {
@@ -474,6 +441,8 @@ export default function useProyectosData({ permissions }) {
     porcentaje: s.porcentaje || 0,
     tracking: typeof s.tracking === 'string' ? JSON.parse(s.tracking) : (s.tracking || {}),
     sortOrder: s.sort_order,
+    worker_id: s.worker_id,
+    subtasks: s.subtasks || [],
   });
 
   const loadProjectPlanner = useCallback(async (projectId) => {
@@ -482,6 +451,7 @@ export default function useProyectosData({ permissions }) {
     
     setPlannerData(null);
     setPlannerStages([]);
+    setPlannerEncargados([]);
     setPlannerLoading(true);
     try {
       const res = await fetchWithCsrf(`${API_BASE}/${pid}/planner`);
@@ -490,6 +460,7 @@ export default function useProyectosData({ permissions }) {
         setPlannerData(json.data.planner);
         // Transform stages from backend format to frontend format
         setPlannerStages((json.data.stages || []).map(transformStageFromBackend));
+        setPlannerEncargados(json.data.encargados || []);
       }
     } catch (e) {
       console.error('Error loading planner:', e);
@@ -498,13 +469,33 @@ export default function useProyectosData({ permissions }) {
     }
   }, []);
 
-  // Transform stage from frontend format (nombre/dias/startDate) to backend format (name/days/start_date)
+  const refreshProjectPlanner = useCallback(async (projectId) => {
+    const pid = projectId || selectedProjectRef.current?.id;
+    if (!pid) return;
+    try {
+      const res = await fetchWithCsrf(`${API_BASE}/${pid}/planner`);
+      const json = await res.json();
+      if (json.success) {
+        setPlannerData(prev => JSON.stringify(prev) === JSON.stringify(json.data.planner) ? prev : json.data.planner);
+        
+        const nextStages = (json.data.stages || []).map(transformStageFromBackend);
+        setPlannerStages(prev => arraysEqual(prev, nextStages) ? prev : nextStages);
+        
+        setPlannerEncargados(prev => arraysEqual(prev, json.data.encargados || []) ? prev : (json.data.encargados || []));
+      }
+    } catch (e) {
+      console.error('Error refreshing planner:', e);
+    }
+  }, []);
+
   const transformStageToBackend = (stage) => ({
-    name: stage.nombre,
-    days: stage.dias,
+    name: stage.nombre || stage.name,
+    days: stage.dias || stage.days,
+    worker_id: stage.worker_id,
+    subtasks: stage.subtasks || [],
     color_index: stage.colorIndex || 0,
-    start_date: stage.startDate || null,
-    end_date: stage.endDate || null,
+    start_date: stage.startDate || stage.start_date || null,
+    end_date: stage.endDate || stage.end_date || null,
     porcentaje: stage.porcentaje || 0,
     tracking: stage.tracking || {},
   });
@@ -601,6 +592,66 @@ export default function useProyectosData({ permissions }) {
     }
   }, [showToastMsg]);
 
+  const toggleSubtaskStatus = useCallback(async (projectId, stageId, subtaskId, newStatus) => {
+    const pid = projectId || selectedProjectRef.current?.id;
+    if (!pid) return;
+    try {
+      const res = await fetchWithCsrf(`${API_BASE}/${pid}/planner/stages/${stageId}/subtasks/${subtaskId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        // Update the subtask inside the stage
+        setPlannerStages(prev => prev.map(s => {
+          if (s.id !== stageId) return s;
+          const updatedSubtasks = (s.subtasks || []).map(st =>
+            st.id === subtaskId ? { ...st, status: newStatus } : st
+          );
+          return { ...s, subtasks: updatedSubtasks, porcentaje: json.porcentaje };
+        }));
+      } else {
+        showToastMsg(json.message || 'Error al actualizar subtarea', 'error');
+      }
+      return json;
+    } catch (e) {
+      console.error('Error toggling subtask:', e);
+      showToastMsg('Error de conexión', 'error');
+    }
+  }, [showToastMsg]);
+
+  const uploadSubtaskEvidence = useCallback(async (projectId, stageId, subtaskId, file) => {
+    const pid = projectId || selectedProjectRef.current?.id;
+    if (!pid) return;
+    const formData = new FormData();
+    formData.append('photo', file);
+    try {
+      const res = await fetchWithCsrf(`${API_BASE}/${pid}/planner/stages/${stageId}/subtasks/${subtaskId}/evidence`, {
+        method: 'POST',
+        body: formData,
+        headers: {}, // Let browser set Content-Type boundary for multipart
+      });
+      const json = await res.json();
+      if (json.success) {
+        // Update evidence_path in local state
+        setPlannerStages(prev => prev.map(s => {
+          if (s.id !== stageId) return s;
+          const updatedSubtasks = (s.subtasks || []).map(st =>
+            st.id === subtaskId ? { ...st, evidence_path: json.data.evidence_path } : st
+          );
+          return { ...s, subtasks: updatedSubtasks };
+        }));
+        showToastMsg('Evidencia subida correctamente');
+      } else {
+        showToastMsg(json.message || 'Error al subir evidencia', 'error');
+      }
+      return json;
+    } catch (e) {
+      console.error('Error uploading evidence:', e);
+      showToastMsg('Error de conexión', 'error');
+    }
+  }, [showToastMsg]);
+
   const resetProjectPlanner = useCallback(async (projectId) => {
     const pid = projectId || selectedProjectRef.current?.id;
     if (!pid) return;
@@ -646,6 +697,7 @@ export default function useProyectosData({ permissions }) {
         setProjectFiles(prev => arraysEqual(prev, data.files || []) ? prev : (data.files || []));
         if (np) setEditForm({ name: np.name, spending_threshold: np.spending_threshold, supervisor_id: np.supervisor_id, supervisor_pdr_id: np.supervisor_pdr_id });
         loadPaidOrders(np.id);
+        await refreshProjectPlanner(np.id);
         // Refresh completion request and materials for pendiente_recuento projects
         if (np.status === 'pendiente_recuento' || np.status === 'active') {
           try {
@@ -669,7 +721,7 @@ export default function useProyectosData({ permissions }) {
         }
       }
     } catch { }
-  }, [loadPaidOrders]);
+  }, [loadPaidOrders, refreshProjectPlanner]);
 
   /* -------- ACTIONS -------- */
   const goBack = useCallback(() => { window.location.href = '/'; }, []);
@@ -1275,7 +1327,7 @@ export default function useProyectosData({ permissions }) {
       pollingRef.current = setInterval(() => { loadProjects(); loadStats(); refreshSelectedProject(); }, POLLING_MS);
     }
 
-    return () => { if (pollingRef.current) clearInterval(pollingRef.current); destroyDatePickers(); };
+    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -1343,16 +1395,18 @@ export default function useProyectosData({ permissions }) {
     createArrivalReport, resolveArrivalReport, loadArrivalReports,
     openArrivalReportDetail, purchasedNotArrivedOrders,
     // Planner
-    plannerData, plannerStages, plannerLoading,
+    plannerData, setPlannerData,
+    plannerStages, setPlannerStages,
+    plannerEncargados,
+    plannerLoading,
     loadProjectPlanner, saveProjectPlanner,
     addProjectStage, updateProjectStage, deleteProjectStage,
+    toggleSubtaskStatus, uploadSubtaskEvidence,
     resetProjectPlanner,
     // Files
     uploadProjectFiles, deleteProjectFile, getProjectFileDownloadUrl,
     // Delete order list
     deleteOrderList,
-    // Refs (for flatpickr)
-    dateFromInputRef, dateToInputRef,
-    openDateFromPicker, openDateToPicker, clearDateFilters,
+    updateDateFrom, updateDateTo, clearDateFilters,
   };
 }

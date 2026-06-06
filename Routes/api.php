@@ -54,6 +54,9 @@ Route::put('/{projectId}/planner', "{$ctrl}@savePlanner")->where('projectId', '[
 Route::post('/{projectId}/planner/stages', "{$ctrl}@addStage")->where('projectId', '[0-9]+');
 Route::put('/{projectId}/planner/stages/{stageId}', "{$ctrl}@updateStage")->where(['projectId' => '[0-9]+', 'stageId' => '[0-9]+']);
 Route::delete('/{projectId}/planner/stages/{stageId}', "{$ctrl}@deleteStage")->where(['projectId' => '[0-9]+', 'stageId' => '[0-9]+']);
+Route::patch('/{projectId}/planner/stages/{stageId}/subtasks/{subtaskId}', "{$ctrl}@patchSubtask")->where(['projectId' => '[0-9]+', 'stageId' => '[0-9]+', 'subtaskId' => '[0-9]+']);
+Route::post('/{projectId}/planner/stages/{stageId}/subtasks/{subtaskId}/evidence', "{$ctrl}@uploadSubtaskEvidence")->where(['projectId' => '[0-9]+', 'stageId' => '[0-9]+', 'subtaskId' => '[0-9]+']);
+Route::get('/{projectId}/planner/stages/{stageId}/subtasks/{subtaskId}/evidence', "{$ctrl}@serveSubtaskEvidence")->where(['projectId' => '[0-9]+', 'stageId' => '[0-9]+', 'subtaskId' => '[0-9]+']);
 Route::delete('/{projectId}/planner/reset', "{$ctrl}@resetPlanner")->where('projectId', '[0-9]+');
 Route::post('/{projectId}/planner/generate', "{$ctrl}@generatePlanner")->where('projectId', '[0-9]+');
 

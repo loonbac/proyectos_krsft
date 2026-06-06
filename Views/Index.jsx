@@ -259,19 +259,21 @@ export default function ProyectosIndex({ permissions, trabajadorId }) {
                 <DocumentTextIcon className="size-4" />
                 ARCHIVOS DEL PROYECTO
               </button>
-              <button
-                role="tab"
-                aria-selected={projectDetailTab === 'planner'}
-                onClick={() => setProjectDetailTab('planner')}
-                className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
-                  projectDetailTab === 'planner'
-                    ? 'border-primary/20 bg-white text-primary shadow-sm'
-                    : 'border-transparent bg-transparent text-gray-600 hover:border-gray-200 hover:bg-white/70 hover:text-gray-700'
-                }`}
-              >
-                <CalendarIcon className="size-4" />
-                PLANIFICADOR
-              </button>
+              {permissions.planner && (
+                <button
+                  role="tab"
+                  aria-selected={projectDetailTab === 'planner'}
+                  onClick={() => setProjectDetailTab('planner')}
+                  className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
+                    projectDetailTab === 'planner'
+                      ? 'border-primary/20 bg-white text-primary shadow-sm'
+                      : 'border-transparent bg-transparent text-gray-600 hover:border-gray-200 hover:bg-white/70 hover:text-gray-700'
+                  }`}
+                >
+                  <CalendarIcon className="size-4" />
+                  PLANIFICADOR
+                </button>
+              )}
             </div>
           </div>
 
@@ -386,10 +388,14 @@ export default function ProyectosIndex({ permissions, trabajadorId }) {
               project={d.selectedProject}
               initialPlanner={d.plannerData}
               initialStages={d.plannerStages}
+              encargados={d.plannerEncargados}
+              projectWorkers={d.projectWorkers}
               onSavePlanner={(data) => d.saveProjectPlanner(d.selectedProject.id, data)}
               onAddStage={(data) => d.addProjectStage(d.selectedProject.id, data)}
               onUpdateStage={(stageId, data) => d.updateProjectStage(d.selectedProject.id, stageId, data)}
               onRemoveStage={(stageId) => d.deleteProjectStage(d.selectedProject.id, stageId)}
+              onToggleSubtask={(stageId, subtaskId, newStatus) => d.toggleSubtaskStatus(d.selectedProject.id, stageId, subtaskId, newStatus)}
+              onUploadEvidence={(stageId, subtaskId, file) => d.uploadSubtaskEvidence(d.selectedProject.id, stageId, subtaskId, file)}
             />
           )}
         </div>
@@ -427,12 +433,10 @@ export default function ProyectosIndex({ permissions, trabajadorId }) {
           onStatusChange={d.setStatusFilter}
           dateFromDisplay={d.dateFromDisplay}
           dateToDisplay={d.dateToDisplay}
-          dateFromInputRef={d.dateFromInputRef}
-          dateToInputRef={d.dateToInputRef}
-          onOpenDateFrom={d.openDateFromPicker}
-          onOpenDateTo={d.openDateToPicker}
           dateFrom={d.dateFrom}
           dateTo={d.dateTo}
+          onDateFromChange={d.updateDateFrom}
+          onDateToChange={d.updateDateTo}
           onClearDates={d.clearDateFilters}
         />
 
@@ -474,10 +478,14 @@ export default function ProyectosIndex({ permissions, trabajadorId }) {
         {activeTab !== 'project-detail' && activeTab !== 'lead-detail' && (
           <header className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-6">
             <div className="flex items-center gap-4">
-              <Button variant="primary" size="md" onClick={d.goBack} className="gap-2">
+              <button
+                type="button"
+                onClick={d.goBack}
+                className="inline-flex items-center justify-center gap-2 rounded bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+              >
                 <ArrowLeftIcon className="size-4" />
                 Volver
-              </Button>
+              </button>
               <h1 className="flex items-center gap-3 text-2xl font-bold text-gray-900">
                 <span className="flex size-11 items-center justify-center rounded-xl bg-primary text-white">
                   <FolderIcon className="size-6" />

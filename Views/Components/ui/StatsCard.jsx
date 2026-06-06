@@ -1,7 +1,7 @@
 import clsx from 'clsx';
 
 /**
- * StatsCard — Master UI Model (Section 13.4)
+ * StatsCard — modelo compacto de proyectos con icono cuadrado.
  */
 export default function StatsCard({
   title,
@@ -19,7 +19,7 @@ export default function StatsCard({
       )}
     >
       <span className={clsx(
-        'flex size-10 shrink-0 items-center justify-center rounded-full',
+        'flex size-10 shrink-0 items-center justify-center rounded-lg',
         iconBg,
         iconColor,
       )}>

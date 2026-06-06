@@ -101,7 +101,7 @@ function PlannerCalendar({ stages, startDate, totalDays, today, onOpenTracking }
         </div>
       </div>
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-8 bg-gray-50">
+      <div className="p-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 bg-gray-50">
         {months.map((monthDate, mIdx) => {
           const year = monthDate.getFullYear();
           const month = monthDate.getMonth();
@@ -134,10 +134,10 @@ function PlannerCalendar({ stages, startDate, totalDays, today, onOpenTracking }
                   </div>
                 ))}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }} className="bg-gray-200 gap-px overflow-x-auto min-w-[600px]">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }} className="bg-gray-200 gap-px">
                 {days.map((date, idx) => {
                   if (!date) {
-                    return <div key={`empty-${idx}`} className="bg-gray-50 min-h-[100px]" />;
+                    return <div key={`empty-${idx}`} className="bg-gray-50 min-h-[60px]" />;
                   }
 
                   const stageInfos = getStagesForDate(date);
@@ -146,40 +146,29 @@ function PlannerCalendar({ stages, startDate, totalDays, today, onOpenTracking }
                   return (
                     <div 
                       key={idx} 
-                      className="min-h-[100px] p-2 flex flex-col relative bg-white hover:bg-gray-50 transition-colors"
+                      className="min-h-[60px] p-1.5 flex flex-col relative bg-white hover:bg-gray-50 transition-colors"
                     >
                       <div className="flex justify-between items-start mb-1">
-                        <span className={`text-sm font-semibold w-7 h-7 flex items-center justify-center rounded-full ${isToday ? 'bg-primary text-white shadow-sm' : (stageInfos.length > 0 ? 'text-gray-900' : 'text-gray-400')}`}>
+                        <span className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-primary text-white shadow-sm' : (stageInfos.length > 0 ? 'text-gray-900' : 'text-gray-400')}`}>
                           {date.getDate()}
                         </span>
                       </div>
                       
-                      <div className="flex flex-col gap-1 mt-auto">
-                        {stageInfos.map((stageInfo, sIdx) => {
-                          const dailyPercentage = stageInfo.stage.tracking?.[toLocalISOString(date)] || 0;
-                          return (
-                            <button 
-                              key={sIdx}
-                              type="button"
-                              onClick={() => onOpenTracking && onOpenTracking(stageInfo.stage.id, stageInfo.stage.nombre, dailyPercentage, toLocalISOString(date))}
-                              className="text-[11px] px-2 py-1 rounded-md w-full truncate border font-semibold flex flex-col shadow-sm transition-shadow hover:shadow-md active:scale-95 text-left"
-                              style={{ 
-                                backgroundColor: stageInfo.color.light, 
-                                color: stageInfo.color.text,
-                                borderColor: stageInfo.color.border
-                              }}
-                              title={`${stageInfo.stage.nombre} - Avance: ${dailyPercentage}% - Click para reportar`}
-                            >
-                              <span className="truncate">{stageInfo.stage.nombre}</span>
-                              <div className="w-full bg-white/50 h-0.5 rounded-full mt-0.5 overflow-hidden">
-                                <div className="h-full bg-current opacity-40 transition-all" style={{ width: `${dailyPercentage}%` }} />
-                              </div>
-                            </button>
-                          );
-                        })}
+                      <div className="flex flex-wrap gap-1 mt-auto justify-start px-0.5 pb-0.5">
+                        {stageInfos.map((stageInfo, sIdx) => (
+                          <div 
+                            key={sIdx}
+                            className="w-3 h-3 rounded-full shadow-sm cursor-help hover:scale-110 transition-transform"
+                            style={{ 
+                              backgroundColor: stageInfo.color.bg, 
+                              border: `1px solid ${stageInfo.color.border}`
+                            }}
+                            title={`${stageInfo.stage.nombre}`}
+                          />
+                        ))}
                       </div>
                     </div>
-                );
+                  );
                 })}
               </div>
             </div>
@@ -353,6 +342,11 @@ function StatsSummary({ stages, totalDays }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
           {stages.map((stage, idx) => {
             const color = STAGE_COLORS[idx % STAGE_COLORS.length];
+            const stageEnd = stage.endDate ? parseDateLocal(stage.endDate) : new Date();
+            const today = getStartOfDay(new Date());
+            const isDelayed = stageEnd < today && (stage.porcentaje || 0) < 100;
+            const delayDays = isDelayed ? Math.floor((today - stageEnd) / (1000 * 60 * 60 * 24)) : 0;
+            
             return (
               <div key={stage.id} className="flex flex-col rounded-lg bg-white p-4 border shadow-sm" style={{ borderColor: color.border }}>
                 <div className="flex items-center justify-between mb-2">
@@ -365,7 +359,12 @@ function StatsSummary({ stages, totalDays }) {
                 <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
                   <div className="h-full bg-primary transition-all" style={{ width: `${stage.porcentaje || 0}%` }} />
                 </div>
-                <div className="mt-2 text-[10px] text-gray-400 font-bold uppercase">{stage.dias} días programados</div>
+                <div className="mt-2 flex justify-between items-center text-[10px] font-bold uppercase">
+                  <span className="text-gray-400">{stage.dias} días programados</span>
+                  {isDelayed && (
+                    <span className="text-red-500 text-[11px]">-{delayDays} días</span>
+                  )}
+                </div>
               </div>
             );
           })}

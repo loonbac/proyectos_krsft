@@ -63,6 +63,7 @@ class ProyectoController extends Controller
                 'field_workers' => false,
                 'surplus_count' => false,
                 'approve_surplus' => false,
+                'planner' => false,
             ];
         }
 
@@ -79,6 +80,7 @@ class ProyectoController extends Controller
             'approve_surplus' => $isAdmin || $user->hasPermission("module.{$this->moduleSlug}.approve_surplus"),
             'view_scope_files' => $isAdmin || $user->hasPermission("module.{$this->moduleSlug}.view_scope_files"),
             'delete_orders' => $user->hasPermission("module.{$this->moduleSlug}.delete_orders"),
+            'planner' => $isAdmin || $user->hasPermission("module.{$this->moduleSlug}.planner"),
         ];
     }
 
@@ -3093,12 +3095,47 @@ class ProyectoController extends Controller
             ->where('project_planner_id', $planner->id)
             ->orderBy('sort_order')
             ->get();
+            
+        foreach ($stages as $stage) {
+            $stage->subtasks = DB::table('project_planner_stage_subtasks')
+                ->where('stage_id', $stage->id)
+                ->orderBy('id')
+                ->get();
+        }
+
+        // Obtener encargados (supervisores del proyecto + trabajadores asignados)
+        $project = DB::table('projects')->where('id', $projectId)->first();
+        $assignedIds = [];
+        if ($project && $project->supervisor_id) $assignedIds[] = $project->supervisor_id;
+        if ($project && $project->supervisor_pdr_id) $assignedIds[] = $project->supervisor_pdr_id;
+        
+        $workersIds = DB::table('project_workers')
+            ->where('project_id', $projectId)
+            ->pluck('trabajador_id')
+            ->toArray();
+            
+        $assignedIds = array_unique(array_merge($assignedIds, $workersIds));
+        
+        $encargados = [];
+        if (!empty($assignedIds)) {
+            $encargados = DB::table('trabajadores')
+                ->whereIn('id', $assignedIds)
+                ->select('id', 'nombre_completo', 'nombres', 'apellido_paterno')
+                ->get()
+                ->map(function ($trab) {
+                    return [
+                        'id' => $trab->id,
+                        'name' => $trab->nombre_completo ?: trim($trab->nombres . ' ' . $trab->apellido_paterno)
+                    ];
+                });
+        }
 
         return response()->json([
             'success' => true,
             'data' => [
                 'planner' => $planner,
-                'stages' => $stages
+                'stages' => $stages,
+                'encargados' => $encargados
             ]
         ]);
     }
@@ -3109,6 +3146,14 @@ class ProyectoController extends Controller
      */
     public function savePlanner($projectId, Request $request)
     {
+        // Validación de supervisor o permiso planner
+        $project = DB::table('projects')->where('id', $projectId)->first();
+        $user = auth()->user();
+        $hasPlannerPerm = $user->hasPermission("module.{$this->moduleSlug}.planner");
+        if ($project && $project->supervisor_id != $user->trabajador_id && !$user->isAdmin() && !$hasPlannerPerm) {
+            return response()->json(['success' => false, 'message' => 'No tienes permisos para configurar el planificador'], 403);
+        }
+
         $planner = DB::table('project_planners')->where('project_id', $projectId)->first();
 
         $data = [
@@ -3142,6 +3187,14 @@ class ProyectoController extends Controller
             return response()->json(['success' => false, 'message' => 'Create planner first'], 400);
         }
 
+        // Validación de supervisor o permiso planner
+        $project = DB::table('projects')->where('id', $projectId)->first();
+        $user = auth()->user();
+        $hasPlannerPerm = $user->hasPermission("module.{$this->moduleSlug}.planner");
+        if ($project && $project->supervisor_id != $user->trabajador_id && !$user->isAdmin() && !$hasPlannerPerm) {
+            return response()->json(['success' => false, 'message' => 'No tienes permisos para agregar tareas al planificador'], 403);
+        }
+
         // Get max sort_order
         $maxOrder = DB::table('project_planner_stages')
             ->where('project_planner_id', $planner->id)
@@ -3162,22 +3215,62 @@ class ProyectoController extends Controller
 
         $days = $request->days ?? 0;
         $endDate = date('Y-m-d', strtotime($startDate . ' +' . ($days - 1) . ' days'));
+        
+        // Determinar el porcentaje inicial (0 si hay subtareas, 0% por defecto)
+        $subtasks = $request->subtasks ?? [];
+        $porcentaje = 0;
+        if (!empty($subtasks) && is_array($subtasks)) {
+            $total = count($subtasks);
+            $completadas = 0;
+            foreach ($subtasks as $st) {
+                if (isset($st['status']) && $st['status'] === 'completed') {
+                    $completadas++;
+                }
+            }
+            if ($total > 0) {
+                $porcentaje = round(($completadas / $total) * 100);
+            }
+        }
 
         $stageId = DB::table('project_planner_stages')->insertGetId([
             'project_planner_id' => $planner->id,
             'name' => $request->name,
+            'worker_id' => $request->worker_id ?? null,
             'days' => $days,
             'color_index' => $request->color_index ?? 0,
             'sort_order' => $maxOrder + 1,
             'start_date' => $startDate,
             'end_date' => $endDate,
-            'porcentaje' => $request->porcentaje ?? 0,
+            'porcentaje' => $porcentaje,
             'tracking' => $request->has('tracking') ? json_encode($request->tracking) : null,
             'created_at' => now(),
             'updated_at' => now()
         ]);
+        
+        if (!empty($subtasks) && is_array($subtasks)) {
+            if (!\Illuminate\Support\Facades\Schema::hasColumn('project_planner_stage_subtasks', 'description')) {
+                \Illuminate\Support\Facades\Schema::table('project_planner_stage_subtasks', function ($table) {
+                    $table->text('description')->nullable();
+                    $table->text('workers')->nullable();
+                });
+            }
+            $subtaskData = [];
+            foreach ($subtasks as $st) {
+                $subtaskData[] = [
+                    'stage_id' => $stageId,
+                    'name' => $st['name'],
+                    'description' => $st['description'] ?? null,
+                    'workers' => $st['workers'] ?? null,
+                    'status' => 'pending',
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ];
+            }
+            DB::table('project_planner_stage_subtasks')->insert($subtaskData);
+        }
 
         $stage = DB::table('project_planner_stages')->where('id', $stageId)->first();
+        $stage->subtasks = DB::table('project_planner_stage_subtasks')->where('stage_id', $stageId)->orderBy('id')->get();
 
         return response()->json(['success' => true, 'data' => $stage]);
     }
@@ -3192,9 +3285,18 @@ class ProyectoController extends Controller
         if (!$stage) {
             return response()->json(['success' => false, 'message' => 'Stage not found'], 404);
         }
+        
+        // Validación de supervisor o permiso planner
+        $project = DB::table('projects')->where('id', $projectId)->first();
+        $user = auth()->user();
+        $hasPlannerPerm = $user->hasPermission("module.{$this->moduleSlug}.planner");
+        if ($project && $project->supervisor_id != $user->trabajador_id && !$user->isAdmin() && !$hasPlannerPerm) {
+            return response()->json(['success' => false, 'message' => 'No tienes permisos para editar tareas del planificador'], 403);
+        }
 
         $update = ['updated_at' => now()];
         if ($request->has('name')) $update['name'] = $request->name;
+        if ($request->has('worker_id')) $update['worker_id'] = $request->worker_id;
         if ($request->has('days')) {
             $update['days'] = $request->days;
             // Recalculate end_date
@@ -3203,11 +3305,60 @@ class ProyectoController extends Controller
         }
         if ($request->has('color_index')) $update['color_index'] = $request->color_index;
         if ($request->has('tracking')) $update['tracking'] = is_array($request->tracking) ? json_encode($request->tracking) : $request->tracking;
-        if ($request->has('porcentaje')) $update['porcentaje'] = $request->porcentaje;
+        
+        // Procesar subtareas si se envían
+        if ($request->has('subtasks')) {
+            $subtasks = $request->subtasks;
+            
+            // Eliminar subtareas actuales
+            DB::table('project_planner_stage_subtasks')->where('stage_id', $stageId)->delete();
+            
+            $porcentaje = 0;
+            if (!empty($subtasks) && is_array($subtasks)) {
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('project_planner_stage_subtasks', 'description')) {
+                    \Illuminate\Support\Facades\Schema::table('project_planner_stage_subtasks', function ($table) {
+                        $table->text('description')->nullable();
+                        $table->text('workers')->nullable();
+                    });
+                }
+                $subtaskData = [];
+                $total = count($subtasks);
+                $completadas = 0;
+                
+                foreach ($subtasks as $st) {
+                    $status = $st['status'] ?? 'pending';
+                    if ($status === 'completed') {
+                        $completadas++;
+                    }
+                    $subtaskData[] = [
+                        'stage_id' => $stageId,
+                        'name' => $st['name'],
+                        'description' => $st['description'] ?? null,
+                        'workers' => $st['workers'] ?? null,
+                        'status' => $status,
+                        'created_at' => now(),
+                        'updated_at' => now()
+                    ];
+                }
+                DB::table('project_planner_stage_subtasks')->insert($subtaskData);
+                
+                if ($total > 0) {
+                    $porcentaje = round(($completadas / $total) * 100);
+                }
+            }
+            
+            $update['porcentaje'] = $porcentaje;
+        } else if ($request->has('porcentaje')) {
+            // Permitir actualizar porcentaje directamente solo si no se están actualizando subtareas, 
+            // aunque el flujo principal debería ser por subtareas
+            $update['porcentaje'] = $request->porcentaje;
+        }
 
         DB::table('project_planner_stages')->where('id', $stageId)->update($update);
 
         $updated = DB::table('project_planner_stages')->where('id', $stageId)->first();
+        $updated->subtasks = DB::table('project_planner_stage_subtasks')->where('stage_id', $stageId)->orderBy('id')->get();
+        
         return response()->json(['success' => true, 'data' => $updated]);
     }
 
@@ -3217,6 +3368,14 @@ class ProyectoController extends Controller
      */
     public function deleteStage($projectId, $stageId)
     {
+        // Validación de supervisor o permiso planner
+        $project = DB::table('projects')->where('id', $projectId)->first();
+        $user = auth()->user();
+        $hasPlannerPerm = $user->hasPermission("module.{$this->moduleSlug}.planner");
+        if ($project && $project->supervisor_id != $user->trabajador_id && !$user->isAdmin() && !$hasPlannerPerm) {
+            return response()->json(['success' => false, 'message' => 'No tienes permisos para eliminar tareas'], 403);
+        }
+
         $stage = DB::table('project_planner_stages')->find($stageId);
         if (!$stage) {
             return response()->json(['success' => false, 'message' => 'Stage not found'], 404);
@@ -3244,6 +3403,14 @@ class ProyectoController extends Controller
      */
     public function resetPlanner($projectId)
     {
+        // Validación de supervisor o permiso planner
+        $project = DB::table('projects')->where('id', $projectId)->first();
+        $user = auth()->user();
+        $hasPlannerPerm = $user->hasPermission("module.{$this->moduleSlug}.planner");
+        if ($project && $project->supervisor_id != $user->trabajador_id && !$user->isAdmin() && !$hasPlannerPerm) {
+            return response()->json(['success' => false, 'message' => 'No tienes permisos para reiniciar el planificador'], 403);
+        }
+
         $planner = DB::table('project_planners')->where('project_id', $projectId)->first();
         if (!$planner) {
             return response()->json(['success' => false, 'message' => 'Planner not found'], 404);
@@ -3266,6 +3433,14 @@ class ProyectoController extends Controller
      */
     public function generatePlanner($projectId)
     {
+        // Validación de supervisor o permiso planner
+        $project = DB::table('projects')->where('id', $projectId)->first();
+        $user = auth()->user();
+        $hasPlannerPerm = $user->hasPermission("module.{$this->moduleSlug}.planner");
+        if ($project && $project->supervisor_id != $user->trabajador_id && !$user->isAdmin() && !$hasPlannerPerm) {
+            return response()->json(['success' => false, 'message' => 'No tienes permisos para generar el planificador'], 403);
+        }
+
         $planner = DB::table('project_planners')->where('project_id', $projectId)->first();
         if (!$planner) {
             return response()->json(['success' => false, 'message' => 'Planner not found'], 404);
@@ -3278,5 +3453,100 @@ class ProyectoController extends Controller
 
         $updated = DB::table('project_planners')->where('id', $planner->id)->first();
         return response()->json(['success' => true, 'data' => $updated]);
+    }
+
+    /**
+     * Patch (toggle) the status of a subtask and recalculate stage progress.
+     * PATCH /api/proyectoskrsft/{projectId}/planner/stages/{stageId}/subtasks/{subtaskId}
+     */
+    public function patchSubtask($projectId, $stageId, $subtaskId, Request $request)
+    {
+        $subtask = DB::table('project_planner_stage_subtasks')->find($subtaskId);
+        if (!$subtask || $subtask->stage_id != $stageId) {
+            return response()->json(['success' => false, 'message' => 'Subtarea no encontrada'], 404);
+        }
+
+        $newStatus = $request->input('status', 'pending');
+        if (!in_array($newStatus, ['pending', 'in_progress', 'completed'])) {
+            return response()->json(['success' => false, 'message' => 'Estado inválido'], 422);
+        }
+
+        DB::table('project_planner_stage_subtasks')
+            ->where('id', $subtaskId)
+            ->update(['status' => $newStatus, 'updated_at' => now()]);
+
+        // Recalculate stage porcentaje
+        $allSubtasks = DB::table('project_planner_stage_subtasks')->where('stage_id', $stageId)->get();
+        $total = $allSubtasks->count();
+        $completed = $allSubtasks->where('status', 'completed')->count();
+        $porcentaje = $total > 0 ? round(($completed / $total) * 100) : 0;
+
+        DB::table('project_planner_stages')
+            ->where('id', $stageId)
+            ->update(['porcentaje' => $porcentaje, 'updated_at' => now()]);
+
+        $updatedSubtask = DB::table('project_planner_stage_subtasks')->find($subtaskId);
+        return response()->json([
+            'success' => true,
+            'data' => $updatedSubtask,
+            'porcentaje' => $porcentaje,
+        ]);
+    }
+
+    /**
+     * Upload evidence photo for a subtask.
+     * POST /api/proyectoskrsft/{projectId}/planner/stages/{stageId}/subtasks/{subtaskId}/evidence
+     */
+    public function uploadSubtaskEvidence($projectId, $stageId, $subtaskId, Request $request)
+    {
+        $subtask = DB::table('project_planner_stage_subtasks')->find($subtaskId);
+        if (!$subtask || $subtask->stage_id != $stageId) {
+            return response()->json(['success' => false, 'message' => 'Subtarea no encontrada'], 404);
+        }
+
+        if (!$request->hasFile('photo') || !$request->file('photo')->isValid()) {
+            return response()->json(['success' => false, 'message' => 'No se recibió imagen válida'], 422);
+        }
+
+        $file = $request->file('photo');
+        $ext = $file->getClientOriginalExtension();
+        $storedName = \Illuminate\Support\Str::uuid() . '.' . $ext;
+        $folder = "planner_evidence/{$projectId}/{$stageId}";
+
+        // Ensure evidence column exists
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('project_planner_stage_subtasks', 'evidence_path')) {
+            \Illuminate\Support\Facades\Schema::table('project_planner_stage_subtasks', function ($table) {
+                $table->string('evidence_path')->nullable();
+            });
+        }
+
+        $file->storeAs($folder, $storedName, 'local');
+        $relativePath = "{$folder}/{$storedName}";
+
+        DB::table('project_planner_stage_subtasks')
+            ->where('id', $subtaskId)
+            ->update(['evidence_path' => $relativePath, 'updated_at' => now()]);
+
+        $updatedSubtask = DB::table('project_planner_stage_subtasks')->find($subtaskId);
+        return response()->json(['success' => true, 'data' => $updatedSubtask]);
+    }
+
+    /**
+     * Serve evidence photo for a subtask (inline, no download).
+     * GET /api/proyectoskrsft/{projectId}/planner/stages/{stageId}/subtasks/{subtaskId}/evidence
+     */
+    public function serveSubtaskEvidence($projectId, $stageId, $subtaskId)
+    {
+        $subtask = DB::table('project_planner_stage_subtasks')->find($subtaskId);
+        if (!$subtask || $subtask->stage_id != $stageId || empty($subtask->evidence_path)) {
+            return response()->json(['success' => false, 'message' => 'Evidencia no encontrada'], 404);
+        }
+
+        if (!\Illuminate\Support\Facades\Storage::disk('local')->exists($subtask->evidence_path)) {
+            return response()->json(['success' => false, 'message' => 'Archivo no encontrado en el servidor'], 404);
+        }
+
+        $path = \Illuminate\Support\Facades\Storage::disk('local')->path($subtask->evidence_path);
+        return response()->file($path, ['Cache-Control' => 'private, max-age=300']);
     }
 }

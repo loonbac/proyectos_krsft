@@ -60,11 +60,13 @@ export const getCsrfToken = () =>
 
 export const fetchWithCsrf = (url, opts = {}) => {
   const headers = {
-    'Content-Type': 'application/json',
     Accept: 'application/json',
     'X-CSRF-TOKEN': getCsrfToken(),
     ...opts.headers,
   };
+  if (!(opts.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
   return fetch(url, { ...opts, headers });
 };
 

@@ -1,5 +1,143 @@
-import { memo } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { CalendarDaysIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import Button from './ui/Button';
+
+const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
+const isoFromDate = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const dateFromIso = (iso) => {
+  if (!iso) return null;
+  const [year, month, day] = iso.split('-').map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+};
+
+function CalendarPopover({ label, value, displayValue, onChange, placeholder = 'dd/mm/yyyy' }) {
+  const selectedDate = dateFromIso(value);
+  const [open, setOpen] = useState(false);
+  const [viewDate, setViewDate] = useState(() => selectedDate || new Date());
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    if (selectedDate) setViewDate(selectedDate);
+  }, [value]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (!wrapperRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [open]);
+
+  const days = useMemo(() => {
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth();
+    const first = new Date(year, month, 1);
+    const mondayOffset = (first.getDay() + 6) % 7;
+    const start = new Date(year, month, 1 - mondayOffset);
+
+    return Array.from({ length: 42 }, (_, index) => {
+      const day = new Date(start);
+      day.setDate(start.getDate() + index);
+      return day;
+    });
+  }, [viewDate]);
+
+  const goMonth = (delta) => {
+    setViewDate((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
+  };
+
+  const selectDay = (day) => {
+    onChange(isoFromDate(day));
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative" ref={wrapperRef}>
+      <span className="text-xs text-gray-500">{label}:</span>
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="ml-2 inline-flex h-9 min-w-[118px] items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-3 text-left text-sm text-gray-700 shadow-sm transition-all hover:border-teal-300 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+      >
+        <span className={displayValue ? 'text-gray-800' : 'text-gray-400'}>{displayValue || placeholder}</span>
+        <CalendarDaysIcon className="size-4 text-gray-400" />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 z-30 mt-2 w-[316px] rounded-xl border border-gray-200 bg-white p-3 shadow-xl shadow-slate-900/12">
+          <div className="mb-3 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => goMonth(-1)}
+              className="inline-flex size-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-100"
+              aria-label="Mes anterior"
+            >
+              <ChevronLeftIcon className="size-4" />
+            </button>
+            <div className="text-sm font-semibold text-gray-900">
+              {MONTHS[viewDate.getMonth()]} <span className="font-medium text-gray-500">{viewDate.getFullYear()}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => goMonth(1)}
+              className="inline-flex size-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-teal-100"
+              aria-label="Mes siguiente"
+            >
+              <ChevronRightIcon className="size-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1 text-center">
+            {WEEKDAYS.map((day) => (
+              <div key={day} className="py-1 text-[11px] font-semibold text-gray-500">
+                {day}
+              </div>
+            ))}
+            {days.map((day) => {
+              const iso = isoFromDate(day);
+              const isCurrentMonth = day.getMonth() === viewDate.getMonth();
+              const isSelected = value === iso;
+              const isToday = iso === isoFromDate(new Date());
+
+              return (
+                <button
+                  key={iso}
+                  type="button"
+                  onClick={() => selectDay(day)}
+                  className={[
+                    'inline-flex h-9 items-center justify-center rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:ring-teal-100',
+                    isSelected
+                      ? 'bg-teal-600 font-semibold text-white shadow-sm hover:bg-teal-700'
+                      : isCurrentMonth
+                        ? 'text-gray-700 hover:bg-teal-50 hover:text-teal-700'
+                        : 'text-gray-300 hover:bg-gray-50',
+                    isToday && !isSelected ? 'ring-1 ring-teal-300' : '',
+                  ].join(' ')}
+                >
+                  {day.getDate()}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /**
  * FilterBar – Status pills + date-range pickers for list view.
@@ -10,12 +148,10 @@ function FilterBar({
   onStatusChange,
   dateFromDisplay,
   dateToDisplay,
-  dateFromInputRef,
-  dateToInputRef,
-  onOpenDateFrom,
-  onOpenDateTo,
   dateFrom,
   dateTo,
+  onDateFromChange,
+  onDateToChange,
   onClearDates,
 }) {
   const activeClasses = {
@@ -63,25 +199,17 @@ function FilterBar({
               Limpiar
             </Button>
           )}
-          <span className="text-xs text-gray-500">Desde:</span>
-          <input
-            ref={dateFromInputRef}
-            type="text"
-            readOnly
-            placeholder="dd/mm/yyyy"
-            value={dateFromDisplay}
-            onClick={onOpenDateFrom}
-            className="w-28 cursor-pointer rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm shadow-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+          <CalendarPopover
+            label="Desde"
+            value={dateFrom}
+            displayValue={dateFromDisplay}
+            onChange={onDateFromChange}
           />
-          <span className="text-xs text-gray-500">Hasta:</span>
-          <input
-            ref={dateToInputRef}
-            type="text"
-            readOnly
-            placeholder="dd/mm/yyyy"
-            value={dateToDisplay}
-            onClick={onOpenDateTo}
-            className="w-28 cursor-pointer rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm shadow-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+          <CalendarPopover
+            label="Hasta"
+            value={dateTo}
+            displayValue={dateToDisplay}
+            onChange={onDateToChange}
           />
         </div>
       </div>

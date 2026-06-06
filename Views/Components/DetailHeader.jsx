@@ -4,7 +4,6 @@ import {
   CalendarIcon,
   Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
-import Button from './ui/Button';
 import {
   getCurrencySymbol, getProjectColor, getProjectDaysAlive,
 } from '../utils';
@@ -21,10 +20,14 @@ function DetailHeader({ project, onBack, onOpenConfig }) {
 
         {/* LEFT: back + name + meta */}
         <div className="flex flex-wrap items-center gap-3">
-          <Button variant="primary" size="sm" onClick={onBack} className="gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+          >
             <ArrowLeftIcon className="size-4" />
             Volver
-          </Button>
+          </button>
 
           <div className="hidden h-6 w-px bg-gray-200 sm:block" />
 
